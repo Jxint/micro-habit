@@ -1,0 +1,45 @@
+{
+  "id": "uts-accessibility-service",
+  "name": "前台应用实时监听",
+  "version": "1.0.0",
+  "permissions": [
+    "android.permission.BIND_ACCESSIBILITY_SERVICE",
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.POST_NOTIFICATIONS",
+    "android.permission.VIBRATE"
+  ],
+  "services": [
+    {
+      "name": "AppMonitorService",
+      "class": "uts.sdk.utsAccessibilityService.AppMonitorService",
+      "permission": "android.permission.BIND_ACCESSIBILITY_SERVICE",
+      "intentFilter": {
+        "actions": ["android.accessibilityservice.AccessibilityService"]
+      },
+      "metaData": {
+        "android.accessibilityservice": {
+          "accessibilityEventTypes": "typeWindowStateChanged",
+          "accessibilityFeedbackType": "feedbackGeneric",
+          "accessibilityFlags": "flagReportViewIds",
+          "canRetrieveWindowContent": "true",
+          "notificationTimeout": 100
+        }
+      }
+    },
+    {
+      "name": "MonitorForegroundService",
+      "class": "uts.sdk.utsAccessibilityService.MonitorForegroundService",
+      "foregroundServiceType": "specialUse"
+    }
+  ],
+  "receivers": [
+    {
+      "name": "BootReceiver",
+      "class": "uts.sdk.utsAccessibilityService.BootReceiver",
+      "intentFilter": {
+        "actions": ["android.intent.action.BOOT_COMPLETED"]
+      }
+    }
+  ]
+}

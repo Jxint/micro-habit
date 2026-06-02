@@ -1,0 +1,382 @@
+import WindowManager from 'android.view.WindowManager'
+import WindowManagerLayoutParams from 'android.view.WindowManager.LayoutParams'
+import PixelFormat from 'android.graphics.PixelFormat'
+import Gravity from 'android.view.Gravity'
+import Color from 'android.graphics.Color'
+import View from 'android.view.View'
+import LinearLayout from 'android.widget.LinearLayout'
+import TextView from 'android.widget.TextView'
+import Button from 'android.widget.Button'
+import FrameLayout from 'android.widget.FrameLayout'
+import ProgressBar from 'android.widget.ProgressBar'
+import Build from 'android.os.Build'
+import Handler from 'android.os.Handler'
+import Looper from 'android.os.Looper'
+import Intent from 'android.content.Intent'
+import Context from 'android.content.Context'
+
+export type TriggerLevel = 'gentle' | 'strong'
+
+export type OverlayConfig = {
+  level: TriggerLevel
+  actionName: string
+  ttsText: string
+  durationMs: number
+  lottieAssetPath: string | null
+  encourageText: string
+}
+
+export type OverlayCallbacks = {
+  onAgree: () => void
+  onSelfReported: () => void
+  onBusyRemindLater: () => void
+  onSkipDuringExec: () => void
+  onCountdownTick: (remainingMs: number) => void
+  onCountdownFinish: () => void
+  onPartialCompletion: (completedMs: number, totalMs: number) => void
+}
+
+let overlayManager: FloatingOverlayManager | null = null
+
+export function showOverlay(config: OverlayConfig, callbacks: OverlayCallbacks): void {
+  if (overlayManager == null) {
+    overlayManager = FloatingOverlayManager()
+  }
+  overlayManager!!.show(config, callbacks)
+}
+
+export function dismissOverlay(): void {
+  if (overlayManager != null) {
+    overlayManager!!.dismiss()
+    overlayManager = null
+  }
+}
+
+export function isOverlayShowing(): boolean {
+  return overlayManager != null && overlayManager.isShowing()
+}
+
+export function hasOverlayPermission(): boolean {
+  if (Build.VERSION.SDK_INT >= 23) {
+    try {
+      const ctx = UTSAndroid.getAppContext()
+      if (ctx != null) {
+        return android.provider.Settings.canDrawOverlays(ctx)
+      }
+    } catch (_) {}
+  }
+  return true
+}
+
+export function requestOverlayPermission(): void {
+  try {
+    if (Build.VERSION.SDK_INT >= 23) {
+      const ctx = UTSAndroid.getAppContext()
+      if (ctx != null) {
+        const intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ctx.startActivity(intent)
+      }
+    }
+  } catch (_) {}
+}
+
+class FloatingOverlayManager {
+  private wm: WindowManager | null = null
+  private rootView: FrameLayout | null = null
+  private showing: boolean = false
+  private handler: Handler | null = null
+  private remainingMs: number = 0
+  private totalMs: number = 0
+  private callbacks: OverlayCallbacks | null = null
+  private config: OverlayConfig | null = null
+  private state: string = 'hidden'
+
+  constructor() {}
+
+  show(config: OverlayConfig, callbacks: OverlayCallbacks): void {
+    if (this.showing) return
+    this.callbacks = callbacks
+    this.config = config
+    this.totalMs = config.durationMs
+    this.remainingMs = config.durationMs
+    this.state = 'selecting'
+
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return
+
+    this.wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    if (this.wm == null) return
+
+    this.rootView = this.buildSelectPhase(ctx, config, callbacks)
+    if (this.rootView == null) return
+
+    const params = this.buildParams(config)
+    if (params == null) return
+
+    try {
+      this.wm.addView(this.rootView, params)
+      this.showing = true
+    } catch (_) {}
+  }
+
+  dismiss(): void {
+    this.showing = false
+    this.state = 'hidden'
+    this.stopCountdown()
+    if (this.rootView != null && this.wm != null) {
+      try {
+        this.wm.removeView(this.rootView)
+      } catch (_) {}
+    }
+    this.rootView = null
+    this.wm = null
+    this.callbacks = null
+    this.config = null
+  }
+
+  isShowing(): boolean {
+    return this.showing
+  }
+
+  private buildSelectPhase(ctx: Context, config: OverlayConfig, cbs: OverlayCallbacks): FrameLayout | null {
+    try {
+      const root = FrameLayout(ctx)
+      const bgColor = config.level == 'gentle' ? Color.parseColor('#B3000000') : Color.parseColor('#99000000')
+      root.setBackgroundColor(bgColor)
+
+      const content = LinearLayout(ctx)
+      content.orientation = LinearLayout.VERTICAL
+      content.gravity = Gravity.CENTER
+      content.setPadding(dp(20), dp(20), dp(20), dp(20))
+
+      const title = TextView(ctx)
+      title.setText(config.actionName)
+        title.setTextSize(22.0.toFloat())
+        title.setTextColor(Color.WHITE)
+        title.gravity = Gravity.CENTER
+        title.setPadding(0, 0, 0, dp(8))
+        content.addView(title)
+
+        const ttsView = TextView(ctx)
+        ttsView.setText(config.ttsText)
+        ttsView.setTextSize(15.0.toFloat())
+        ttsView.setTextColor(Color.parseColor('#DDDDDD'))
+        ttsView.gravity = Gravity.CENTER
+        ttsView.setPadding(0, 0, 0, dp(16))
+        content.addView(ttsView)
+
+        const btnRow1 = LinearLayout(ctx)
+        btnRow1.orientation = LinearLayout.HORIZONTAL
+        btnRow1.gravity = Gravity.CENTER
+
+        const selfBtn = Button(ctx)
+        selfBtn.setText('我做过了')
+        selfBtn.setTextSize(14.0.toFloat())
+        selfBtn.setTextColor(Color.WHITE)
+        selfBtn.setBackgroundColor(Color.parseColor('#555555'))
+        selfBtn.setPadding(dp(12), dp(8), dp(12), dp(8))
+        const self = this
+        selfBtn.setOnClickListener(function(v: View): void {
+          cbs.onSelfReported()
+          self.dismiss()
+        })
+        btnRow1.addView(selfBtn)
+
+        const gap = TextView(ctx)
+        gap.setText('   ')
+        btnRow1.addView(gap)
+
+        const busyBtn = Button(ctx)
+        busyBtn.setText('现在忙，晚点提醒我')
+        busyBtn.setTextSize(14.0.toFloat())
+      busyBtn.setTextColor(Color.WHITE)
+      busyBtn.setBackgroundColor(Color.parseColor('#555555'))
+      busyBtn.setPadding(dp(12), dp(8), dp(12), dp(8))
+      busyBtn.setOnClickListener(function(v: View): void {
+        cbs.onBusyRemindLater()
+        self.dismiss()
+      })
+      btnRow1.addView(busyBtn)
+
+      content.addView(btnRow1)
+
+      const spacer2 = TextView(ctx)
+      spacer2.setText('')
+      spacer2.setPadding(0, dp(12), 0, 0)
+      content.addView(spacer2)
+
+      const agreeBtn = Button(ctx)
+      agreeBtn.setText('好啊')
+      agreeBtn.setTextSize(18.0.toFloat())
+      agreeBtn.setTextColor(Color.WHITE)
+      agreeBtn.setBackgroundColor(Color.parseColor('#27AE60'))
+      agreeBtn.setPadding(dp(40), dp(12), dp(40), dp(12))
+      agreeBtn.setOnClickListener(function(v: View): void {
+        cbs.onAgree()
+        const r = self.rootView
+        if (r != null) {
+          r.removeAllViews()
+        }
+        self.switchToExec(ctx, config, cbs)
+      })
+      content.addView(agreeBtn)
+
+      root.addView(content)
+      return root
+    } catch (_) {
+      return null
+    }
+  }
+
+  private switchToExec(ctx: Context, config: OverlayConfig, cbs: OverlayCallbacks): void {
+    this.state = 'executing'
+    const root = this.rootView
+    if (root == null) return
+
+    const content = LinearLayout(ctx)
+    content.orientation = LinearLayout.VERTICAL
+    content.gravity = Gravity.CENTER
+    content.setPadding(dp(20), dp(20), dp(20), dp(20))
+
+    const title = TextView(ctx)
+    title.setText(config.actionName)
+    title.setTextSize(22.0.toFloat())
+    title.setTextColor(Color.WHITE)
+    title.gravity = Gravity.CENTER
+    title.setPadding(0, 0, 0, dp(16))
+    content.addView(title)
+
+    const ttsView = TextView(ctx)
+    ttsView.setText(config.ttsText)
+    ttsView.setTextSize(15.0.toFloat())
+    ttsView.setTextColor(Color.parseColor('#DDDDDD'))
+    ttsView.gravity = Gravity.CENTER
+    ttsView.setPadding(0, 0, 0, dp(20))
+    content.addView(ttsView)
+
+    const progressBar = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal)
+    progressBar.setMax(config.durationMs.toInt())
+    progressBar.setProgress(0)
+    progressBar.setPadding(0, 0, 0, dp(8))
+    content.addView(progressBar)
+
+    const countdownText = TextView(ctx)
+    countdownText.setText('' + Math.ceil(config.durationMs / 1000) + 's')
+    countdownText.setTextSize(18.0.toFloat())
+    countdownText.setTextColor(Color.WHITE)
+    countdownText.gravity = Gravity.CENTER
+    countdownText.setPadding(0, 0, 0, dp(20))
+    content.addView(countdownText)
+
+    const skipBtn = Button(ctx)
+    skipBtn.setText('跳过')
+    skipBtn.setTextSize(14.0.toFloat())
+    skipBtn.setTextColor(Color.WHITE)
+    skipBtn.setBackgroundColor(Color.parseColor('#E74C3C'))
+    skipBtn.setPadding(dp(20), dp(8), dp(20), dp(8))
+    const self = this
+    skipBtn.setOnClickListener(function(v: View): void {
+      cbs.onSkipDuringExec()
+      self.dismiss()
+    })
+    content.addView(skipBtn)
+
+    root.addView(content)
+    this.startCountdown(config.durationMs, cbs, progressBar, countdownText)
+  }
+
+  private startCountdown(total: number, cbs: OverlayCallbacks, bar: ProgressBar, text: TextView): void {
+    this.remainingMs = total
+    this.handler = Handler(Looper.getMainLooper())
+    const self = this
+    this.handler!!.postDelayed(function(): void {
+      self.remainingMs -= 100
+      const secs = Math.max(0, Math.ceil(self.remainingMs / 1000))
+      bar.setProgress((total - self.remainingMs).toInt())
+      text.setText('' + secs + 's')
+      if (self.remainingMs <= 0) {
+        cbs.onCountdownTick(0)
+        self.showDone(cbs)
+      } else {
+        cbs.onCountdownTick(self.remainingMs)
+        self.startCountdown(total, cbs, bar, text)
+      }
+    }, 100)
+  }
+
+  private showDone(cbs: OverlayCallbacks): void {
+    if (this.rootView == null) return
+    this.stopCountdown()
+    const root = this.rootView
+    root.removeAllViews()
+
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return
+
+    const content = LinearLayout(ctx)
+    content.orientation = LinearLayout.VERTICAL
+    content.gravity = Gravity.CENTER
+    content.setPadding(dp(30), dp(40), dp(30), dp(40))
+
+    const checkMark = TextView(ctx)
+    checkMark.setText('✓')
+    checkMark.setTextSize(48.0.toFloat())
+    checkMark.setTextColor(Color.parseColor('#2ECC71'))
+    checkMark.gravity = Gravity.CENTER
+    content.addView(checkMark)
+
+    const doneText = TextView(ctx)
+    const encourage = this.config != null ? this.config!!.encourageText : '又完成一次！'
+    doneText.setText(encourage)
+    doneText.setTextSize(20.0.toFloat())
+    doneText.setTextColor(Color.WHITE)
+    doneText.gravity = Gravity.CENTER
+    doneText.setPadding(0, dp(12), 0, 0)
+    content.addView(doneText)
+
+    root.addView(content)
+
+    cbs.onCountdownFinish()
+    const self = this
+    Handler(Looper.getMainLooper()).postDelayed(function(): void {
+      self.dismiss()
+    }, 1500)
+  }
+
+  private stopCountdown(): void {
+    if (this.handler != null) {
+      this.handler.removeCallbacksAndMessages(null)
+      this.handler = null
+    }
+  }
+
+  private buildParams(config: OverlayConfig): WindowManagerLayoutParams | null {
+    try {
+      const ctx = UTSAndroid.getAppContext()
+      if (ctx == null) return null
+      const displayMetrics = ctx.getResources().getDisplayMetrics()
+
+      const w = config.level == 'gentle' ? (displayMetrics.widthPixels * 0.7).toInt() : WindowManagerLayoutParams.MATCH_PARENT
+      const h = WindowManagerLayoutParams.WRAP_CONTENT
+      const flags = WindowManagerLayoutParams.FLAG_NOT_FOCUSABLE | WindowManagerLayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManagerLayoutParams.FLAG_LAYOUT_NO_LIMITS
+
+      const params = WindowManagerLayoutParams(w, h, WindowManagerLayoutParams.TYPE_APPLICATION_OVERLAY, flags, PixelFormat.TRANSLUCENT)
+      params.gravity = Gravity.CENTER
+      return params
+    } catch (_) {
+      return null
+    }
+  }
+
+  private dp(value: number): Int {
+    try {
+      const ctx = UTSAndroid.getAppContext()
+      if (ctx != null) {
+        const density = ctx.getResources().getDisplayMetrics().density
+        return (value * density + 0.5).toInt()
+      }
+    } catch (_) {}
+    return value.toInt()
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "version": "1",
+  "env": {
+    "vapor": false,
+    "compiler_version": "5.11.2026052520-alpha"
+  },
+  "files": {
+    "pages/settings/index.kt": {
+      "md5": "69892ab7dea5a3394cbcef2243392afb5b513bc3",
+      "class": "GenPagesSettingsIndex"
+    },
+    "components/ActionCard.kt": {
+      "md5": "4b5ae07d36536e22cd76c8da127b08c129d87ff0",
+      "class": "GenComponentsActionCard"
+    },
+    "components/CountdownBar.kt": {
+      "md5": "da402fab1a51f8b936d63a8eac71527c27d3659d",
+      "class": "GenComponentsCountdownBar"
+    },
+    "pages/data/dashboard.kt": {
+      "md5": "a0bdf7f9c4504bf5008568763ae31b351ef2afea",
+      "class": "GenPagesDataDashboard"
+    },
+    "index.kt": {
+      "class": "",
+      "md5": "207029892d9cb63a694ef4c1066bcb6344eabccd"
+    },
+    "pages/guide/index.kt": {
+      "class": "GenPagesGuideIndex",
+      "md5": "e343a7061feb4f31e4e903b462d073eb5084bc86"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmDaily.kt": {
+      "class": "GenCloudObjLlmDaily",
+      "md5": "0c3cd1a85a1135e443a8557d9edbfc4ce3f51e7f"
+    },
+    "pages/home/index.kt": {
+      "md5": "8503b21576558091c5b59a547ce6f34b493c9d91",
+      "class": "GenPagesHomeIndex"
+    },
+    "components/HeatmapCalendar.kt": {
+      "class": "GenComponentsHeatmapCalendar",
+      "md5": "41eeb9154d2b1fe527b40d08976ec929a9d65095"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmRuleSuggest.kt": {
+      "md5": "f069c8e8edba1b5ccf1d6e3f3ddc808d82feee48",
+      "class": "GenCloudObjLlmRuleSuggest"
+    },
+    "components/StatusIndicator.kt": {
+      "class": "GenComponentsStatusIndicator",
+      "md5": "c0f0e45d74bf04e49b7147a162547bcc2fbe83b6"
+    },
+    "pages/action/execute.kt": {
+      "md5": "8cdcdc7d6b977927ccca04a35076ae0bd77576e3",
+      "class": "GenPagesActionExecute"
+    },
+    "components/EncourageToast.kt": {
+      "md5": "a98481b3a473d9578e42e5732d74fdf4962f1703",
+      "class": "GenComponentsEncourageToast"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmWeekly.kt": {
+      "class": "GenCloudObjLlmWeekly",
+      "md5": "d8372e5bea68f528e3c9ea0a754b2cc8f209e6ce"
+    },
+    "components/BarChart.kt": {
+      "md5": "c8187961635816f6767726d51ee6ccca042ebe86",
+      "class": "GenComponentsBarChart"
+    },
+    "components/LineChart.kt": {
+      "md5": "57544cbdcc8c9ed6cd63f9b62586bee719f9214b",
+      "class": "GenComponentsLineChart"
+    },
+    "components/FeedbackDialog.kt": {
+      "md5": "20c966cdce079d9cf855c094e9f8ae0b985bd1bd",
+      "class": "GenComponentsFeedbackDialog"
+    }
+  }
+}

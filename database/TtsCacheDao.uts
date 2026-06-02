@@ -1,0 +1,30 @@
+import { dbManager } from './DatabaseManager'
+import { TtsCache } from '../models/TtsCache'
+
+export function getByHash(hash: string): TtsCache | null {
+  const row = dbManager.queryOne('SELECT * FROM tts_cache WHERE text_hash = ?', [hash])
+  if (row == null) return null
+  return mapRow(row)
+}
+
+export function save(textHash: string, textContent: string, filePath: string, fileSize: number, source: string): void {
+  dbManager.insert('tts_cache', {
+    text_hash: textHash,
+    text_content: textContent,
+    file_path: filePath,
+    file_size: fileSize,
+    source: source,
+    created_at: Math.floor(Date.now() / 1000)
+  })
+}
+
+function mapRow(row: Map<string, any>): TtsCache {
+  return {
+    text_hash: row.get("text_hash") as string,
+    text_content: row.get("text_content") as string,
+    file_path: row.get("file_path") as string,
+    file_size: row.get("file_size") as number,
+    source: row.get("source") as string,
+    created_at: row.get("created_at") as number
+  }
+}

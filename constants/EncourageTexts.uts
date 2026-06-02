@@ -1,0 +1,56 @@
+export const ENCOURAGE_GENERAL: string[] = [
+  '又完成一次，身体在偷偷感谢你',
+  '很好，继续保持',
+  '微习惯的力量',
+  '身体记住了你的每一次善意',
+  '小小的动作，大大地关爱自己',
+  '你比刚才健康了一点点',
+  '积少成多，你懂的',
+  '健康就是这么攒出来的',
+  '这一刻，你选择了自己',
+  '完美，继续加油'
+]
+
+export const ENCOURAGE_EYE: string[] = [
+  '眼睛说谢谢',
+  '给眼睛放了个小假',
+  '目光如炬，但你休息了一下',
+  '眼睛刚刚充了个电',
+  '明眸亮眼，就靠这几十秒'
+]
+
+export const ENCOURAGE_NECK: string[] = [
+  '颈椎在鼓掌',
+  '肩膀松了一口气',
+  '脖子表示很满意',
+  '肩颈自由了那么一瞬间'
+]
+
+export const ENCOURAGE_BREATH: string[] = [
+  '呼吸之间，找回平静',
+  '一口气的事，但身体很受用',
+  '深呼吸，世界慢了半拍',
+  '肺部刚刚做了个按摩'
+]
+
+export const STREAK_TEXTS: string[] = [
+  '连续第 {n} 次！',
+  '你已经连续 {n} 次了，这就是习惯',
+  '连续 {n} 次坚持，了不起',
+  '第 {n} 次，数都数不过来了'
+]
+
+export function getRandomEncourage(category: string): string {
+  let pool: string[]
+  if (category === '护眼') {
+    pool = ENCOURAGE_GENERAL.concat(ENCOURAGE_EYE)
+  } else if (category === '肩颈') {
+    pool = ENCOURAGE_GENERAL.concat(ENCOURAGE_NECK)
+  } else if (category === '呼吸') {
+    pool = ENCOURAGE_GENERAL.concat(ENCOURAGE_BREATH)
+  } else {
+    pool = ENCOURAGE_GENERAL
+  }
+  const idx = Math.floor(Math.random() * pool.length)
+  return pool[idx]
+}

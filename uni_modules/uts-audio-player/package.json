@@ -1,0 +1,7 @@
+{
+  "id": "uts-audio-player",
+  "name": "音频播放",
+  "version": "1.0.0",
+  "description": "MediaPlayer 封装 + 系统 TTS 降级",
+  "dependencies": []
+}

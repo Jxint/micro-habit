@@ -1,0 +1,412 @@
+<template>
+  <view class="page">
+    <scroll-view class="scroll-area" scroll-y="true">
+      <view class="section">
+        <view class="section-header">
+          <text class="section-title">今日数据</text>
+        </view>
+        <view class="section-body">
+          <StatusIndicator title="护眼" :percent="eyeScore" :status="eyeStatus" />
+          <StatusIndicator title="体态" :percent="postureScore" :status="postureStatus" />
+          <StatusIndicator title="活力" :percent="vitalityScore" :status="vitalityStatus" />
+
+          <view class="guard-box">
+            <text class="guard-label">今日守护</text>
+            <text class="guard-value">{{ guardMinutes }} 分钟</text>
+            <text class="guard-sub">习惯渗透度 {{ penetrationText }}</text>
+          </view>
+
+          <view class="chart-container">
+            <text class="chart-label">各时段完成次数</text>
+            <BarChart :data="hourlyData" :height="380" barColor="#4CAF50" />
+          </view>
+
+          <view class="list-section" v-if="detailCount > 0">
+            <text class="chart-label">今日完成记录</text>
+            <view class="detail-item" v-for="(item, idx) in todayDetails" :key="idx">
+              <view class="detail-left">
+                <text class="detail-name">{{ item.name }}</text>
+                <text class="detail-type">{{ item.type }}</text>
+              </view>
+              <view class="detail-right">
+                <text class="detail-duration">{{ item.durationSec }}s</text>
+                <text class="detail-time">{{ item.time }}</text>
+              </view>
+            </view>
+          </view>
+          <view class="empty-hint" v-if="detailCount === 0">
+            <text class="empty-text">今日暂无完成记录</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section-header">
+          <text class="section-title">本周趋势</text>
+        </view>
+        <view class="section-body">
+          <view class="chart-container">
+            <LineChart :series="weekTrend" :height="380" title="7日三状态趋势" />
+          </view>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section-header">
+          <text class="section-title">打卡热力图（近4周）</text>
+        </view>
+        <view class="section-body">
+          <view class="chart-container">
+            <HeatmapCalendar :data="heatmapData" :height="300" />
+          </view>
+          <view class="heatmap-legend">
+            <text class="legend-text">点击格子查看当天详情</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section-header" @tap="toggleWeekly">
+          <text class="section-title">每周健康报告</text>
+          <text class="section-toggle">{{ weeklyToggleText }}</text>
+        </view>
+        <view class="section-body" v-if="weeklyShow">
+          <view class="loading-box" v-if="weeklyReportLoading">
+            <text class="loading-text">生成中...</text>
+          </view>
+          <view class="report-box" v-if="weeklyLoaded && !weeklyReportLoading">
+            <text class="report-title">{{ wkTitle }}</text>
+            <text class="report-highlight">{{ wkHighlight }}</text>
+            <view class="report-stats">
+              <view class="stat-item">
+                <text class="stat-val">{{ wkTotalCompleted }}</text>
+                <text class="stat-label">次完成</text>
+              </view>
+              <view class="stat-item">
+                <text class="stat-val">{{ wkAvgGuard }}</text>
+                <text class="stat-label">日均守护</text>
+              </view>
+              <view class="stat-item">
+                <text class="stat-val">{{ wkBestDay }}</text>
+                <text class="stat-label">最佳日次</text>
+              </view>
+            </view>
+            <text class="report-improve" v-if="wkImprovement !== ''">{{ wkImprovement }}</text>
+            <view class="suggestions" v-if="wkSuggestCount > 0">
+              <text class="sug-label">AI 建议</text>
+              <view v-for="(s, sIdx) in wkSuggestions" :key="sIdx">
+                <text class="sug-text">· {{ s }}</text>
+              </view>
+            </view>
+            <text class="report-goal" v-if="wkGoal !== ''">{{ wkGoal }}</text>
+          </view>
+          <view class="empty-hint" v-if="!weeklyLoaded && !weeklyReportLoading">
+            <text class="empty-text">点击下方按钮生成周报</text>
+            <view class="refresh-btn" @tap="refreshWeek">
+              <text class="refresh-text">生成周报</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="bottom-spacer" />
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import StatusIndicator from '../../components/StatusIndicator.uvue'
+import BarChart from '../../components/BarChart.uvue'
+import LineChart from '../../components/LineChart.uvue'
+import HeatmapCalendar from '../../components/HeatmapCalendar.uvue'
+import { useAppStore } from '../../stores/appStore'
+import { getHourlyData, getWeeklyTrend, getTodayDetail, ActionDetail, LineSeries } from '../../services/ScoreCalculator'
+import { today } from '../../utils/TimeUtils'
+import { BarItem } from '../../database/ActionLogDao'
+import { DailyCount } from '../../models/DailyCount'
+
+const store = useAppStore()
+
+const eyeScore = computed<number>(() : number => store.eyeScore.value)
+const eyeStatus = computed<string>(() : string => store.eyeStatus.value)
+const postureScore = computed<number>(() : number => store.postureScore.value)
+const postureStatus = computed<string>(() : string => store.postureStatus.value)
+const vitalityScore = computed<number>(() : number => store.vitalityScore.value)
+const vitalityStatus = computed<string>(() : string => store.vitalityStatus.value)
+const guardMinutes = computed<number>(() : number => store.guardMinutes.value)
+const penetrationText = computed<string>(() : string => {
+  const p = store.penetration.value
+  return '' + Math.round(p * 10) / 10
+})
+const heatmapData = computed<DailyCount[]>(() : DailyCount[] => store.heatmapData.value)
+
+const weeklyShow = ref<boolean>(false)
+const weeklyToggleText = computed<string>(() : string => weeklyShow.value ? '▼' : '▶')
+
+const weeklyLoaded = computed<boolean>(() : boolean => store.weeklyReport.value != null)
+const weeklyReportLoading = computed<boolean>(() : boolean => store.weeklyReportLoading.value)
+
+const wkTitle = computed<string>(() : string => {
+  const r = store.weeklyReport.value
+  return r != null ? r.title : ''
+})
+const wkHighlight = computed<string>(() : string => {
+  const r = store.weeklyReport.value
+  return r != null ? r.highlight : ''
+})
+const wkTotalCompleted = computed<number>(() : number => {
+  const r = store.weeklyReport.value
+  return r != null ? r.stats.totalCompleted : 0
+})
+const wkAvgGuard = computed<number>(() : number => {
+  const r = store.weeklyReport.value
+  return r != null ? r.stats.avgGuardMinutes : 0
+})
+const wkBestDay = computed<number>(() : number => {
+  const r = store.weeklyReport.value
+  return r != null ? r.stats.bestDayCount : 0
+})
+const wkImprovement = computed<string>(() : string => {
+  const r = store.weeklyReport.value
+  return r != null ? r.improvement : ''
+})
+const wkSuggestions = computed<string[]>(() : string[] => {
+  const r = store.weeklyReport.value
+  return r != null ? r.suggestions : []
+})
+const wkSuggestCount = computed<number>(() : number => wkSuggestions.value.length)
+const wkGoal = computed<string>(() : string => {
+  const r = store.weeklyReport.value
+  return r != null ? r.nextWeekGoal : ''
+})
+
+const hourlyData = ref<BarItem[]>([])
+const weekTrend = ref<LineSeries[]>([])
+const todayDetails = ref<ActionDetail[]>([])
+const detailCount = computed<number>(() : number => todayDetails.value.length)
+
+function loadData(): void {
+  const date = today()
+  hourlyData.value = getHourlyData(date)
+  weekTrend.value = getWeeklyTrend()
+  todayDetails.value = getTodayDetail()
+}
+
+function toggleWeekly(): void {
+  weeklyShow.value = !weeklyShow.value
+}
+
+function refreshWeek(): void {
+  weeklyShow.value = true
+  store.refreshWeeklyReport()
+}
+
+onPageShow(() => {
+  store.refreshHomeData()
+  loadData()
+})
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: #F5F6FA;
+}
+.scroll-area {
+  flex: 1;
+}
+.section {
+  background-color: #FFFFFF;
+  margin: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.section-header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #F0F0F0;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.section-toggle {
+  font-size: 12px;
+  color: #95A5A6;
+}
+.section-body {
+  padding: 12px 0;
+}
+.guard-box {
+  align-items: center;
+  padding: 16px;
+  margin: 8px 16px;
+  background-color: #EBF5FB;
+  border-radius: 12px;
+}
+.guard-label {
+  font-size: 13px;
+  color: #7F8C8D;
+}
+.guard-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #2980B9;
+  margin-top: 4px;
+}
+.guard-sub {
+  font-size: 12px;
+  color: #95A5A6;
+  margin-top: 4px;
+}
+.chart-container {
+  padding: 8px 4px;
+}
+.chart-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #7F8C8D;
+  padding-left: 16px;
+  margin-bottom: 4px;
+}
+.list-section {
+  padding: 0 16px;
+}
+.detail-item {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #F0F0F0;
+}
+.detail-left {
+  flex-direction: column;
+}
+.detail-name {
+  font-size: 14px;
+  color: #2C3E50;
+}
+.detail-type {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.detail-right {
+  flex-direction: column;
+  align-items: flex-end;
+}
+.detail-duration {
+  font-size: 14px;
+  color: #27AE60;
+  font-weight: bold;
+}
+.detail-time {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.heatmap-legend {
+  align-items: center;
+  padding: 4px 0 12px;
+}
+.legend-text {
+  font-size: 12px;
+  color: #BDC3C7;
+}
+.empty-hint {
+  align-items: center;
+  padding: 24px;
+}
+.empty-text {
+  font-size: 13px;
+  color: #BDC3C7;
+}
+.loading-box {
+  align-items: center;
+  padding: 24px;
+}
+.loading-text {
+  font-size: 13px;
+  color: #95A5A6;
+}
+.report-box {
+  padding: 16px;
+}
+.report-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 8px;
+}
+.report-highlight {
+  font-size: 14px;
+  color: #34495E;
+  line-height: 1.5;
+}
+.report-stats {
+  flex-direction: row;
+  justify-content: space-around;
+  margin: 16px 0;
+  padding: 12px;
+  background-color: #F5F6FA;
+  border-radius: 8px;
+}
+.stat-item {
+  align-items: center;
+}
+.stat-val {
+  font-size: 20px;
+  font-weight: bold;
+  color: #2980B9;
+}
+.stat-label {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.report-improve {
+  font-size: 13px;
+  color: #7F8C8D;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.suggestions {
+  margin-top: 12px;
+}
+.sug-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 6px;
+}
+.sug-text {
+  font-size: 13px;
+  color: #34495E;
+  line-height: 1.5;
+}
+.report-goal {
+  font-size: 14px;
+  font-weight: bold;
+  color: #27AE60;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #EAFAF1;
+  border-radius: 8px;
+}
+.refresh-btn {
+  margin-top: 12px;
+  padding: 10px 24px;
+  background-color: #2980B9;
+  border-radius: 8px;
+}
+.refresh-text {
+  color: #FFFFFF;
+  font-size: 14px;
+}
+.bottom-spacer {
+  height: 80px;
+}
+</style>

@@ -1,0 +1,661 @@
+type RowEntry = {
+  cols: string[]
+  vals: any[]
+}
+
+type TableEntry = {
+  name: string
+  rows: RowEntry[]
+}
+
+type AutoIncrementEntry = {
+  name: string
+  value: number
+}
+
+class MicroHabitDB {
+  private static instance: MicroHabitDB | null = null
+  private tables: TableEntry[]
+  private autoIncrement: AutoIncrementEntry[]
+
+  private constructor() {
+    this.tables = []
+    this.autoIncrement = []
+  }
+
+  static getInstance(): MicroHabitDB {
+    if (MicroHabitDB.instance == null) {
+      MicroHabitDB.instance = new MicroHabitDB()
+    }
+    return MicroHabitDB.instance!
+  }
+
+  init(): void {
+    try {
+      this.loadFromStorage()
+    } catch (e) {
+      console.error('DatabaseManager.init error: ' + e)
+    }
+  }
+
+  execSql(sql: string, params: any[] = []): void {
+    const upper = sql.toUpperCase().trim()
+    if (upper.startsWith('PRAGMA')) return
+    if (upper.startsWith('CREATE TABLE')) {
+      const nameMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i)
+      if (nameMatch != null) {
+        const tableName = nameMatch[1] as string
+        if (this.findTable(tableName) == null) {
+          const tableEntry: TableEntry = { name: tableName, rows: [] }
+          this.tables.push(tableEntry)
+          const autoIncEntry: AutoIncrementEntry = { name: tableName, value: 1 }
+          this.autoIncrement.push(autoIncEntry)
+        }
+      }
+      return
+    }
+    if (upper.startsWith('CREATE INDEX') || upper.startsWith('CREATE UNIQUE INDEX')) return
+
+    if (upper.startsWith('INSERT INTO')) {
+      const nameMatch = sql.match(/INSERT\s+INTO\s+(\w+)/i)
+      if (nameMatch != null) {
+        const tableName = nameMatch[1] as string
+        const entry = this.findTable(tableName)
+        if (entry == null) return
+
+        const colsMatch = sql.match(/\(([^)]+)\)\s*VALUES/i)
+        if (colsMatch == null) return
+
+        const colsParts = (colsMatch[1] as string).split(',')
+        const row: RowEntry = { cols: ['id'], vals: [this.getNextId(tableName)] }
+        for (let c = 0; c < colsParts.length && c < params.length; c++) {
+          const col = colsParts[c].trim()
+          row.cols.push(col)
+          row.vals.push(params[c])
+        }
+        entry.rows.push(row)
+        this.saveToStorage()
+      }
+      return
+    }
+
+    if (upper.startsWith('UPDATE')) {
+      const nameMatch = sql.match(/UPDATE\s+(\w+)/i)
+      if (nameMatch != null) {
+        const tableName = nameMatch[1] as string
+        const entry = this.findTable(tableName)
+        if (entry == null) return
+
+        const setMatch = sql.match(/SET\s+(.+?)(?:\s+WHERE\s|$)/i)
+        const whereMatch = sql.match(/WHERE\s+(.+)$/i)
+        if (setMatch == null) return
+
+        const setParts = (setMatch[1] as string).split(',')
+        const setCols: string[] = []
+        for (let c = 0; c < setParts.length; c++) {
+          const eqParts = setParts[c].trim().split('=')
+          if (eqParts.length >= 1) {
+            setCols.push(eqParts[0].trim())
+          }
+        }
+
+        let paramIdx = 0
+        for (let r = 0; r < entry.rows.length; r++) {
+          if (whereMatch != null) {
+            const whereParams: any[] = []
+            for (let w = setCols.length; w < params.length; w++) {
+              whereParams.push(params[w])
+            }
+            if (!this.matchWhere(entry.rows[r], whereMatch[1] as string, whereParams)) continue
+          }
+          for (let c = 0; c < setCols.length; c++) {
+            this.setColVal(entry.rows[r], setCols[c], params[paramIdx + c])
+          }
+          paramIdx += setCols.length
+        }
+        this.saveToStorage()
+      }
+      return
+    }
+
+    if (upper.startsWith('DELETE FROM') || upper.startsWith('DELETE')) {
+      const nameMatch = sql.match(/DELETE\s+FROM\s+(\w+)/i)
+      if (nameMatch != null) {
+        const tableName = nameMatch[1] as string
+        const entry = this.findTable(tableName)
+        if (entry == null) return
+
+        const whereMatch = sql.match(/WHERE\s+(.+)$/i)
+        if (whereMatch != null) {
+          const toRemove: number[] = []
+          for (let i = 0; i < entry.rows.length; i++) {
+            if (this.matchWhere(entry.rows[i], whereMatch[1] as string, params)) {
+              toRemove.push(i)
+            }
+          }
+          for (let i = toRemove.length - 1; i >= 0; i--) {
+            entry.rows.splice(toRemove[i], 1)
+          }
+        } else {
+          entry.rows = []
+        }
+        this.saveToStorage()
+      }
+      return
+    }
+  }
+
+  query(sql: string, params: any[] = []): Map<string, any>[] {
+    const upper = sql.toUpperCase().trim()
+
+    if (upper.startsWith('SELECT')) {
+      const nameMatch = sql.match(/FROM\s+(\w+)/i)
+      if (nameMatch == null) return []
+      const tableName = nameMatch[1] as string
+      const entry = this.findTable(tableName)
+      if (entry == null) return []
+
+      const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+ORDER\s+BY|$)/i)
+      const orderMatch = sql.match(/ORDER\s+BY\s+(.+)$/i)
+
+      let results: RowEntry[] = []
+      if (whereMatch != null) {
+        for (let i = 0; i < entry.rows.length; i++) {
+          if (this.matchWhere(entry.rows[i], whereMatch[1] as string, params)) {
+            results.push(this.cloneRow(entry.rows[i]))
+          }
+        }
+      } else {
+        for (let i = 0; i < entry.rows.length; i++) {
+          results.push(this.cloneRow(entry.rows[i]))
+        }
+      }
+
+      if (orderMatch != null) {
+        const orderParts = (orderMatch[1] as string).trim().split(/\s+/)
+        const orderCol = orderParts[0]
+        const orderDir = orderParts.length > 1 ? orderParts[1].toUpperCase() : 'ASC'
+        this.sortResults(results, orderCol, orderDir)
+      }
+
+      const selectMatch = sql.match(/SELECT\s+(.+?)\s+FROM/i)
+      if (selectMatch != null) {
+        const selectPart = (selectMatch[1] as string).trim()
+        if (selectPart === 'last_insert_rowid() as id') {
+          const out: Map<string, any>[] = []
+          for (let i = 0; i < results.length; i++) {
+            out.push(this.rowToMap(results[i]))
+          }
+          return out
+        }
+        if (selectPart !== '*') {
+          const aggMatch = selectPart.match(/(\w+)\((\w+)\)/i)
+          if (aggMatch != null) {
+            const aggFn = (aggMatch[1] as string).toUpperCase()
+            const aggCol = aggMatch[2] as string
+            if (aggFn === 'COUNT') {
+              const row: RowEntry = { cols: [], vals: [] }
+              row.cols.push('COUNT(*)')
+              row.vals.push(results.length)
+              return [this.rowToMap(row)]
+            }
+            if (aggFn === 'SUM') {
+              let sum = 0
+              for (let i = 0; i < results.length; i++) {
+                const v = this.getColVal(results[i], aggCol)
+                const n = parseFloat(this.toStr(v))
+                if (!isNaN(n)) sum += n
+              }
+              const row: RowEntry = { cols: [], vals: [] }
+              row.cols.push('SUM(' + aggCol + ')')
+              row.vals.push(sum)
+              return [this.rowToMap(row)]
+            }
+          }
+        }
+      }
+
+      const out: Map<string, any>[] = []
+      for (let i = 0; i < results.length; i++) {
+        out.push(this.rowToMap(results[i]))
+      }
+      return out
+    }
+    return []
+  }
+
+  queryOne(sql: string, params: any[] = []): Map<string, any> | null {
+    const results = this.query(sql, params)
+    return results.length > 0 ? results[0] : null
+  }
+
+  insert(table: string, data: any): number {
+    const entry = this.findTable(table)
+    if (entry == null) return -1
+    const id = this.getNextId(table)
+    const row: RowEntry = { cols: [], vals: [] }
+    row.cols.push('id')
+    row.vals.push(id)
+    const dataRow = this.objToRow(data)
+    for (let d = 0; d < dataRow.cols.length; d++) {
+      row.cols.push(dataRow.cols[d])
+      row.vals.push(dataRow.vals[d])
+    }
+    entry.rows.push(row)
+    this.saveToStorage()
+    return id
+  }
+
+  update(table: string, data: any, where: string, whereArgs: any[] = []): void {
+    const entry = this.findTable(table)
+    if (entry == null) return
+    const dataRow = this.objToRow(data)
+    for (let i = 0; i < entry.rows.length; i++) {
+      if (this.matchWhere(entry.rows[i], where, whereArgs)) {
+        for (let d = 0; d < dataRow.cols.length; d++) {
+          this.setColVal(entry.rows[i], dataRow.cols[d], dataRow.vals[d])
+        }
+      }
+    }
+    this.saveToStorage()
+  }
+
+  delete(table: string, where: string, whereArgs: any[] = []): void {
+    const entry = this.findTable(table)
+    if (entry == null) return
+    const toRemove: number[] = []
+    for (let i = 0; i < entry.rows.length; i++) {
+      if (this.matchWhere(entry.rows[i], where, whereArgs)) {
+        toRemove.push(i)
+      }
+    }
+    for (let i = toRemove.length - 1; i >= 0; i--) {
+      entry.rows.splice(toRemove[i], 1)
+    }
+    this.saveToStorage()
+  }
+
+  close(): void {
+    this.saveToStorage()
+  }
+
+  private findTable(name: string): TableEntry | null {
+    for (let i = 0; i < this.tables.length; i++) {
+      if (this.tables[i].name === name) return this.tables[i]
+    }
+    return null
+  }
+
+  private getNextId(tableName: string): number {
+    for (let i = 0; i < this.autoIncrement.length; i++) {
+      if (this.autoIncrement[i].name === tableName) {
+        const id = this.autoIncrement[i].value
+        this.autoIncrement[i].value = this.autoIncrement[i].value + 1
+        return id
+      }
+    }
+    return 1
+  }
+
+  private toStr(v: any | null): string {
+    if (v == null) return 'null'
+    return '' + v
+  }
+
+  private getColVal(row: RowEntry, col: string): any | null {
+    for (let i = 0; i < row.cols.length; i++) {
+      if (row.cols[i] === col) return row.vals[i]
+    }
+    return null
+  }
+
+  private setColVal(row: RowEntry, col: string, val: any): void {
+    for (let i = 0; i < row.cols.length; i++) {
+      if (row.cols[i] === col) {
+        row.vals[i] = val
+        return
+      }
+    }
+    row.cols.push(col)
+    row.vals.push(val)
+  }
+
+  private cloneRow(row: RowEntry): RowEntry {
+    const clone: RowEntry = { cols: [], vals: [] }
+    for (let i = 0; i < row.cols.length; i++) {
+      clone.cols.push(row.cols[i])
+      clone.vals.push(row.vals[i])
+    }
+    return clone
+  }
+
+  private rowToMap(row: RowEntry): Map<string, any> {
+    const map: Map<string, any> = new Map()
+    for (let i = 0; i < row.cols.length; i++) {
+      map.set(row.cols[i], row.vals[i])
+    }
+    return map
+  }
+
+  private rowToObj(row: RowEntry): any {
+    const pairs: string[] = []
+    for (let i = 0; i < row.cols.length; i++) {
+      pairs.push('"' + row.cols[i] + '":' + JSON.stringify(row.vals[i]))
+    }
+    const jsonStr = '{' + pairs.join(',') + '}'
+    return JSON.parse(jsonStr) as any
+  }
+
+  private objToRow(obj: any): RowEntry {
+    const row: RowEntry = { cols: [], vals: [] }
+    const jsonStr = JSON.stringify(obj)
+    if (jsonStr != null && jsonStr.length > 0 && jsonStr.substring(0, 1) === '{') {
+      const inner = this.extractJsonPairs(jsonStr)
+      for (let p = 0; p < inner.length; p++) {
+        const kv = this.splitPair(inner[p])
+        if (kv != null) {
+          row.cols.push(kv[0] as string)
+          row.vals.push(kv[1])
+        }
+      }
+    }
+    return row
+  }
+
+  private extractJsonPairs(jsonStr: string): string[] {
+    const result: string[] = []
+    const content = jsonStr.substring(1, jsonStr.length - 1)
+    let depth = 0
+    let start = 0
+    let inStr = false
+    for (let i = 0; i < content.length; i++) {
+      const ch = content.substring(i, i + 1)
+      if (ch === '"' && (i === 0 || content.substring(i - 1, i) !== '\\')) {
+        inStr = !inStr
+      } else if (!inStr) {
+        if (ch === '{' || ch === '[') depth++
+        else if (ch === '}' || ch === ']') depth--
+        else if (ch === ',' && depth === 0) {
+          result.push(content.substring(start, i).trim())
+          start = i + 1
+        }
+      }
+    }
+    if (start < content.length) {
+      result.push(content.substring(start).trim())
+    }
+    return result
+  }
+
+  private splitPair(pair: string): any[] | null {
+    let colonIdx = -1
+    let inStr = false
+    for (let i = 0; i < pair.length; i++) {
+      const ch = pair.substring(i, i + 1)
+      if (ch === '"' && (i === 0 || pair.substring(i - 1, i) !== '\\')) {
+        inStr = !inStr
+      } else if (!inStr && ch === ':') {
+        colonIdx = i
+      }
+    }
+    if (colonIdx < 0) return null
+    const keyPart = pair.substring(0, colonIdx).trim()
+    let key = keyPart
+    if (key.length >= 2 && key.substring(0, 1) === '"' && key.substring(key.length - 1) === '"') {
+      key = key.substring(1, key.length - 1)
+    }
+    const valPart = pair.substring(colonIdx + 1).trim()
+    let val: any = valPart
+    if (valPart === 'true') val = true
+    else if (valPart === 'false') val = false
+    else if (valPart.length >= 2 && valPart.substring(0, 1) === '"' && valPart.substring(valPart.length - 1) === '"') {
+      val = valPart.substring(1, valPart.length - 1)
+    } else {
+      const parsedNum = parseFloat(valPart)
+      if (!isNaN(parsedNum) && this.isNumericStr(valPart)) {
+        val = parsedNum
+      }
+    }
+    return [key, val]
+  }
+
+  private isNumericStr(s: string): boolean {
+    if (s.length === 0) return false
+    let dots = 0
+    for (let i = 0; i < s.length; i++) {
+      const ch = s.substring(i, i + 1)
+      if (ch === '-' && i === 0) continue
+      if (ch === '.') {
+        dots++
+        if (dots > 1) return false
+        continue
+      }
+      const digitMatch = ch.match(/[0-9]/)
+      if (digitMatch == null) return false
+    }
+    return true
+  }
+
+  private sortResults(results: RowEntry[], col: string, dir: string): void {
+    const n = results.length
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = 0; j < n - i - 1; j++) {
+        const va = this.getColVal(results[j], col)
+        const vb = this.getColVal(results[j + 1], col)
+        let shouldSwap = false
+        if (va == null && vb != null) {
+          shouldSwap = true
+        } else if (va != null && vb == null) {
+          shouldSwap = false
+        } else {
+          const na = parseFloat(this.toStr(va))
+          const nb = parseFloat(this.toStr(vb))
+          if (!isNaN(na) && !isNaN(nb)) {
+            shouldSwap = dir === 'ASC' ? na > nb : na < nb
+          } else {
+            const sa = this.toStr(va)
+            const sb = this.toStr(vb)
+            shouldSwap = dir === 'ASC' ? sa > sb : sa < sb
+          }
+        }
+        if (shouldSwap) {
+          const tmp = results[j]
+          results[j] = results[j + 1]
+          results[j + 1] = tmp
+        }
+      }
+    }
+  }
+
+  private matchWhere(row: RowEntry, whereClause: string, params: any[]): boolean {
+    const trimmed = whereClause.trim()
+    if (trimmed === '1' || trimmed === '1=1') return true
+
+    const parts = trimmed.split(/\s+(?:AND|and)\s+/)
+    let paramIdx = 0
+    for (let p = 0; p < parts.length; p++) {
+      const part = parts[p]
+      const eqMatch = part.match(/(\w+)\s*=\s*\?/)
+      if (eqMatch != null) {
+        const col = eqMatch[1] as string
+        const val = params[paramIdx]
+        paramIdx++
+        if (this.getColVal(row, col) != val) return false
+        continue
+      }
+      const neqMatch = part.match(/(\w+)\s*(!=|<>)\s*\?/)
+      if (neqMatch != null) {
+        const col = neqMatch[1] as string
+        const val = params[paramIdx]
+        paramIdx++
+        if (this.getColVal(row, col) == val) return false
+        continue
+      }
+      const gteMatch = part.match(/(\w+)\s*>=\s*\?/)
+      if (gteMatch != null) {
+        const col = gteMatch[1] as string
+        const val = params[paramIdx] as number
+        paramIdx++
+        const rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
+        if (isNaN(rowVal) || rowVal < val) return false
+        continue
+      }
+      const gtMatch = part.match(/(\w+)\s*>\s*\?/)
+      if (gtMatch != null) {
+        const col = gtMatch[1] as string
+        const val = params[paramIdx] as number
+        paramIdx++
+        const rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
+        if (isNaN(rowVal) || rowVal <= val) return false
+        continue
+      }
+      const lteMatch = part.match(/(\w+)\s*<=\s*\?/)
+      if (lteMatch != null) {
+        const col = lteMatch[1] as string
+        const val = params[paramIdx] as number
+        paramIdx++
+        const rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
+        if (isNaN(rowVal) || rowVal > val) return false
+        continue
+      }
+      const ltMatch = part.match(/(\w+)\s*<\s*\?/)
+      if (ltMatch != null) {
+        const col = ltMatch[1] as string
+        const val = params[paramIdx] as number
+        paramIdx++
+        const rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
+        if (isNaN(rowVal) || rowVal >= val) return false
+        continue
+      }
+      paramIdx++
+    }
+    return true
+  }
+
+  private loadFromStorage(): void {
+    try {
+      const raw = uni.getStorageSync('_db_tables')
+      if (raw != null && raw !== '') {
+        this.tables = this.parseTableEntries(raw as string)
+      }
+      const idRaw = uni.getStorageSync('_db_auto_inc')
+      if (idRaw != null && idRaw !== '') {
+        this.autoIncrement = this.parseAutoIncEntries(idRaw as string)
+      }
+    } catch (_) {}
+  }
+
+  private parseTableEntries(json: string): TableEntry[] {
+    const result: TableEntry[] = []
+    const items = this.splitJsonArray(json)
+    for (let i = 0; i < items.length; i++) {
+      const name = this.extractJsonStrValue(items[i], 'name')
+      if (name == null || name.length === 0) continue
+      const rowsJson = this.extractJsonRawValue(items[i], 'rows')
+      const rows = rowsJson != null ? this.parseRowEntries(rowsJson) : []
+      result.push({ name: name, rows: rows })
+    }
+    return result
+  }
+
+  private parseAutoIncEntries(json: string): AutoIncrementEntry[] {
+    const result: AutoIncrementEntry[] = []
+    const items = this.splitJsonArray(json)
+    for (let i = 0; i < items.length; i++) {
+      const name = this.extractJsonStrValue(items[i], 'name')
+      const value = this.extractJsonNumValue(items[i], 'value')
+      if (name != null && name.length > 0) {
+        result.push({ name: name, value: value })
+      }
+    }
+    return result
+  }
+
+  private parseRowEntries(json: string): RowEntry[] {
+    const result: RowEntry[] = []
+    const items = this.splitJsonArray(json)
+    for (let i = 0; i < items.length; i++) {
+      const colsJson = this.extractJsonRawValue(items[i], 'cols')
+      const valsJson = this.extractJsonRawValue(items[i], 'vals')
+      if (colsJson == null || valsJson == null) continue
+      const cols = JSON.parse(colsJson) as string[]
+      const vals = JSON.parse(valsJson) as any[]
+      result.push({ cols: cols, vals: vals })
+    }
+    return result
+  }
+
+  private splitJsonArray(json: string): string[] {
+    const trimmed = json.trim()
+    if (trimmed.length < 2 || trimmed.substring(0, 1) !== '[') return []
+    const content = trimmed.substring(1, trimmed.length - 1)
+    const items: string[] = []
+    let depth = 0
+    let start = 0
+    let inStr = false
+    for (let i = 0; i < content.length; i++) {
+      const ch = content.substring(i, i + 1)
+      if (ch === '"' && (i === 0 || content.substring(i - 1, i) !== '\\')) {
+        inStr = !inStr
+      } else if (!inStr) {
+        if (ch === '{' || ch === '[') depth++
+        else if (ch === '}' || ch === ']') depth--
+        else if (ch === ',' && depth === 0) {
+          items.push(content.substring(start, i))
+          start = i + 1
+        }
+      }
+    }
+    if (start < content.length) {
+      const last = content.substring(start).trim()
+      if (last.length > 0) items.push(last)
+    }
+    return items
+  }
+
+  private extractJsonStrValue(objJson: string, key: string): string | null {
+    const pair = this.findJsonPair(objJson, key)
+    if (pair == null) return null
+    const raw = pair.substring(pair.indexOf(':') + 1).trim()
+    if (raw.length >= 2 && raw.substring(0, 1) === '"' && raw.substring(raw.length - 1) === '"') {
+      return raw.substring(1, raw.length - 1)
+    }
+    return null
+  }
+
+  private extractJsonNumValue(objJson: string, key: string): number {
+    const pair = this.findJsonPair(objJson, key)
+    if (pair == null) return 0
+    const raw = pair.substring(pair.indexOf(':') + 1).trim()
+    const n = parseFloat(raw)
+    return !isNaN(n) ? n : 0
+  }
+
+  private extractJsonRawValue(objJson: string, key: string): string | null {
+    const pair = this.findJsonPair(objJson, key)
+    if (pair == null) return null
+    return pair.substring(pair.indexOf(':') + 1).trim()
+  }
+
+  private findJsonPair(objJson: string, key: string): string | null {
+    const pairs = this.extractJsonPairs(objJson)
+    for (let i = 0; i < pairs.length; i++) {
+      const splitted = this.splitPair(pairs[i])
+      if (splitted != null && splitted.length > 0 && splitted[0] === key) {
+        return pairs[i]
+      }
+    }
+    return null
+  }
+
+  private saveToStorage(): void {
+    try {
+      uni.setStorageSync('_db_tables', JSON.stringify(this.tables))
+      uni.setStorageSync('_db_auto_inc', JSON.stringify(this.autoIncrement))
+    } catch (e) {
+      console.error('DB save error: ' + e)
+    }
+  }
+}
+
+export const dbManager = MicroHabitDB.getInstance()

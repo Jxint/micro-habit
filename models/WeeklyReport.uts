@@ -1,0 +1,20 @@
+export type WeeklyReportStats = {
+  totalCompleted: number
+  totalDurationSec: number
+  avgPenetration: number
+  avgGuardMinutes: number
+  bestDay: string
+  bestDayCount: number
+  worstDay: string
+  worstDayCount: number
+}
+
+export type WeeklyReport = {
+  title: string
+  highlight: string
+  improvement: string
+  suggestions: string[]
+  nextWeekGoal: string
+  tone: string
+  stats: WeeklyReportStats
+}

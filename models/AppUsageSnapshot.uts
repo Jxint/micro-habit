@@ -1,0 +1,8 @@
+export type AppUsageSnapshot = {
+  id: number
+  date: string
+  package_name: string
+  app_label: string
+  total_foreground_sec: number
+  created_at: number
+}

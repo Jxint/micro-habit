@@ -1,0 +1,57 @@
+export function now(): number {
+  return Date.now()
+}
+
+export function today(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = ('' + (d.getMonth() + 1)).padStart(2, '0')
+  const day = ('' + d.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + day
+}
+
+export function yesterday(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  const y = d.getFullYear()
+  const m = ('' + (d.getMonth() + 1)).padStart(2, '0')
+  const day = ('' + d.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + day
+}
+
+export function daysAgo(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  const y = d.getFullYear()
+  const m = ('' + (d.getMonth() + 1)).padStart(2, '0')
+  const day = ('' + d.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + day
+}
+
+export function currentHour(): number {
+  return new Date().getHours()
+}
+
+export function getHour(timestamp: number): number {
+  return new Date(timestamp).getHours()
+}
+
+export function formatDate(timestamp: number): string {
+  const d = new Date(timestamp)
+  const y = d.getFullYear()
+  const m = ('' + (d.getMonth() + 1)).padStart(2, '0')
+  const day = ('' + d.getDate()).padStart(2, '0')
+  const h = ('' + d.getHours()).padStart(2, '0')
+  const min = ('' + d.getMinutes()).padStart(2, '0')
+  return y + '-' + m + '-' + day + ' ' + h + ':' + min
+}
+
+export function isInTimeRange(start: string, end: string): boolean {
+  const h = currentHour()
+  const sHour = parseInt(start.split(':')[0] as string)
+  const eHour = parseInt(end.split(':')[0] as string)
+  if (sHour <= eHour) {
+    return h >= sHour && h < eHour
+  }
+  return h >= sHour || h < eHour
+}

@@ -1,0 +1,152 @@
+import { TriggerLog } from '../models/TriggerLog'
+import { selectAction, isFrequencyReduced, onConsecutiveSkip, onCompleted } from './RuleEngine'
+import { isNewbie, getMinTriggerIntervalMs, getNewbieTriggerLevel } from './NewbieGuard'
+import { insertTriggerLog } from '../database/TriggerLogDao'
+import { insertActionLog } from '../database/ActionLogDao'
+import { getInt, getBool, getSetting as getSettingVal } from '../database/SettingsDao'
+import { getActionById } from '../constants/Actions'
+import { isInTimeRange, now } from '../utils/TimeUtils'
+
+export enum TriggerState {
+  IDLE,
+  SHOWING,
+  EXECUTING,
+  COMPLETING,
+  COOLING_DOWN
+}
+
+export type TriggerContext = {
+  appPackage: string
+  appLabel: string
+  continuousMinutes: number
+  triggerType: string
+}
+
+export type TriggerDecision = {
+  actionId: string
+  triggerLevel: string
+  triggerType: string
+  durationMs: number
+  ttsText: string
+  actionName: string
+}
+
+let currentState: TriggerState = TriggerState.IDLE
+let lastTriggerTime: number = 0
+const COOL_DOWN_MS: number = 5 * 60 * 1000
+
+export function getCurrentState(): TriggerState {
+  return currentState
+}
+
+export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
+  if (currentState !== TriggerState.IDLE) return null
+
+  const nowMs = Date.now()
+  if (nowMs - lastTriggerTime < COOL_DOWN_MS) return null
+
+  if (isInDndPeriod()) return null
+
+  if (isBlacklisted(context.appPackage)) return null
+
+  if (isNewbie()) {
+    const minInterval = getMinTriggerIntervalMs()
+    if (nowMs - lastTriggerTime < minInterval) return null
+  }
+
+  if (isFrequencyReduced(context.triggerType)) return null
+
+  const actionId = selectAction(context.triggerType)
+  if (actionId == null) return null
+
+  const action = getActionById(actionId)
+  if (action == null) return null
+
+  let triggerLevel = decideTriggerLevel(context)
+  if (isNewbie()) {
+    triggerLevel = getNewbieTriggerLevel(triggerLevel)
+  }
+
+  currentState = TriggerState.SHOWING
+  lastTriggerTime = nowMs
+
+  const triggerLog: TriggerLog = {
+    id: 0,
+    trigger_type: context.triggerType,
+    trigger_level: triggerLevel,
+    app_package: context.appPackage,
+    app_category: null,
+    continuous_minutes: context.continuousMinutes,
+    action_id: actionId,
+    user_action: null,
+    created_at: Math.floor(nowMs / 1000)
+  }
+  insertTriggerLog(triggerLog)
+
+  return {
+    actionId: actionId,
+    triggerLevel: triggerLevel,
+    triggerType: context.triggerType,
+    durationMs: action.defaultDurationMs,
+    ttsText: action.ttsText,
+    actionName: action.name
+  }
+}
+
+export function onUserAccepted(): void {
+  currentState = TriggerState.EXECUTING
+}
+
+export function onActionResolved(): void {
+  currentState = TriggerState.COOLING_DOWN
+  scheduleCooldownEnd()
+}
+
+export function onExternalInterrupt(): void {
+  dismissOverlay()
+  currentState = TriggerState.COOLING_DOWN
+  scheduleCooldownEnd()
+}
+
+export function forceIdle(): void {
+  currentState = TriggerState.IDLE
+}
+
+function dismissOverlay(): void {
+}
+
+function scheduleCooldownEnd(): void {
+  scheduleTimer(() : void => {
+    if (currentState === TriggerState.COOLING_DOWN) {
+      currentState = TriggerState.IDLE
+    }
+  }, COOL_DOWN_MS)
+}
+
+function isInDndPeriod(): boolean {
+  const enabled = getBool('dnd_enabled', true)
+  if (!enabled) return false
+  const start = getSettingVal('dnd_start', '22:00')
+  const end = getSettingVal('dnd_end', '07:00')
+  return isInTimeRange(start, end)
+}
+
+function isBlacklisted(packageName: string): boolean {
+  const listStr = getSettingVal('app_blacklist', '[]')
+  try {
+    const list = JSON.parse(listStr) as string[]
+    return list.indexOf(packageName) >= 0
+  } catch (_) {
+    return false
+  }
+}
+
+function decideTriggerLevel(context: TriggerContext): string {
+  if (context.continuousMinutes >= 120) return 'strong'
+  if (context.continuousMinutes >= 90) return 'strong'
+  return 'gentle'
+}
+
+function scheduleTimer(fn: () => void, ms: number): void {
+  setTimeout(fn, ms)
+}

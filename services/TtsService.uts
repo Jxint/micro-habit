@@ -1,0 +1,52 @@
+import { getInt, getBool } from '../database/SettingsDao'
+import { currentHour } from '../utils/TimeUtils'
+
+type AdhocContext = {
+  appLabel: string
+  continuousMinutes: number
+  hour: number
+}
+
+export function speakAdhocOpen(context: AdhocContext): void {
+  if (isSystemMuted()) return
+
+  const volume = getAdjustedVolume()
+  playFallbackIntro(volume)
+}
+
+export function speakFixedGuide(text: string): void {
+  if (isSystemMuted()) return
+  const volume = getAdjustedVolume()
+  speakSystemTts(text, volume)
+}
+
+export function preGenerateAll(): void {
+}
+
+function playFallbackIntro(volume: number): void {
+  const intros = [
+    '该起来动动了——',
+    '休息一下，来——',
+    '你的身体发来一条提醒——'
+  ]
+  const idx = Math.floor(Math.random() * intros.length)
+  speakSystemTts(intros[idx], volume)
+}
+
+function speakSystemTts(text: string, volume: number): void {
+}
+
+function getAdjustedVolume(): number {
+  let vol = getInt('tts_volume', 70) / 100
+  if (isNightTime()) vol *= 0.5
+  return vol
+}
+
+function isNightTime(): boolean {
+  const h = currentHour()
+  return h >= 22 || h < 7
+}
+
+function isSystemMuted(): boolean {
+  return !getBool('tts_enabled', true)
+}

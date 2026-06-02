@@ -1,0 +1,120 @@
+export type DailyData = {
+  totalCompleted: number
+  totalSkipped: number
+  totalDurationSec: number
+  guardMinutes: number
+  penetration: number
+  eyeScore: number
+  postureScore: number
+  vitalityScore: number
+  todayCompletedCount: number
+}
+
+import { WeeklyReportStats } from '../models/WeeklyReport'
+import { TriggerRule } from '../models/TriggerRule'
+
+type CloudResponse = {
+  code: number
+  data: any
+  error: string | null
+}
+
+export function callDaily(date: string, data: DailyData, onOK: (result: any) => void, onFail: () => void): void {
+  callCloudFn('llm-daily', {
+    date: date,
+    data: {
+      totalCompleted: data.totalCompleted,
+      totalSkipped: data.totalSkipped,
+      totalDurationSec: data.totalDurationSec,
+      guardMinutes: data.guardMinutes,
+      penetration: data.penetration,
+      eyeScore: data.eyeScore,
+      postureScore: data.postureScore,
+      vitalityScore: data.vitalityScore
+    }
+  }, onOK, onFail)
+}
+
+export function callWeekly(data: WeeklyReportStats, onOK: (result: any) => void, onFail: () => void): void {
+  callCloudFn('llm-weekly', {
+    data: {
+      totalCompleted: data.totalCompleted,
+      totalDurationSec: data.totalDurationSec,
+      avgPenetration: data.avgPenetration,
+      avgGuardMinutes: data.avgGuardMinutes,
+      bestDay: data.bestDay,
+      bestDayCount: data.bestDayCount,
+      worstDay: data.worstDay,
+      worstDayCount: data.worstDayCount
+    }
+  }, onOK, onFail)
+}
+
+export function callRuleSuggest(data: any, onOK: (result: any) => void): void {
+  const r = Math.random()
+  if (r < 0.15) {
+    const rule: TriggerRule = {
+      id: 0,
+      rule_type: 'frequency',
+      trigger_type: 'app_duration',
+      condition_json: '{}',
+      action_weights_json: '{}',
+      enabled: 1,
+      priority: 1,
+      source: 'ai_suggest',
+      expires_at: null,
+      created_at: Math.floor(Date.now() / 1000),
+      updated_at: Math.floor(Date.now() / 1000)
+    }
+    onOK({ shouldSuggest: true, rule: rule })
+  } else {
+    onOK({ shouldSuggest: false, rule: null })
+  }
+}
+
+export function callRuleRefine(data: any, onOK: (result: any) => void): void {
+  onOK({ shouldAdjust: false, insight: '' })
+}
+
+export function callTtsProxy(text: string, onOK: (result: any) => void): void {
+  onOK({ code: -1, error: 'TTS 暂未实现' })
+}
+
+type TtsAdhocOptions = {
+  timeout: number
+}
+
+export function callTtsAdhoc(context: any, options: TtsAdhocOptions, onOK: (result: any) => void, onFail: () => void): void {
+  onFail()
+}
+
+function callCloudFn(name: string, payload: any, onOK: (result: any) => void, onFail: () => void): void {
+  try {
+    const payloadStr = JSON.stringify(payload)
+    uni.request({
+      url: 'https://fc-mp-xxx.bspapp.com/' + name,
+      method: 'POST',
+      header: { 'Content-Type': 'application/json' },
+      data: payloadStr,
+      timeout: 15000,
+      success(res) {
+        try {
+          const dataJson = JSON.stringify(res.data)
+          const obj = JSON.parse(dataJson) as CloudResponse
+          if (obj.code === 0 && obj.data != null) {
+            onOK(obj.data)
+          } else {
+            onFail()
+          }
+        } catch (_) {
+          onFail()
+        }
+      },
+      fail(err) {
+        onFail()
+      }
+    })
+  } catch (_) {
+    onFail()
+  }
+}

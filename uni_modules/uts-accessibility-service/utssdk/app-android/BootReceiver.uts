@@ -1,0 +1,18 @@
+import BroadcastReceiver from 'android.content.BroadcastReceiver'
+import Context from 'android.content.Context'
+import Intent from 'android.content.Intent'
+
+class BootReceiver extends BroadcastReceiver {
+  constructor() {
+    super()
+  }
+
+  override onReceive(context: Context, intent: Intent): void {
+    try {
+      if (intent.action == 'android.intent.action.BOOT_COMPLETED') {
+        const serviceIntent = Intent(context, MonitorForegroundService)
+        context.startForegroundService(serviceIntent)
+      }
+    } catch (_) {}
+  }
+}

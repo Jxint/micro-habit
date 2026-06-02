@@ -1,0 +1,13 @@
+export function shortVibrate(times: number = 1): void {
+  try {
+    for (let i = 0; i < times; i++) {
+      uni.vibrateShort({ type: 'medium' })
+    }
+  } catch (_) {}
+}
+
+export function longVibrate(): void {
+  try {
+    uni.vibrateLong({})
+  } catch (_) {}
+}

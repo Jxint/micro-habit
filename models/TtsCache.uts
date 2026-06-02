@@ -1,0 +1,8 @@
+export type TtsCache = {
+  text_hash: string
+  text_content: string
+  file_path: string
+  file_size: number
+  source: string
+  created_at: number
+}

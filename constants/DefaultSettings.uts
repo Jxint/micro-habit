@@ -1,0 +1,26 @@
+export type DefaultSetting = {
+  key: string
+  value: string
+}
+
+export const DEFAULT_SETTINGS: DefaultSetting[] = [
+  { key: 'daily_goal', value: '20' },
+  { key: 'app_duration_threshold', value: '60' },
+  { key: 'dnd_start', value: '22:00' },
+  { key: 'dnd_end', value: '07:00' },
+  { key: 'dnd_enabled', value: '1' },
+  { key: 'app_blacklist', value: '[]' },
+  { key: 'action_duration_pref', value: '15' },
+  { key: 'tts_enabled', value: '1' },
+  { key: 'tts_volume', value: '70' },
+  { key: 'tts_night_quiet', value: '1' },
+  { key: 'cloud_sync_enabled', value: '0' },
+  { key: 'llm_analysis_enabled', value: '1' },
+  { key: 'daily_summary_time', value: '21:00' },
+  { key: 'weekly_report_enabled', value: '1' },
+  { key: 'dark_mode', value: 'system' },
+  { key: 'newbie_mode', value: '1' },
+  { key: 'guide_completed', value: '0' },
+  { key: 'health_preference', value: 'balanced' },
+  { key: 'body_limit', value: 'none' }
+]

@@ -1,0 +1,13 @@
+export type ActionCategory = '护眼' | '肩颈' | '核心' | '下肢' | '呼吸'
+
+export type DifficultyLevel = 1 | 2 | 3
+
+export type MicroAction = {
+  id: string
+  name: string
+  category: ActionCategory
+  defaultDurationMs: number
+  difficulty: DifficultyLevel
+  ttsText: string
+  iconPath: string
+}

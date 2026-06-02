@@ -1,0 +1,163 @@
+<template>
+  <view class="chart-wrapper">
+    <canvas :id="canvasId" class="chart-canvas" :style="{ height: canvasH + 'px' }"></canvas>
+  </view>
+</template>
+
+<script setup lang="uts">
+type LinePoint = {
+  label: string
+  value: number
+}
+
+type LineSeries = {
+  name: string
+  color: string
+  points: LinePoint[]
+}
+
+const props = withDefaults(defineProps<{
+  series: LineSeries[]
+  title: string
+  height: number
+}>(), {
+  series: () => [],
+  title: '',
+  height: 260
+})
+
+const canvasId = 'line_' + Math.floor(Math.random() * 100000)
+const canvasH = props.height
+
+let ctx: CanvasRenderingContext2D | null = null
+let canvasW = 0
+let canvasHPhys = 0
+
+function draw(): void {
+  if (ctx == null) return
+  const c = ctx as CanvasRenderingContext2D
+  const w = canvasW
+  const h = canvasHPhys
+  const padLeft = 36
+  const padTop = 30
+  const padRight = 16
+  const padBottom = 24
+  const chartW = w - padLeft - padRight
+  const chartH = h - padTop - padBottom
+
+  c.clearRect(0, 0, w, h)
+
+  if (props.title !== '') {
+    c.fillStyle = '#2C3E50'
+    c.font = '12px sans-serif'
+    c.textAlign = 'center'
+    c.fillText(props.title, w / 2, 14)
+    c.textAlign = 'start'
+  }
+
+  const seriesArr = props.series
+  if (seriesArr.length === 0 || seriesArr[0].points.length === 0) return
+
+  const maxPoints = seriesArr[0].points.length
+
+  const gridLines = 4
+  c.strokeStyle = '#E8E8E8'
+  c.lineWidth = 0.5
+  for (let i = 0; i <= gridLines; i++) {
+    const y = padTop + (chartH * i) / gridLines
+    c.beginPath()
+    c.moveTo(padLeft, y)
+    c.lineTo(w - padRight, y)
+    c.stroke()
+
+    const label = Math.round(100 * (1 - i / gridLines))
+    c.fillStyle = '#95A5A6'
+    c.font = '9px sans-serif'
+    c.textAlign = 'right'
+    c.fillText('' + label, padLeft - 4, y + 3)
+    c.textAlign = 'start'
+  }
+
+  for (let si = 0; si < seriesArr.length; si++) {
+    const s = seriesArr[si]
+    if (s.points.length === 0) continue
+
+    c.strokeStyle = s.color
+    c.lineWidth = 2
+    c.beginPath()
+    for (let i = 0; i < s.points.length; i++) {
+      const x = padLeft + (chartW * i) / (s.points.length - 1)
+      const val = Math.max(0, Math.min(100, s.points[i].value))
+      const y = padTop + chartH * (1 - val / 100)
+      if (i === 0) c.moveTo(x, y)
+      else c.lineTo(x, y)
+    }
+    c.stroke()
+
+    c.fillStyle = s.color
+    for (let i = 0; i < s.points.length; i++) {
+      const x = padLeft + (chartW * i) / (s.points.length - 1)
+      const val = Math.max(0, Math.min(100, s.points[i].value))
+      const y = padTop + chartH * (1 - val / 100)
+      c.beginPath()
+      c.arc(x, y, 3, 0, Math.PI * 2, false)
+      c.fill()
+    }
+  }
+
+  let legendX: number = padLeft
+  for (let si = 0; si < seriesArr.length; si++) {
+    const s = seriesArr[si]
+    c.fillStyle = s.color
+    c.fillRect(legendX, padTop - 14, 10, 10)
+    c.fillStyle = '#2C3E50'
+    c.font = '10px sans-serif'
+    c.textAlign = 'start'
+    c.fillText(s.name, legendX + 14, padTop - 6)
+    legendX += 70
+  }
+  c.textAlign = 'start'
+
+  const firstSeries = seriesArr[0]
+  c.fillStyle = '#95A5A6'
+  c.font = '9px sans-serif'
+  c.textAlign = 'center'
+  for (let i = 0; i < maxPoints; i++) {
+    const x = padLeft + (chartW * i) / (maxPoints - 1)
+    c.fillText(firstSeries.points[i].label, x, padTop + chartH + 14)
+  }
+  c.textAlign = 'start'
+}
+
+onReady(() => {
+  const instance = getCurrentInstance()?.proxy
+  if (instance == null) return
+  uni.createCanvasContextAsync({
+    id: canvasId,
+    component: instance,
+    success: (context: CanvasContext) => {
+      ctx = context.getContext('2d')!
+      if (ctx == null) return
+      const canvas = ctx.canvas
+      const dpr = uni.getDeviceInfo().devicePixelRatio ?? 1
+      canvasW = canvas.offsetWidth
+      canvas.width = canvasW * dpr
+      canvas.height = canvasH * dpr
+      ctx.scale(dpr, dpr)
+      canvasHPhys = canvasH
+      draw()
+    }
+  })
+})
+</script>
+
+<style scoped>
+.chart-wrapper {
+  flex-direction: column;
+  width: 100%;
+  padding: 4px 0;
+}
+.chart-canvas {
+  width: 100%;
+}
+</style>

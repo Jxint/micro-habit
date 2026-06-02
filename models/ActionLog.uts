@@ -1,0 +1,18 @@
+export type ActionResult = 'completed' | 'self_reported' | 'skipped' | 'feedback'
+
+export type SkipReason = 'busy' | 'too_hard' | 'bad_timing' | 'dont_want' | string
+
+export type ActionLog = {
+  id: number
+  action_id: string
+  action_type: string
+  result: ActionResult
+  skip_reason: string | null
+  trigger_type: string
+  trigger_level: string
+  duration_ms: number
+  target_ms: number
+  triggered_at: number
+  completed_at: number
+  created_at: number
+}

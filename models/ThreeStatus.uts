@@ -1,0 +1,10 @@
+export type StatusLevel = 'good' | 'normal' | 'warning' | 'no_data'
+
+export type ThreeStatus = {
+  eyeScore: number
+  eyeLevel: StatusLevel
+  postureScore: number
+  postureLevel: StatusLevel
+  vitalityScore: number
+  vitalityLevel: StatusLevel
+}

@@ -1,0 +1,149 @@
+<template>
+  <view class="dialog-overlay" v-if="visible">
+    <view class="dialog-content">
+      <text class="dialog-title">跳过原因</text>
+      <view class="reason-list">
+        <view
+          v-for="(item, index) in reasons"
+          :key="index"
+          class="reason-item"
+          :class="{ selected: selectedIndex === index }"
+          @tap="selectReason(index)"
+        >
+          <text class="reason-text">{{ item }}</text>
+        </view>
+      </view>
+      <input v-if="showCustom" class="custom-input" v-model="customText" placeholder="输入其他原因..." />
+      <view class="dialog-actions">
+        <button class="cancel-btn" @tap="onCancel">取消</button>
+        <button class="confirm-btn" @tap="onConfirm">确定</button>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  visible: boolean
+}>(), {})
+
+const emit = defineEmits<{
+  (e: 'confirm', reason: string): void
+  (e: 'cancel'): void
+}>()
+
+const reasons: string[] = ['正在忙', '动作太难', '时机不对', '不想做', '其他']
+const selectedIndex = ref(-1)
+const showCustom = ref(false)
+const customText = ref('')
+
+function selectReason(index: number): void {
+  selectedIndex.value = index
+  showCustom.value = index === (reasons.length - 1)
+}
+
+function onCancel(): void {
+  selectedIndex.value = -1
+  showCustom.value = false
+  customText.value = ''
+  emit('cancel')
+}
+
+function onConfirm(): void {
+  let reason = ''
+  if (selectedIndex.value >= 0) {
+    if (selectedIndex.value === reasons.length - 1) {
+      const ct = customText.value
+      reason = ct.length > 0 ? ct : '其他'
+    } else {
+      reason = reasons[selectedIndex.value]
+    }
+  }
+  selectedIndex.value = -1
+  showCustom.value = false
+  customText.value = ''
+  emit('confirm', reason)
+}
+</script>
+
+<style scoped>
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+}
+.dialog-content {
+  width: 280px;
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  padding: 20px;
+  flex-direction: column;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.reason-list {
+  flex-direction: column;
+}
+.reason-item {
+  padding: 10px 12px;
+  margin: 3px 0;
+  border-radius: 8px;
+  background-color: #F8F9FA;
+  border-width: 1px;
+  border-color: #E8E8E8;
+  border-style: solid;
+}
+.reason-item.selected {
+  background-color: #EBF5FB;
+  border-color: #3498DB;
+}
+.reason-text {
+  font-size: 14px;
+  color: #2C3E50;
+}
+.custom-input {
+  border-width: 1px;
+  border-color: #E0E0E0;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.dialog-actions {
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+.cancel-btn {
+  flex: 1;
+  margin-right: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #ECF0F1;
+  color: #7F8C8D;
+  font-size: 14px;
+  text-align: center;
+}
+.confirm-btn {
+  flex: 1;
+  margin-left: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #3498DB;
+  color: #FFFFFF;
+  font-size: 14px;
+  text-align: center;
+}
+</style>

@@ -1,0 +1,331 @@
+<template>
+  <view class="page">
+    <scroll-view class="scroll-area" scroll-y="true">
+      <view class="greeting-bar">
+        <text class="greeting-text">{{ greeting }}</text>
+        <text class="settings-icon" @tap="goSettings">⚙</text>
+      </view>
+
+      <StatusIndicator
+        title="护眼"
+        :percent="eyeScore"
+        :status="eyeStatus"
+      />
+      <StatusIndicator
+        title="体态"
+        :percent="postureScore"
+        :status="postureStatus"
+      />
+      <StatusIndicator
+        title="活力"
+        :percent="vitalityScore"
+        :status="vitalityStatus"
+      />
+
+      <view class="guard-section">
+        <text class="guard-text">今日已为你守护 {{ guardMinutes }} 分钟</text>
+      </view>
+
+      <view class="penetration-section">
+        <text class="section-label">习惯渗透度</text>
+        <view class="penetration-track">
+          <view class="penetration-fill" :style="{ width: (penetration * 10 > 100 ? 100 : penetration * 10) + '%' }"></view>
+        </view>
+        <text class="penetration-value">{{ penetrationStr }}</text>
+      </view>
+
+      <view class="summary-card" v-if="dailySummary != null">
+        <text class="summary-eyebrow">✨ 今日小结</text>
+        <text class="summary-oneliner">{{ summaryOneLiner }}</text>
+        <text v-if="summaryBody.length > 0" class="summary-body">{{ summaryBody }}</text>
+        <view v-if="summaryGoal.length > 0" class="summary-goal-row">
+          <text class="summary-goal-label">🎯 明日目标</text>
+          <text class="summary-goal-text">{{ summaryGoal }}</text>
+        </view>
+        <text v-if="summaryEncourage.length > 0" class="summary-encourage">{{ summaryEncourage }}</text>
+      </view>
+      <view class="summary-card summary-empty" v-else>
+        <text class="summary-empty-text">{{ summaryPlaceholder }}</text>
+        <text class="summary-empty-hint">完成更多动作，{{ summaryHour }}:00 后自动生成</text>
+      </view>
+
+      <view class="recommend-section">
+        <text class="section-title">🎯 今日推荐</text>
+        <view v-if="recommendedActions.length === 0" class="empty-recommend">
+          <text class="empty-text">暂无推荐</text>
+        </view>
+        <view v-for="(action, idx) in recommendedActions" :key="'r-' + idx">
+          <ActionCard
+            :action-id="action.id"
+            :action-name="action.name"
+            :action-duration="Math.ceil(action.defaultDurationMs / 1000)"
+            @actionTap="startAction"
+          />
+        </view>
+      </view>
+
+      <view class="library-section">
+        <view class="library-header">
+          <text class="section-title">📚 全部微动作库（{{ allActions.length }}）</text>
+          <text class="library-hint">点选任意动作立即开始</text>
+        </view>
+        <view v-for="(action, idx) in allActions" :key="'a-' + idx" class="library-item">
+          <ActionCard
+            :action-id="action.id"
+            :action-name="action.name"
+            :action-duration="Math.ceil(action.defaultDurationMs / 1000)"
+            @actionTap="startAction"
+          />
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import StatusIndicator from '../../components/StatusIndicator.uvue'
+import ActionCard from '../../components/ActionCard.uvue'
+import { useAppStore, DailyOutput } from '../../stores/appStore'
+import { MicroAction } from '../../models/MicroAction'
+import { currentHour } from '../../utils/TimeUtils'
+import { getEnabledActions } from '../../services/ActionManager'
+import { getSetting } from '../../database/SettingsDao'
+
+const store = useAppStore()
+
+const eyeScore = computed<number>(() : number => store.eyeScore.value)
+const eyeStatus = computed<string>(() : string => store.eyeStatus.value)
+const postureScore = computed<number>(() : number => store.postureScore.value)
+const postureStatus = computed<string>(() : string => store.postureStatus.value)
+const vitalityScore = computed<number>(() : number => store.vitalityScore.value)
+const vitalityStatus = computed<string>(() : string => store.vitalityStatus.value)
+const guardMinutes = computed<number>(() : number => store.guardMinutes.value)
+const penetration = computed<number>(() : number => store.penetration.value)
+const penetrationStr = computed<string>(() : string => penetration.value.toFixed(1))
+const recommendedActions = computed<MicroAction[]>(() : MicroAction[] => store.recommendedActions.value)
+const allActions = computed<MicroAction[]>(() : MicroAction[] => getEnabledActions())
+
+const dailySummary = computed<DailyOutput | null>(() : DailyOutput | null => store.dailySummary.value)
+const dailySummaryLoading = computed<boolean>(() : boolean => store.dailySummaryLoading.value)
+const summaryOneLiner = computed<string>(() : string => {
+  const s = dailySummary.value
+  return s != null && s.one_liner.length > 0 ? s.one_liner : '今日小结待生成'
+})
+const summaryBody = computed<string>(() : string => {
+  const s = dailySummary.value
+  return s != null ? s.summary : ''
+})
+const summaryGoal = computed<string>(() : string => {
+  const s = dailySummary.value
+  return s != null ? s.tomorrow_goal : ''
+})
+const summaryEncourage = computed<string>(() : string => {
+  const s = dailySummary.value
+  return s != null ? s.encourage : ''
+})
+const summaryHour = computed<number>(() : number => {
+  const raw = getSetting('daily_summary_time', '21:00')
+  const sep = raw.indexOf(':')
+  const h = parseInt(sep > 0 ? raw.substring(0, sep) : raw)
+  if (h < 0 || h > 23) return 21
+  return h
+})
+const summaryPlaceholder = computed<string>(() : string => {
+  if (dailySummaryLoading.value) return '正在生成今日小结…'
+  const cnt = store.todayCompletedCount.value
+  if (cnt === 0) return '完成一个微动作，开启今日小结'
+  return '已完成' + cnt + '次，' + summaryHour.value + ':00 后自动小结'
+})
+
+const greeting = computed<string>(() : string => {
+  const h = currentHour()
+  if (h < 6) return '夜深了 🌙'
+  if (h < 9) return '早上好 ☀️'
+  if (h < 12) return '上午好 ☀️'
+  if (h < 14) return '中午好 🌤'
+  if (h < 18) return '下午好 ⛅'
+  if (h < 22) return '晚上好 🌆'
+  return '夜深了 🌙'
+})
+
+onPageShow(() => {
+  store.refreshHomeData()
+})
+
+function startAction(actionId: string): void {
+  uni.navigateTo({
+    url: '/pages/action/execute?actionId=' + actionId
+  })
+}
+
+function goSettings(): void {
+  uni.switchTab({
+    url: '/pages/settings/index'
+  })
+}
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: #F5F6FA;
+}
+.scroll-area {
+  flex: 1;
+}
+.greeting-bar {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  padding-top: 50px;
+}
+.greeting-text {
+  font-size: 22px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.settings-icon {
+  font-size: 22px;
+  color: #7F8C8D;
+}
+.guard-section {
+  align-items: center;
+  padding: 12px 16px;
+}
+.guard-text {
+  font-size: 18px;
+  font-weight: bold;
+  color: #2ECC71;
+}
+.penetration-section {
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 16px;
+  margin: 4px 16px;
+  background-color: #FFFFFF;
+  border-radius: 10px;
+}
+.section-label {
+  font-size: 13px;
+  color: #7F8C8D;
+  width: 80px;
+}
+.penetration-track {
+  flex: 1;
+  height: 6px;
+  background-color: #ECF0F1;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.penetration-fill {
+  height: 6px;
+  background-color: #9B59B6;
+  border-radius: 3px;
+}
+.penetration-value {
+  font-size: 13px;
+  color: #9B59B6;
+  width: 40px;
+  text-align: right;
+}
+.summary-card {
+  background-color: #FFFFFF;
+  margin: 12px 16px;
+  padding: 16px;
+  border-radius: 12px;
+  border-left-width: 4px;
+  border-left-color: #3498DB;
+  border-left-style: solid;
+  flex-direction: column;
+}
+.summary-empty {
+  border-left-color: #BDC3C7;
+  align-items: center;
+}
+.summary-eyebrow {
+  font-size: 12px;
+  color: #3498DB;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+.summary-oneliner {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 8px;
+}
+.summary-body {
+  font-size: 14px;
+  color: #34495E;
+  line-height: 20px;
+  margin-bottom: 8px;
+}
+.summary-goal-row {
+  flex-direction: row;
+  align-items: center;
+  background-color: #F8F9FA;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.summary-goal-label {
+  font-size: 12px;
+  color: #7F8C8D;
+  margin-right: 8px;
+}
+.summary-goal-text {
+  font-size: 13px;
+  color: #2C3E50;
+  flex: 1;
+}
+.summary-encourage {
+  font-size: 13px;
+  color: #E67E22;
+  font-style: italic;
+  margin-top: 4px;
+}
+.summary-empty-text {
+  font-size: 14px;
+  color: #7F8C8D;
+  margin-bottom: 4px;
+}
+.summary-empty-hint {
+  font-size: 12px;
+  color: #95A5A6;
+}
+.recommend-section {
+  margin-top: 8px;
+  padding-bottom: 12px;
+}
+.library-section {
+  margin-top: 8px;
+  padding-bottom: 24px;
+}
+.library-header {
+  flex-direction: column;
+  padding: 0 16px 4px 16px;
+}
+.library-hint {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.library-item {
+  margin: 0 0 8px 0;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #2C3E50;
+  padding: 8px 16px;
+}
+.empty-recommend {
+  padding: 20px;
+  align-items: center;
+}
+.empty-text {
+  font-size: 14px;
+  color: #BDC3C7;
+}
+</style>

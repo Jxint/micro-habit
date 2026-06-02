@@ -1,0 +1,34 @@
+import { dbManager } from './DatabaseManager'
+import { AppUsageSnapshot } from '../models/AppUsageSnapshot'
+import { today } from '../utils/TimeUtils'
+
+export function insertOrUpdateSnapshot(packageName: string, appLabel: string, foregroundSec: number): void {
+  const date = today()
+  const existing = dbManager.queryOne(
+    'SELECT id FROM app_usage_snapshots WHERE date = ? AND package_name = ?',
+    [date, packageName]
+  )
+  if (existing != null) {
+    dbManager.update('app_usage_snapshots',
+      { total_foreground_sec: foregroundSec, app_label: appLabel },
+      'id = ?', [(existing.get("id") as number)]
+    )
+  } else {
+    dbManager.insert('app_usage_snapshots', {
+      date: date,
+      package_name: packageName,
+      app_label: appLabel,
+      total_foreground_sec: foregroundSec,
+      created_at: Math.floor(Date.now() / 1000)
+    })
+  }
+}
+
+export function getTodayTotalUsageMinutes(): number {
+  const date = today()
+  const row = dbManager.queryOne(
+    'SELECT COALESCE(SUM(total_foreground_sec), 0) as total FROM app_usage_snapshots WHERE date = ?',
+    [date]
+  )
+  return row != null ? Math.floor((row.get("total") as number) / 60) : 0
+}

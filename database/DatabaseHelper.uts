@@ -1,0 +1,143 @@
+import { DEFAULT_SETTINGS } from '../constants/DefaultSettings'
+import { dbManager } from './DatabaseManager'
+
+const DB_NAME = 'micro_habit.db'
+const DB_VERSION = 1
+
+export function getDbName(): string {
+  return DB_NAME
+}
+
+export function getDbVersion(): number {
+  return DB_VERSION
+}
+
+function runSql(sql: string, params: any[] = []): void {
+  dbManager.execSql(sql, params)
+}
+
+export function onCreate(db: any): void {
+  createTables()
+  insertDefaultSettings()
+}
+
+export function onUpgrade(db: any, oldVersion: number, newVersion: number): void {
+  if (oldVersion < 2) {
+    runSql("ALTER TABLE daily_summaries ADD COLUMN llm_one_liner TEXT DEFAULT ''")
+  }
+  if (oldVersion < 3) {
+    runSql("CREATE TABLE IF NOT EXISTS weekly_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, week_start TEXT, week_end TEXT, content TEXT, created_at INTEGER)")
+  }
+}
+
+function createTables(): void {
+  runSql(`CREATE TABLE IF NOT EXISTS action_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL,
+    action_type TEXT NOT NULL,
+    result TEXT NOT NULL,
+    skip_reason TEXT DEFAULT NULL,
+    trigger_type TEXT NOT NULL,
+    trigger_level TEXT NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    target_ms INTEGER NOT NULL,
+    triggered_at INTEGER NOT NULL,
+    completed_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_action_logs_date ON action_logs(created_at)")
+  runSql("CREATE INDEX IF NOT EXISTS idx_action_logs_action_id ON action_logs(action_id)")
+  runSql("CREATE INDEX IF NOT EXISTS idx_action_logs_result ON action_logs(result)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS trigger_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_type TEXT NOT NULL,
+    trigger_level TEXT NOT NULL DEFAULT 'gentle',
+    app_package TEXT DEFAULT NULL,
+    app_category TEXT DEFAULT NULL,
+    continuous_minutes INTEGER DEFAULT 0,
+    action_id TEXT DEFAULT NULL,
+    user_action TEXT DEFAULT NULL,
+    created_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_trigger_logs_date ON trigger_logs(created_at)")
+  runSql("CREATE INDEX IF NOT EXISTS idx_trigger_logs_type ON trigger_logs(trigger_type)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS daily_summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    total_completed INTEGER NOT NULL DEFAULT 0,
+    total_skipped INTEGER NOT NULL DEFAULT 0,
+    total_duration_sec INTEGER NOT NULL DEFAULT 0,
+    eye_score REAL NOT NULL DEFAULT 0,
+    posture_score REAL NOT NULL DEFAULT 0,
+    vitality_score REAL NOT NULL DEFAULT 0,
+    penetration REAL NOT NULL DEFAULT 0,
+    phone_usage_min INTEGER NOT NULL DEFAULT 0,
+    guard_minutes INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS trigger_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_type TEXT NOT NULL,
+    trigger_type TEXT NOT NULL,
+    condition_json TEXT NOT NULL,
+    action_weights_json TEXT DEFAULT '{}',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    priority INTEGER NOT NULL DEFAULT 0,
+    source TEXT DEFAULT 'local',
+    expires_at INTEGER DEFAULT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`)
+
+  runSql(`CREATE TABLE IF NOT EXISTS user_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`)
+
+  runSql(`CREATE TABLE IF NOT EXISTS app_usage_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    package_name TEXT NOT NULL,
+    app_label TEXT DEFAULT '',
+    total_foreground_sec INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_app_usage_snapshots_date ON app_usage_snapshots(date)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS tts_cache (
+    text_hash TEXT PRIMARY KEY,
+    text_content TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER NOT NULL DEFAULT 0,
+    source TEXT NOT NULL DEFAULT 'minimax',
+    created_at INTEGER NOT NULL
+  )`)
+
+  runSql(`CREATE TABLE IF NOT EXISTS heartbeat_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    service_status TEXT NOT NULL,
+    timestamp INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_heartbeat_timestamp ON heartbeat_logs(timestamp)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS llm_cache (
+    cache_key TEXT PRIMARY KEY,
+    cache_type TEXT NOT NULL,
+    response TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`)
+}
+
+function insertDefaultSettings(): void {
+  const now = Math.floor(Date.now() / 1000)
+  for (const s of DEFAULT_SETTINGS) {
+    runSql("INSERT OR IGNORE INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)", [s.key, s.value, now])
+  }
+}

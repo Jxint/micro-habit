@@ -1,0 +1,30 @@
+import { dbManager } from './DatabaseManager'
+import { LlmCache } from '../models/LlmCache'
+
+export function getByKey(key: string): LlmCache | null {
+  const row = dbManager.queryOne('SELECT * FROM llm_cache WHERE cache_key = ?', [key])
+  if (row == null) return null
+  return mapRow(row)
+}
+
+export function save(key: string, type: string, response: string, expiresAt: number): void {
+  dbManager.execSql(
+    'INSERT OR REPLACE INTO llm_cache (cache_key, cache_type, response, expires_at, created_at) VALUES (?,?,?,?,?)',
+    [key, type, response, expiresAt, Math.floor(Date.now() / 1000)]
+  )
+}
+
+export function cleanExpired(): void {
+  dbManager.delete('llm_cache', 'expires_at < ?', [Math.floor(Date.now() / 1000)])
+}
+
+function mapRow(row: Map<string, any>): LlmCache {
+  return {
+    cache_key: row.get("cache_key") as string,
+    cache_type: row.get("cache_type") as string,
+    response: row.get("response") as string,
+    model: row.get("model") as string,
+    created_at: row.get("created_at") as number,
+    expires_at: row.get("expires_at") as number
+  }
+}

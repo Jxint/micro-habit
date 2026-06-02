@@ -1,0 +1,77 @@
+<template>
+  <view class="action-card" @tap="onTap">
+    <text class="action-icon">{{ iconEmoji }}</text>
+    <view class="action-info">
+      <text class="action-name">{{ props.actionName }}</text>
+      <text class="action-duration-text">{{ props.actionDuration }}秒</text>
+    </view>
+    <text class="action-arrow">›</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  actionId: string
+  actionName: string
+  actionDuration: number
+}>(), {})
+
+const emit = defineEmits<{
+  (e: 'actionTap', actionId: string): void
+}>()
+
+function iconEmoji(): string {
+  if (props.actionId === 'eye_blink') return '👁'
+  if (props.actionId === 'eye_rotate') return '👀'
+  if (props.actionId === 'neck_rotate') return '🔄'
+  if (props.actionId === 'shoulder_roll') return '💪'
+  if (props.actionId === 'neck_stretch') return '🧘'
+  if (props.actionId === 'core_tighten') return '🔥'
+  if (props.actionId === 'heel_raise') return '🦶'
+  if (props.actionId === 'deep_breath') return '🌬'
+  if (props.actionId === 'far_gaze') return '🏔'
+  return '✓'
+}
+
+function onTap(): void {
+  emit('actionTap', props.actionId)
+}
+</script>
+
+<style scoped>
+.action-card {
+  flex-direction: row;
+  align-items: center;
+  padding: 12px 16px;
+  margin: 4px 16px;
+  background-color: #F8F9FA;
+  border-radius: 10px;
+  border-width: 1px;
+  border-color: #E8E8E8;
+  border-style: solid;
+}
+.action-icon {
+  font-size: 24px;
+  width: 36px;
+  text-align: center;
+}
+.action-info {
+  flex: 1;
+  flex-direction: column;
+  margin-left: 8px;
+}
+.action-name {
+  font-size: 15px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.action-duration-text {
+  font-size: 12px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.action-arrow {
+  font-size: 20px;
+  color: #BDC3C7;
+}
+</style>

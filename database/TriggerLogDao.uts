@@ -1,0 +1,75 @@
+import { dbManager } from './DatabaseManager'
+import { TriggerLog, UserAction } from '../models/TriggerLog'
+
+export function insertTriggerLog(log: TriggerLog): number {
+  return dbManager.insert('trigger_logs', {
+    trigger_type: log.trigger_type,
+    trigger_level: log.trigger_level,
+    app_package: log.app_package,
+    app_category: log.app_category,
+    continuous_minutes: log.continuous_minutes,
+    action_id: log.action_id,
+    user_action: log.user_action,
+    created_at: log.created_at
+  })
+}
+
+export function countTriggersByDateAndActionIds(date: string, actionIds: string[]): number {
+  const start = getTimestampFromDate(date)
+  const end = start + 86400000
+  const ids = actionIds.map((id: string): string => "'" + id + "'").join(',')
+  const row = dbManager.queryOne(
+    'SELECT COUNT(*) as cnt FROM trigger_logs WHERE created_at >= ? AND created_at < ? AND action_id IN (' + ids + ')',
+    [start, end]
+  )
+  return row != null ? (row.get("cnt") as number) : 0
+}
+
+export function countTriggersToday(): number {
+  const start = getDayStartTimestamp()
+  const end = start + 86400000
+  const row = dbManager.queryOne(
+    'SELECT COUNT(*) as cnt FROM trigger_logs WHERE created_at >= ? AND created_at < ?',
+    [start, end]
+  )
+  return row != null ? (row.get("cnt") as number) : 0
+}
+
+export function getTodayTriggerLogs(): TriggerLog[] {
+  const start = getDayStartTimestamp()
+  const end = start + 86400000
+  const rows = dbManager.query(
+    'SELECT * FROM trigger_logs WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC',
+    [start, end]
+  )
+  return rows.map((r: Map<string, any>): TriggerLog => mapRow(r))
+}
+
+export function cleanOldTriggerLogs(): void {
+  const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400
+  dbManager.delete('trigger_logs', 'created_at < ?', [thirtyDaysAgo])
+}
+
+function mapRow(row: Map<string, any>): TriggerLog {
+  return {
+    id: row.get("id") as number,
+    trigger_type: row.get("trigger_type") as string,
+    trigger_level: row.get("trigger_level") as string,
+    app_package: row.get("app_package") as string | null,
+    app_category: row.get("app_category") as string | null,
+    continuous_minutes: row.get("continuous_minutes") as number,
+    action_id: row.get("action_id") as string | null,
+    user_action: row.get("user_action") as UserAction | null,
+    created_at: row.get("created_at") as number
+  }
+}
+
+function getDayStartTimestamp(): number {
+  const d = new Date()
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
+function getTimestampFromDate(date: string): number {
+  const parts = date.split('-')
+  return new Date(parseInt(parts[0] as string), parseInt(parts[1] as string) - 1, parseInt(parts[2] as string)).getTime()
+}

@@ -1,0 +1,62 @@
+import { MicroAction } from '../models/MicroAction'
+import { getEnabledActions } from './ActionManager'
+import { getTodayLogs } from '../database/ActionLogDao'
+import { currentHour } from '../utils/TimeUtils'
+
+type ScoredItem = {
+  action: MicroAction
+  score: number
+}
+
+export function getRecommendedActions(): MicroAction[] {
+  const enabledActions = getEnabledActions()
+  if (enabledActions.length === 0) return []
+
+  const hour = currentHour()
+  const todayLogs = getTodayLogs()
+
+  const categoryCount: Map<string, number> = new Map<string, number>()
+  for (const action of enabledActions) {
+    categoryCount.set(action.category, 0)
+  }
+  for (const log of todayLogs) {
+    if (log.result === 'completed' || log.result === 'self_reported') {
+      const current = categoryCount.get(log.action_type)
+      if (current != null) {
+        categoryCount.set(log.action_type, current + 1)
+      }
+    }
+  }
+
+  let minCategory = ''
+  let minCount: number = 999999999
+  const allCats: string[] = ['护眼', '肩颈', '核心', '下肢', '呼吸']
+  for (let i = 0; i < allCats.length; i++) {
+    const cnt = categoryCount.get(allCats[i])
+    if (cnt != null && cnt < minCount) {
+      minCount = cnt
+      minCategory = allCats[i]
+    }
+  }
+
+  const preferredTypes = getPreferredTypes(hour)
+
+  const scored: ScoredItem[] = enabledActions.map((a: MicroAction): ScoredItem => {
+    const rawCount = categoryCount.get(a.category)
+    const catCount = rawCount != null ? rawCount : 0
+    const isPreferred = preferredTypes.indexOf(a.category) >= 0 ? 0 : 1
+    const isMinCategory = a.category === minCategory ? -1 : 0
+    const item: ScoredItem = { action: a, score: catCount + isPreferred + isMinCategory }
+    return item
+  })
+
+  scored.sort((a: ScoredItem, b: ScoredItem): number => a.score - b.score)
+  return scored.slice(0, 3).map((s: ScoredItem): MicroAction => s.action)
+}
+
+function getPreferredTypes(hour: number): string[] {
+  if (hour >= 22 || hour < 7) return ['护眼', '呼吸', '肩颈']
+  if (hour >= 7 && hour <= 12) return ['肩颈', '核心', '护眼']
+  if (hour >= 13 && hour <= 18) return ['核心', '下肢', '护眼']
+  return ['护眼', '肩颈', '呼吸']
+}

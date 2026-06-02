@@ -1,0 +1,10 @@
+export const EYE_ACTION_IDS: string[] = ['eye_blink', 'eye_rotate', 'far_gaze']
+export const POSTURE_ACTION_IDS: string[] = ['neck_rotate', 'shoulder_roll', 'neck_stretch']
+export const VITALITY_ACTION_IDS: string[] = ['core_tighten', 'heel_raise', 'deep_breath']
+
+export function getActionCategory(actionId: string): string {
+  if (EYE_ACTION_IDS.indexOf(actionId) >= 0) return '护眼'
+  if (POSTURE_ACTION_IDS.indexOf(actionId) >= 0) return '体态'
+  if (VITALITY_ACTION_IDS.indexOf(actionId) >= 0) return '活力'
+  return '其他'
+}

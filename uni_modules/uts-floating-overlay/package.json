@@ -1,0 +1,10 @@
+{
+  "id": "uts-floating-overlay",
+  "name": "悬浮窗覆盖",
+  "version": "1.0.0",
+  "description": "WindowManager 悬浮窗管理，支持 Lottie 动画",
+  "dependencies": [],
+  "permissions": [
+    "android.permission.SYSTEM_ALERT_WINDOW"
+  ]
+}

@@ -1,0 +1,53 @@
+import TextToSpeech from 'android.speech.tts.TextToSpeech'
+import Locale from 'java.util.Locale'
+
+let ttsInstance: TextToSpeech | null = null
+let ttsReady: boolean = false
+let pendingText: string = ''
+
+export function speakSystemTts(text: string): void {
+  if (ttsInstance != null && ttsReady) {
+    ttsInstance!!.speak(text, TextToSpeech.QUEUE_FLUSH, null, 'micro_habit_tts')
+  } else {
+    if (ttsInstance == null) {
+      initTts()
+    }
+    pendingText = text
+  }
+}
+
+export function isSystemTtsAvailable(): boolean {
+  return ttsReady
+}
+
+export function stopSystemTts(): void {
+  if (ttsInstance != null) {
+    ttsInstance!!.stop()
+  }
+}
+
+export function shutdownSystemTts(): void {
+  if (ttsInstance != null) {
+    ttsInstance!!.shutdown()
+    ttsInstance = null
+    ttsReady = false
+    pendingText = ''
+  }
+}
+
+function initTts(): void {
+  try {
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return
+    ttsInstance = TextToSpeech(ctx, function(status: number): void {
+      if (status == TextToSpeech.SUCCESS) {
+        const result = ttsInstance!!.setLanguage(Locale.CHINESE)
+        ttsReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+        if (ttsReady && !pendingText.isEmpty()) {
+          ttsInstance!!.speak(pendingText, TextToSpeech.QUEUE_FLUSH, null, 'micro_habit_tts')
+          pendingText = ''
+        }
+      }
+    })
+  } catch (_) {}
+}

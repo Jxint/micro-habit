@@ -1,0 +1,432 @@
+<template>
+  <view class="page">
+    <view class="header">
+      <view class="header-left" @tap="goBack">
+        <text class="header-back">‹</text>
+      </view>
+      <text class="header-title">调试日志</text>
+      <view class="header-right" @tap="refresh">
+        <text class="header-refresh">↻</text>
+      </view>
+    </view>
+
+    <view class="stats-row">
+      <view class="stat-card">
+        <text class="stat-num">{{ triggerLogs.length }}</text>
+        <text class="stat-label">今日触发</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-num">{{ actionLogs.length }}</text>
+        <text class="stat-label">今日动作</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-num">{{ completedCount }}</text>
+        <text class="stat-label">完成数</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-num">{{ skippedCount }}</text>
+        <text class="stat-label">跳过数</text>
+      </view>
+    </view>
+
+    <view class="tab-bar">
+      <view class="tab" :class="{ active: currentTab === 'trigger' }" @tap="switchTabTrigger">
+        <text class="tab-text">触发日志</text>
+      </view>
+      <view class="tab" :class="{ active: currentTab === 'action' }" @tap="switchTabAction">
+        <text class="tab-text">动作日志</text>
+      </view>
+    </view>
+
+    <scroll-view class="log-scroll" scroll-y="true">
+      <view v-if="currentTab === 'trigger'">
+        <view v-if="triggerLogs.length === 0" class="empty">
+          <text class="empty-text">今日暂无触发记录</text>
+          <text class="empty-hint">去使用某个 App 1 分钟以上会触发提醒</text>
+        </view>
+        <view v-for="(log, idx) in triggerLogs" :key="log.id" class="log-item">
+          <view class="log-row1">
+            <text class="log-time">{{ formatTime(log.created_at) }}</text>
+            <text class="log-tag" :class="'tag-' + log.trigger_type">{{ formatTriggerType(log.trigger_type) }}</text>
+            <text class="log-level">{{ log.trigger_level }}</text>
+          </view>
+          <view class="log-row2">
+            <text class="log-field-label">动作：</text>
+            <text class="log-field-val">{{ formatActionId(log.action_id) }}</text>
+          </view>
+          <view class="log-row2">
+            <text class="log-field-label">App：</text>
+            <text class="log-field-val">{{ formatStr(log.app_package) }}</text>
+            <text class="log-field-label" style="margin-left:12px;">连续：</text>
+            <text class="log-field-val">{{ log.continuous_minutes }}分</text>
+          </view>
+          <view class="log-row3">
+            <text class="log-field-label">用户操作：</text>
+            <text class="log-user-action" :class="'ua-' + log.user_action">{{ formatUserAction(log.user_action) }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="currentTab === 'action'">
+        <view v-if="actionLogs.length === 0" class="empty">
+          <text class="empty-text">今日暂无动作记录</text>
+          <text class="empty-hint">点击首页"全部微动作库"开始第一次动作</text>
+        </view>
+        <view v-for="(log, idx) in actionLogs" :key="log.id" class="log-item">
+          <view class="log-row1">
+            <text class="log-time">{{ formatTime(log.created_at) }}</text>
+            <text class="log-tag" :class="'tag-' + log.trigger_type">{{ formatTriggerType(log.trigger_type) }}</text>
+            <text class="log-result" :class="'res-' + log.result">{{ formatResult(log.result) }}</text>
+          </view>
+          <view class="log-row2">
+            <text class="log-field-label">动作ID：</text>
+            <text class="log-field-val">{{ log.action_id }}</text>
+            <text class="log-field-label" style="margin-left:12px;">分类：</text>
+            <text class="log-field-val">{{ log.action_type }}</text>
+          </view>
+          <view class="log-row2">
+            <text class="log-field-label">用时：</text>
+            <text class="log-field-val">{{ formatDuration(log.duration_ms) }} / {{ formatDuration(log.target_ms) }}</text>
+            <text class="log-field-label" style="margin-left:12px;">等级：</text>
+            <text class="log-field-val">{{ log.trigger_level }}</text>
+          </view>
+          <view v-if="log.skip_reason != null && log.skip_reason.length > 0" class="log-row3">
+            <text class="log-field-label">跳过原因：</text>
+            <text class="log-skip-reason">{{ log.skip_reason }}</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { getTodayTriggerLogs } from '../../database/TriggerLogDao'
+import { getTodayLogs, countCompletedToday, countSkippedToday } from '../../database/ActionLogDao'
+import { TriggerLog, UserAction } from '../../models/TriggerLog'
+import { ActionLog, ActionResult } from '../../models/ActionLog'
+
+const triggerLogs = ref<TriggerLog[]>([])
+const actionLogs = ref<ActionLog[]>([])
+const completedCount = ref<number>(0)
+const skippedCount = ref<number>(0)
+const currentTab = ref<string>('trigger')
+
+function pad2(n: number): string {
+  return n < 10 ? '0' + n : '' + n
+}
+
+function formatTime(t: number): string {
+  if (t == null || t <= 0) return '-'
+  const d = new Date(t * 1000)
+  const yyyy = d.getFullYear()
+  const mm = d.getMonth() + 1
+  const dd = d.getDate()
+  const hh = d.getHours()
+  const mi = d.getMinutes()
+  const ss = d.getSeconds()
+  return yyyy + '-' + pad2(mm) + '-' + pad2(dd) + ' ' + pad2(hh) + ':' + pad2(mi) + ':' + pad2(ss)
+}
+
+function formatDuration(ms: number): string {
+  if (ms == null || ms <= 0) return '0s'
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return s + 's'
+  const m = Math.floor(s / 60)
+  return m + 'm' + (s % 60) + 's'
+}
+
+function formatStr(s: string | null): string {
+  if (s == null || s.length === 0) return '-'
+  return s
+}
+
+function formatTriggerType(t: string): string {
+  if (t === 'app_duration') return 'APP时长'
+  if (t === 'manual') return '手动'
+  if (t === 'scheduled') return '定时'
+  if (t === 'time_period') return '时段'
+  if (t === 'usage_threshold') return '阈值'
+  if (t === 'app_switch') return '切换'
+  return t
+}
+
+function formatActionId(id: string | null): string {
+  if (id == null || id.length === 0) return '-'
+  return id
+}
+
+function formatUserAction(ua: UserAction | null): string {
+  if (ua == null) return '未响应'
+  if (ua === 'completed') return '完成'
+  if (ua === 'self_reported') return '自我报告'
+  if (ua === 'skipped') return '跳过'
+  if (ua === 'feedback') return '反馈'
+  if (ua === 'ignored') return '忽略'
+  if (ua === 'timeout') return '超时'
+  if (ua === 'busy_remind_later') return '忙，稍后'
+  return ua
+}
+
+function formatResult(r: ActionResult): string {
+  if (r === 'completed') return '完成'
+  if (r === 'self_reported') return '已做'
+  if (r === 'skipped') return '跳过'
+  if (r === 'feedback') return '反馈'
+  return r
+}
+
+function refresh(): void {
+  try {
+    triggerLogs.value = getTodayTriggerLogs()
+  } catch (_) {
+    triggerLogs.value = []
+  }
+  try {
+    actionLogs.value = getTodayLogs()
+  } catch (_) {
+    actionLogs.value = []
+  }
+  try {
+    completedCount.value = countCompletedToday()
+  } catch (_) {
+    completedCount.value = 0
+  }
+  try {
+    skippedCount.value = countSkippedToday()
+  } catch (_) {
+    skippedCount.value = 0
+  }
+  console.log('[debug] refresh triggerLogs=' + triggerLogs.value.length + ' actionLogs=' + actionLogs.value.length)
+}
+
+function switchTabTrigger(): void {
+  currentTab.value = 'trigger'
+}
+
+function switchTabAction(): void {
+  currentTab.value = 'action'
+}
+
+function goBack(): void {
+  uni.navigateBack({})
+}
+
+onPageShow(() => {
+  refresh()
+})
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: #F5F6FA;
+}
+.header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  padding-top: 50px;
+  background-color: #FFFFFF;
+  border-bottom-width: 1px;
+  border-bottom-color: #ECF0F1;
+  border-bottom-style: solid;
+}
+.header-left {
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+}
+.header-back {
+  font-size: 28px;
+  color: #2C3E50;
+}
+.header-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.header-right {
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+}
+.header-refresh {
+  font-size: 22px;
+  color: #3498DB;
+}
+.stats-row {
+  flex-direction: row;
+  padding: 12px 8px;
+  background-color: #FFFFFF;
+  margin-bottom: 8px;
+}
+.stat-card {
+  flex: 1;
+  align-items: center;
+  padding: 4px 0;
+}
+.stat-num {
+  font-size: 20px;
+  font-weight: bold;
+  color: #3498DB;
+  margin-bottom: 2px;
+}
+.stat-label {
+  font-size: 11px;
+  color: #7F8C8D;
+}
+.tab-bar {
+  flex-direction: row;
+  background-color: #FFFFFF;
+  border-bottom-width: 1px;
+  border-bottom-color: #ECF0F1;
+  border-bottom-style: solid;
+}
+.tab {
+  flex: 1;
+  padding: 12px 0;
+  align-items: center;
+  border-bottom-width: 3px;
+  border-bottom-color: transparent;
+  border-bottom-style: solid;
+}
+.tab.active {
+  border-bottom-color: #3498DB;
+}
+.tab-text {
+  font-size: 14px;
+  color: #7F8C8D;
+}
+.tab.active .tab-text {
+  color: #3498DB;
+  font-weight: bold;
+}
+.log-scroll {
+  flex: 1;
+  padding: 8px 12px;
+}
+.empty {
+  align-items: center;
+  padding: 40px 20px;
+}
+.empty-text {
+  font-size: 14px;
+  color: #95A5A6;
+  margin-bottom: 6px;
+}
+.empty-hint {
+  font-size: 12px;
+  color: #BDC3C7;
+}
+.log-item {
+  background-color: #FFFFFF;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.log-row1 {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.log-time {
+  font-size: 12px;
+  color: #7F8C8D;
+  font-family: monospace;
+  margin-right: 8px;
+}
+.log-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #ECF0F1;
+  color: #34495E;
+  margin-right: 6px;
+}
+.tag-app_duration {
+  background-color: #FCF3CF;
+  color: #B7950B;
+}
+.tag-manual {
+  background-color: #D5F5E3;
+  color: #239B56;
+}
+.tag-scheduled {
+  background-color: #D6EAF8;
+  color: #2874A6;
+}
+.log-level {
+  font-size: 10px;
+  color: #95A5A6;
+  margin-left: auto;
+}
+.log-result {
+  font-size: 11px;
+  font-weight: bold;
+  margin-left: auto;
+}
+.res-completed {
+  color: #27AE60;
+}
+.res-self_reported {
+  color: #16A085;
+}
+.res-skipped {
+  color: #E74C3C;
+}
+.res-feedback {
+  color: #8E44AD;
+}
+.log-row2 {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 2px;
+}
+.log-row3 {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 4px;
+  background-color: #FDF2E9;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.log-field-label {
+  font-size: 11px;
+  color: #95A5A6;
+}
+.log-field-val {
+  font-size: 12px;
+  color: #2C3E50;
+  font-family: monospace;
+}
+.log-user-action {
+  font-size: 12px;
+  font-weight: bold;
+}
+.ua-completed {
+  color: #27AE60;
+}
+.ua-self_reported {
+  color: #16A085;
+}
+.ua-skipped {
+  color: #E74C3C;
+}
+.ua-busy_remind_later {
+  color: #E67E22;
+}
+.ua-ignored {
+  color: #95A5A6;
+}
+.ua-timeout {
+  color: #7F8C8D;
+}
+.log-skip-reason {
+  font-size: 12px;
+  color: #E67E22;
+}
+</style>

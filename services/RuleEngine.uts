@@ -1,0 +1,102 @@
+import { MicroAction } from '../models/MicroAction'
+import { getEnabledActions, isSuitableForContext } from './ActionManager'
+import { getInt, putInt } from '../database/SettingsDao'
+
+type FrequencyState = {
+  skipCount: number
+  reductionRatio: number
+  reducedAt: number
+  recoveryDeadline: number
+}
+
+type AdjustmentChanges = {
+  thresholdMinutes?: number
+  actionWeightsDelta?: Map<string, number>
+}
+
+const frequencyReducer: Map<string, FrequencyState> = new Map<string, FrequencyState>()
+const actionWeights: Map<string, number> = new Map<string, number>()
+
+export function onConsecutiveSkip(actionType: string): void {
+  const state = getOrCreateState(actionType)
+  state.skipCount++
+
+  if (state.skipCount >= 3) {
+    state.reductionRatio = Math.max(0.125, state.reductionRatio * 0.5)
+    state.reducedAt = Date.now()
+    state.recoveryDeadline = Date.now() + 24 * 3600 * 1000
+    state.skipCount = 0
+  }
+}
+
+export function onCompleted(actionType: string): void {
+  const state = frequencyReducer.get(actionType)
+  if (state == null) return
+  state.skipCount = 0
+  if (state.reductionRatio < 1.0) {
+    state.reductionRatio = Math.min(1.0, state.reductionRatio * 2)
+  }
+}
+
+export function isFrequencyReduced(actionType: string): boolean {
+  const state = frequencyReducer.get(actionType)
+  if (state == null) return false
+  if (state.reductionRatio >= 1.0) return false
+  if (Date.now() >= state.recoveryDeadline) {
+    state.reductionRatio = 1.0
+    return false
+  }
+  return Math.random() >= state.reductionRatio
+}
+
+export function selectAction(triggerType: string): string | null {
+  const enabled = getEnabledActions()
+  if (enabled.length === 0) return null
+
+  const candidates = enabled.filter(a => isSuitableForContext(a, triggerType))
+  if (candidates.length === 0) return enabled[0].id
+
+  return weightedRandomSelect(candidates)
+}
+
+function weightedRandomSelect(actions: MicroAction[]): string {
+  const weights: number[] = actions.map(a => {
+    const w = actionWeights.get(a.id)
+    if (w != null) { return w }
+    return 1.0
+  })
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0)
+  let r = Math.random() * totalWeight
+  for (let i = 0; i < actions.length; i++) {
+    r -= weights[i]
+    if (r <= 0) return actions[i].id
+  }
+  return actions[actions.length - 1].id
+}
+
+export function applyAdjustments(changes: AdjustmentChanges): void {
+  if (changes.thresholdMinutes != null) {
+    putInt('app_duration_threshold', changes.thresholdMinutes)
+  }
+  if (changes.actionWeightsDelta != null) {
+    changes.actionWeightsDelta.forEach((val, key) : void => {
+      actionWeights.set(key, val)
+    })
+  }
+}
+
+export function exportRules(): any {
+  return {
+    thresholdMinutes: getInt('app_duration_threshold', 60),
+    actionWeights: actionWeights,
+    reductionStates: frequencyReducer
+  }
+}
+
+function getOrCreateState(actionType: string): FrequencyState {
+  if (frequencyReducer.get(actionType) == null) {
+    const state: FrequencyState = { skipCount: 0, reductionRatio: 1.0, reducedAt: 0, recoveryDeadline: 0 }
+    frequencyReducer.set(actionType, state)
+  }
+  return frequencyReducer.get(actionType)!
+}

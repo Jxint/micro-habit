@@ -1,0 +1,195 @@
+import { getHomepageData } from '../services/ScoreCalculator'
+import { getRecommendedActions } from '../services/Recommendation'
+import { MicroAction } from '../models/MicroAction'
+import { today, yesterday, getHour } from '../utils/TimeUtils'
+import { getByKey, save } from '../database/LlmCacheDao'
+import { getInt, getSetting } from '../database/SettingsDao'
+import { isNetworkAvailable } from '../utils/NetworkUtils'
+import { DailyCount } from '../models/DailyCount'
+import { callDaily, DailyData } from '../services/CloudService'
+import { WeeklyReport } from '../models/WeeklyReport'
+import { generateWeeklyReport } from '../services/WeeklyReportService'
+
+export type DailyOutput = {
+  one_liner: string
+  summary: string
+  tomorrow_goal: string
+  encourage: string
+}
+
+export type AppStore = {
+  eyeScore: Ref<number>
+  eyeStatus: Ref<string>
+  postureScore: Ref<number>
+  postureStatus: Ref<string>
+  vitalityScore: Ref<number>
+  vitalityStatus: Ref<string>
+  guardMinutes: Ref<number>
+  penetration: Ref<number>
+  todayCompletedCount: Ref<number>
+  recommendedActions: Ref<MicroAction[]>
+  heatmapData: Ref<DailyCount[]>
+  dailySummary: Ref<DailyOutput | null>
+  dailySummaryLoading: Ref<boolean>
+  homeDataLoaded: Ref<boolean>
+  weeklyReport: Ref<WeeklyReport | null>
+  weeklyReportLoading: Ref<boolean>
+  refreshHomeData(): void
+  refreshWeeklyReport(): void
+}
+
+const eyeScore = ref<number>(0)
+const eyeStatus = ref<string>('no_data')
+const postureScore = ref<number>(0)
+const postureStatus = ref<string>('no_data')
+const vitalityScore = ref<number>(0)
+const vitalityStatus = ref<string>('no_data')
+const guardMinutes = ref<number>(0)
+const penetration = ref<number>(0)
+const todayCompletedCount = ref<number>(0)
+const recommendedActions = ref<MicroAction[]>([])
+const heatmapData = ref<DailyCount[]>([])
+const dailySummary = ref<DailyOutput | null>(null)
+const dailySummaryLoading = ref<boolean>(false)
+const homeDataLoaded = ref<boolean>(false)
+const weeklyReport = ref<WeeklyReport | null>(null)
+const weeklyReportLoading = ref<boolean>(false)
+
+export function useAppStore(): AppStore {
+  const store: AppStore = {
+    eyeScore,
+    eyeStatus,
+    postureScore,
+    postureStatus,
+    vitalityScore,
+    vitalityStatus,
+    guardMinutes,
+    penetration,
+    todayCompletedCount,
+    recommendedActions,
+    heatmapData,
+    dailySummary,
+    dailySummaryLoading,
+    homeDataLoaded,
+    weeklyReport,
+    weeklyReportLoading,
+
+    refreshHomeData(): void {
+      homeDataLoaded.value = false
+      try {
+        const date = today()
+        const nowMs = Date.now()
+        const summaryHour = parseSummaryHour(getSetting('daily_summary_time', '21:00'))
+
+        const data = getHomepageData(date)
+
+        eyeScore.value = Math.round(data.eyeScore)
+        eyeStatus.value = data.eyeLevel
+        postureScore.value = Math.round(data.postureScore)
+        postureStatus.value = data.postureLevel
+        vitalityScore.value = Math.round(data.vitalityScore)
+        vitalityStatus.value = data.vitalityLevel
+        guardMinutes.value = data.guardMinutes
+        penetration.value = Math.round(data.penetration * 100) / 100
+        todayCompletedCount.value = data.todayCompletedCount
+        heatmapData.value = data.heatmapData
+
+        const todayKey = 'daily_summary:' + date
+        const todayCache = getByKey(todayKey)
+        if (todayCache != null) {
+          try {
+            const parsed = JSON.parse(todayCache.response)
+            dailySummary.value = parsed as DailyOutput
+          } catch (_) {}
+          dailySummaryLoading.value = false
+        } else if (getHour(nowMs) >= summaryHour) {
+          dailySummaryLoading.value = true
+          generateDailySummary(date, (summary: DailyOutput) => {
+            save(todayKey, 'daily_summary', JSON.stringify(summary), nowMs + 7 * 24 * 3600 * 1000)
+            dailySummary.value = summary
+            dailySummaryLoading.value = false
+          })
+        }
+
+        const yDate = yesterday()
+        const yesterdayKey = 'daily_summary:' + yDate
+        if (getByKey(yesterdayKey) == null) {
+          const ydata = getHomepageData(yDate)
+          const fallback: DailyOutput = {
+            one_liner: '昨天完成' + ydata.todayCompletedCount + '次微动作',
+            summary: '累计' + ydata.guardMinutes + '分钟',
+            tomorrow_goal: '',
+            encourage: ''
+          }
+          save(yesterdayKey, 'daily_summary', JSON.stringify(fallback), nowMs + 30 * 24 * 3600 * 1000)
+        }
+      } catch (_) {}
+      try {
+        recommendedActions.value = getRecommendedActions()
+      } catch (_) {}
+      homeDataLoaded.value = true
+    },
+
+    refreshWeeklyReport(): void {
+      weeklyReportLoading.value = true
+      generateWeeklyReport((report: WeeklyReport) => {
+        weeklyReport.value = report
+        weeklyReportLoading.value = false
+      })
+    }
+  }
+  return store
+}
+
+function parseSummaryHour(setting: string): number {
+  if (setting == null || setting.length === 0) return 21
+  const sep = setting.indexOf(':')
+  const hourStr = sep > 0 ? setting.substring(0, sep) : setting
+  const h = parseInt(hourStr)
+  if (isNaN(h) || h < 0 || h > 23) return 21
+  return h
+}
+
+function buildLocalSummary(completedCount: number, minutes: number): DailyOutput {
+  return {
+    one_liner: '今日完成' + completedCount + '次微动作',
+    summary: '守护' + minutes + '分钟，继续加油',
+    tomorrow_goal: '继续保持！',
+    encourage: '你做得很好'
+  }
+}
+
+function generateDailySummary(date: string, onComplete: (summary: DailyOutput) => void): void {
+  const data = getHomepageData(date)
+
+  if (!isNetworkAvailable()) {
+    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+    return
+  }
+
+  const dto: DailyData = {
+    totalCompleted: data.todayCompletedCount,
+    totalSkipped: 0,
+    totalDurationSec: data.guardMinutes * 60,
+    guardMinutes: data.guardMinutes,
+    penetration: data.penetration,
+    eyeScore: Math.max(0, Math.round(data.eyeScore)),
+    postureScore: Math.max(0, Math.round(data.postureScore)),
+    vitalityScore: Math.max(0, Math.round(data.vitalityScore)),
+    todayCompletedCount: data.todayCompletedCount
+  }
+
+  callDaily(date, dto, (result: any) => {
+    try {
+      const jsonStr = JSON.stringify(result)
+      const obj = JSON.parse(jsonStr) as DailyOutput
+      if (obj.one_liner != null) {
+        onComplete(obj)
+        return
+      }
+    } catch (_) {}
+    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+  }, () => {
+    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+  })
+}

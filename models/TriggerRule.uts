@@ -1,0 +1,13 @@
+export type TriggerRule = {
+  id: number
+  rule_type: string
+  trigger_type: string
+  condition_json: string
+  action_weights_json: string
+  enabled: number
+  priority: number
+  source: string
+  expires_at: number | null
+  created_at: number
+  updated_at: number
+}

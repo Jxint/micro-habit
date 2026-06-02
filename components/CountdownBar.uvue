@@ -1,0 +1,50 @@
+<template>
+  <view class="countdown-container">
+    <view class="countdown-track">
+      <view class="countdown-fill" :style="{ width: progressPercent + '%' }"></view>
+    </view>
+    <text class="countdown-text">{{ remainingText }}</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  total: number
+  remaining: number
+}>(), {})
+
+const progressPercent = computed<number>(() : number => {
+  if (props.total <= 0) return 0
+  return ((props.total - props.remaining) / props.total) * 100
+})
+
+const remainingText = computed<string>(() : string => {
+  const secs = Math.ceil(props.remaining / 1000)
+  return secs + 's / ' + Math.ceil(props.total / 1000) + 's'
+})
+</script>
+
+<style scoped>
+.countdown-container {
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px;
+}
+.countdown-track {
+  width: 100%;
+  height: 10px;
+  background-color: #ECF0F1;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.countdown-fill {
+  height: 10px;
+  background-color: #3498DB;
+  border-radius: 5px;
+}
+.countdown-text {
+  font-size: 14px;
+  color: #7F8C8D;
+  margin-top: 6px;
+}
+</style>

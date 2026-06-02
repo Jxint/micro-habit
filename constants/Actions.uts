@@ -1,0 +1,92 @@
+import { MicroAction } from '../models/MicroAction'
+
+export const ALL_ACTIONS: MicroAction[] = [
+  {
+    id: 'eye_blink',
+    name: '眨眼休息',
+    category: '护眼',
+    defaultDurationMs: 10000,
+    difficulty: 1,
+    ttsText: '闭上眼睛，1、2、3，感受眼部放松',
+    iconPath: '/static/icons/eye_blink.png'
+  },
+  {
+    id: 'eye_rotate',
+    name: '眼球转动',
+    category: '护眼',
+    defaultDurationMs: 10000,
+    difficulty: 1,
+    ttsText: '眼球缓慢顺时针转一圈，再逆时针转一圈',
+    iconPath: '/static/icons/eye_rotate.png'
+  },
+  {
+    id: 'neck_rotate',
+    name: '颈部转动',
+    category: '肩颈',
+    defaultDurationMs: 15000,
+    difficulty: 1,
+    ttsText: '头缓慢向左转，保持3秒，回正，再向右转',
+    iconPath: '/static/icons/neck_rotate.png'
+  },
+  {
+    id: 'shoulder_roll',
+    name: '绕肩放松',
+    category: '肩颈',
+    defaultDurationMs: 15000,
+    difficulty: 1,
+    ttsText: '双肩向上提起，向后画圈，缓慢放下',
+    iconPath: '/static/icons/shoulder_roll.png'
+  },
+  {
+    id: 'neck_stretch',
+    name: '拉斜方肌',
+    category: '肩颈',
+    defaultDurationMs: 15000,
+    difficulty: 2,
+    ttsText: '右手扶左耳，缓慢向右拉伸，保持5秒',
+    iconPath: '/static/icons/neck_stretch.png'
+  },
+  {
+    id: 'core_tighten',
+    name: '收紧核心',
+    category: '核心',
+    defaultDurationMs: 10000,
+    difficulty: 1,
+    ttsText: '收紧腹部，像被人打了一拳，保持住',
+    iconPath: '/static/icons/core_tighten.png'
+  },
+  {
+    id: 'heel_raise',
+    name: '踮脚拉伸',
+    category: '下肢',
+    defaultDurationMs: 20000,
+    difficulty: 1,
+    ttsText: '双脚与肩同宽，缓慢踮起脚跟，再缓慢放下',
+    iconPath: '/static/icons/heel_raise.png'
+  },
+  {
+    id: 'deep_breath',
+    name: '腹式呼吸',
+    category: '呼吸',
+    defaultDurationMs: 15000,
+    difficulty: 1,
+    ttsText: '鼻子深吸气4秒，肚子鼓起，嘴巴缓慢呼气6秒',
+    iconPath: '/static/icons/deep_breath.png'
+  },
+  {
+    id: 'far_gaze',
+    name: '远眺放松',
+    category: '护眼',
+    defaultDurationMs: 10000,
+    difficulty: 1,
+    ttsText: '看向远处至少6米外，放松眼部肌肉',
+    iconPath: '/static/icons/far_gaze.png'
+  }
+]
+
+export function getActionById(id: string): MicroAction | null {
+  for (const a of ALL_ACTIONS) {
+    if (a.id === id) return a
+  }
+  return null
+}

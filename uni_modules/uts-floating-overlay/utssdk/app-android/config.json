@@ -1,0 +1,11 @@
+{
+  "id": "uts-floating-overlay",
+  "name": "悬浮窗覆盖",
+  "version": "1.0.0",
+  "permissions": [
+    "android.permission.SYSTEM_ALERT_WINDOW"
+  ],
+  "dependencies": [
+    "com.airbnb.android:lottie:5.2.0"
+  ]
+}

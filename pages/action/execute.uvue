@@ -1,0 +1,443 @@
+<template>
+  <view class="page">
+    <view class="debug-bar">
+      <text class="debug-text">aid={{ actionId }} | act={{ actionName }} | exec={{ isExecuting }} | done={{ isCompleted }} | ms={{ remainingMs }}</text>
+    </view>
+
+    <view class="action-container">
+      <text class="action-title">{{ actionName }}</text>
+
+      <view class="icon-display">
+        <text class="action-icon">{{ iconEmoji }}</text>
+      </view>
+
+      <text class="tts-text">{{ actionTtsText }}</text>
+
+      <view v-if="showCountdown">
+        <CountdownBar :total="actionDuration" :remaining="remainingMs" />
+      </view>
+
+      <view v-if="showButtons" class="button-group">
+        <button class="action-btn secondary" @tap="handleSelfReported">我做过了</button>
+        <button class="action-btn secondary" @tap="handleBusy">现在忙，晚点提醒我</button>
+        <button class="action-btn primary" @tap="handleAgree">好啊</button>
+      </view>
+
+      <view v-if="showSkip" class="button-group">
+        <button class="action-btn secondary" @tap="handleSkipDuringExec">跳过</button>
+      </view>
+    </view>
+
+    <EncourageToast :visible="showEncourage" :text="encourageText" />
+
+    <FeedbackDialog :visible="showFeedback" @confirm="onFeedbackConfirm" @cancel="onFeedbackCancel" />
+
+    <view class="dialog-overlay" v-if="showRuleSuggest">
+      <view class="dialog-content">
+        <text class="dialog-title">发现新的触发模式</text>
+        <text class="dialog-body-text">根据你的完成习惯，建议添加一条自动提醒规则</text>
+        <view class="dialog-actions">
+          <button class="cancel-btn" @tap="onRejectRule">暂不使用</button>
+          <button class="confirm-btn" @tap="onAcceptRule">添加规则</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import CountdownBar from '../../components/CountdownBar.uvue'
+import EncourageToast from '../../components/EncourageToast.uvue'
+import FeedbackDialog from '../../components/FeedbackDialog.uvue'
+import { ActionLog } from '../../models/ActionLog'
+import { MicroAction } from '../../models/MicroAction'
+import { TriggerRule } from '../../models/TriggerRule'
+import { getActionById } from '../../constants/Actions'
+import { getRandomEncourage } from '../../constants/EncourageTexts'
+import { insertActionLog } from '../../database/ActionLogDao'
+import { insertRule } from '../../database/RuleDao'
+import { onCompleted, onConsecutiveSkip } from '../../services/RuleEngine'
+import { callRuleSuggest } from '../../services/CloudService'
+
+const actionId = ref<string>('')
+const action = ref<MicroAction | null>(null)
+const isExecuting = ref<boolean>(false)
+const isCompleted = ref<boolean>(false)
+const showEncourage = ref<boolean>(false)
+const encourageText = ref<string>('')
+const showFeedback = ref<boolean>(false)
+const remainingMs = ref<number>(0)
+const showRuleSuggest = ref<boolean>(false)
+const pendingRule = ref<TriggerRule | null>(null)
+let countdownTimerId: number | null = null
+
+const showButtons = computed<boolean>((): boolean => {
+  const a = action.value
+  const exec = isExecuting.value
+  const done = isCompleted.value
+  return a != null && exec === false && done === false
+})
+
+const showCountdown = computed<boolean>((): boolean => {
+  return isExecuting.value === true
+})
+
+const showSkip = computed<boolean>((): boolean => {
+  const exec = isExecuting.value
+  const done = isCompleted.value
+  return exec === true && done === false
+})
+
+const actionName = computed<string>((): string => {
+  const a = action.value
+  return a != null ? a.name : '未找到动作'
+})
+
+const actionTtsText = computed<string>((): string => {
+  const a = action.value
+  return a != null ? a.ttsText : ''
+})
+
+const actionDuration = computed<number>((): number => {
+  const a = action.value
+  return a != null ? a.defaultDurationMs : 0
+})
+
+const iconEmoji = computed<string>((): string => {
+  const a = action.value
+  if (a == null) return '?'
+  const id = a.id
+  if (id === 'eye_blink') return '👁'
+  if (id === 'eye_rotate') return '👀'
+  if (id === 'neck_rotate') return '🔄'
+  if (id === 'shoulder_roll') return '💪'
+  if (id === 'neck_stretch') return '🧘'
+  if (id === 'core_tighten') return '🔥'
+  if (id === 'heel_raise') return '🦶'
+  if (id === 'deep_breath') return '🌬'
+  if (id === 'far_gaze') return '🏔'
+  return '?'
+})
+
+/* ---------- leaf functions (no deps) ---------- */
+
+function parseActionId(source: any): string {
+  if (source == null) return ''
+  const obj = source as UTSJSONObject
+  const raw = obj['actionId']
+  if (raw == null) return ''
+  const str = raw as string
+  return str.length > 0 ? str : ''
+}
+
+function clearCountdown(): void {
+  const tid = countdownTimerId
+  if (tid != null) {
+    clearInterval(tid)
+    countdownTimerId = null
+  }
+}
+
+function recordAction(result: string, skipReason: string = ''): void {
+  const a = action.value
+  if (a == null) return
+  const nowMs = Date.now()
+  const dur = result === 'completed' ? a.defaultDurationMs : Math.floor(a.defaultDurationMs - remainingMs.value)
+  const log: ActionLog = {
+    id: 0,
+    action_id: a.id,
+    action_type: a.category,
+    result: result,
+    skip_reason: skipReason.length > 0 ? skipReason : null,
+    trigger_type: 'manual',
+    trigger_level: 'gentle',
+    duration_ms: dur,
+    target_ms: a.defaultDurationMs,
+    triggered_at: nowMs - 30000,
+    completed_at: nowMs,
+    created_at: Math.floor(nowMs / 1000)
+  }
+  insertActionLog(log)
+}
+
+function onRejectRule(): void {
+  showRuleSuggest.value = false
+  pendingRule.value = null
+}
+
+function onAcceptRule(): void {
+  const r = pendingRule.value
+  if (r != null) {
+    const now = Math.floor(Date.now() / 1000)
+    const rule: TriggerRule = {
+      id: 0,
+      rule_type: r.rule_type.length > 0 ? r.rule_type : 'frequency',
+      trigger_type: r.trigger_type.length > 0 ? r.trigger_type : 'app_duration',
+      condition_json: r.condition_json.length > 0 ? r.condition_json : '{}',
+      action_weights_json: r.action_weights_json.length > 0 ? r.action_weights_json : '{}',
+      enabled: 1,
+      priority: r.priority > 0 ? r.priority : 1,
+      source: 'ai_suggest',
+      expires_at: r.expires_at,
+      created_at: now,
+      updated_at: now
+    }
+    insertRule(rule)
+    uni.showToast({ title: '规则已添加', icon: 'none' })
+  }
+  showRuleSuggest.value = false
+  pendingRule.value = null
+}
+
+function maybeSuggestRule(): void {
+  const a = action.value
+  if (a == null) return
+  const emptyArr: any[] = []
+  callRuleSuggest({
+    completionRateByCategory: {},
+    completionRateByHour: {},
+    avgContinuousMinutesByCategory: {},
+    recentTriggers: emptyArr
+  }, (result: any) => {
+    try {
+      const s = JSON.stringify(result)
+      const obj = JSON.parse(s) as UTSJSONObject
+      if (obj == null) return
+      const should = obj.get('shouldSuggest')
+      if (should == null) return
+      if ((should as boolean) !== true) return
+      const ruleRaw = obj.get('rule')
+      if (ruleRaw == null) return
+      pendingRule.value = ruleRaw as TriggerRule
+      showRuleSuggest.value = true
+    } catch (_) {}
+  })
+}
+
+/* ---------- mid-layer functions ---------- */
+
+function showEncourageNow(): void {
+  const a = action.value
+  const cat = a != null ? a.category : ''
+  encourageText.value = getRandomEncourage(cat)
+  showEncourage.value = true
+  isCompleted.value = true
+  maybeSuggestRule()
+  setTimeout((): void => {
+    showEncourage.value = false
+    uni.navigateBack({})
+  }, 1500)
+}
+
+function startCountdown(): void {
+  const interval = 100
+  console.log('[execute] startCountdown total=' + remainingMs.value + 'ms')
+  countdownTimerId = setInterval((): void => {
+    remainingMs.value -= interval
+    if (remainingMs.value <= 0) {
+      remainingMs.value = 0
+      clearCountdown()
+      recordAction('completed')
+      const a = action.value
+      onCompleted(a != null ? a.category : '')
+      showEncourageNow()
+    }
+  }, interval)
+}
+
+function handleAgree(): void {
+  console.log('[execute] handleAgree')
+  const a = action.value
+  if (a == null) {
+    uni.showToast({ title: '未找到动作', icon: 'none' })
+    return
+  }
+  isExecuting.value = true
+  remainingMs.value = a.defaultDurationMs
+  console.log('[execute] countdown start, ms=' + a.defaultDurationMs)
+  startCountdown()
+  try { uni.vibrateShort({ type: 'light' }) } catch (_) {}
+}
+
+function handleSelfReported(): void {
+  recordAction('self_reported')
+  showEncourageNow()
+}
+
+function handleBusy(): void {
+  recordAction('skipped', 'busy')
+  setTimeout((): void => { uni.navigateBack({}) }, 300)
+}
+
+function handleSkipDuringExec(): void {
+  clearCountdown()
+  showFeedback.value = true
+}
+
+function onFeedbackConfirm(reason: string): void {
+  showFeedback.value = false
+  recordAction('skipped', reason)
+  const a = action.value
+  onConsecutiveSkip(a != null ? a.category : '')
+  showEncourageNow()
+}
+
+function onFeedbackCancel(): void {
+  showFeedback.value = false
+  isExecuting.value = false
+  uni.navigateBack({})
+}
+
+/* ---------- lifecycle hooks (must be LAST) ---------- */
+
+onLoad((option) => {
+  console.log('[execute] onLoad begin')
+  let aid = parseActionId(option)
+  console.log('[execute] option parsed aid=' + aid)
+  actionId.value = aid
+  if (aid.length > 0) {
+    const found = getActionById(aid)
+    action.value = found
+    console.log('[execute] found action=' + (found != null ? found.name : 'null'))
+  } else {
+    console.log('[execute] no actionId from option')
+  }
+})
+
+onUnload((): void => {
+  clearCountdown()
+})
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: #F5F6FA;
+  justify-content: center;
+  align-items: center;
+}
+.action-container {
+  width: 85%;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 24px;
+  flex-direction: column;
+  align-items: center;
+}
+.action-title {
+  font-size: 22px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 16px;
+}
+.icon-display {
+  width: 100px;
+  height: 100px;
+  justify-content: center;
+  align-items: center;
+  background-color: #F0F3F4;
+  border-radius: 50px;
+  margin-bottom: 16px;
+}
+.action-icon {
+  font-size: 48px;
+}
+.tts-text {
+  font-size: 15px;
+  color: #7F8C8D;
+  text-align: center;
+  margin-bottom: 20px;
+  padding: 0 16px;
+}
+.button-group {
+  width: 100%;
+  flex-direction: column;
+  margin-top: 16px;
+}
+.action-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 16px;
+  text-align: center;
+  margin-bottom: 8px;
+  border-width: 0;
+}
+.action-btn.primary {
+  background-color: #3498DB;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.action-btn.secondary {
+  background-color: #F0F3F4;
+  color: #7F8C8D;
+}
+.debug-bar {
+  width: 100%;
+  padding: 4px 8px;
+  background-color: #FFE9A8;
+}
+.debug-text {
+  font-size: 10px;
+  color: #8B6914;
+  font-family: monospace;
+}
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+}
+.dialog-content {
+  width: 280px;
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  padding: 20px;
+  flex-direction: column;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.dialog-body-text {
+  font-size: 14px;
+  color: #34495E;
+  line-height: 20px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.dialog-actions {
+  flex-direction: row;
+  justify-content: space-between;
+}
+.cancel-btn {
+  flex: 1;
+  margin-right: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #ECF0F1;
+  color: #7F8C8D;
+  font-size: 14px;
+  text-align: center;
+  border-width: 0;
+}
+.confirm-btn {
+  flex: 1;
+  margin-left: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #3498DB;
+  color: #FFFFFF;
+  font-size: 14px;
+  text-align: center;
+  border-width: 0;
+}
+</style>

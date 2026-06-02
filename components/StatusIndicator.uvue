@@ -1,0 +1,74 @@
+<template>
+  <view class="status-card">
+    <text class="status-title">{{ title }}</text>
+    <view class="progress-track">
+      <view class="progress-fill" :style="{ width: displayPercent + '%', backgroundColor: barColor }"></view>
+    </view>
+    <text class="status-label" :style="{ color: textColor }">{{ statusText }}</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  title: string
+  percent: number
+  status: string
+}>(), {})
+
+const displayPercent = computed<number>(() : number => {
+  if (props.percent < 0) return 0
+  return Math.min(props.percent, 100)
+})
+
+const barColor = computed<string>(() : string => {
+  if (props.status === 'no_data') return '#D5D8DC'
+  if (props.status === 'good') return '#2ECC71'
+  if (props.status === 'normal') return '#F39C12'
+  return '#E74C3C'
+})
+
+const textColor = computed<string>(() : string => {
+  if (props.status === 'no_data') return '#95A5A6'
+  if (props.status === 'good') return '#27AE60'
+  if (props.status === 'normal') return '#E67E22'
+  return '#C0392B'
+})
+
+const statusText = computed<string>(() : string => {
+  if (props.status === 'no_data') return '暂无数据'
+  if (props.status === 'good') return '良好'
+  if (props.status === 'normal') return '一般'
+  return '需关注'
+})
+</script>
+
+<style scoped>
+.status-card {
+  flex-direction: column;
+  padding: 12px 16px;
+  margin: 4px 16px;
+  background-color: #FFFFFF;
+  border-radius: 10px;
+}
+.status-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 6px;
+}
+.progress-track {
+  height: 8px;
+  background-color: #ECF0F1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 8px;
+  border-radius: 4px;
+}
+.status-label {
+  font-size: 12px;
+  margin-top: 4px;
+  text-align: right;
+}
+</style>

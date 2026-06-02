@@ -1,0 +1,53 @@
+import { dbManager } from './DatabaseManager'
+import { TriggerRule } from '../models/TriggerRule'
+
+export function getAllEnabledRules(): TriggerRule[] {
+  const rows = dbManager.query(
+    'SELECT * FROM trigger_rules WHERE enabled = 1 ORDER BY priority DESC'
+  )
+  return rows.map((r: Map<string, any>): TriggerRule => mapRow(r))
+}
+
+export function getRulesByTriggerType(triggerType: string): TriggerRule[] {
+  const rows = dbManager.query(
+    'SELECT * FROM trigger_rules WHERE trigger_type = ? AND enabled = 1 ORDER BY priority DESC',
+    [triggerType]
+  )
+  return rows.map((r: Map<string, any>): TriggerRule => mapRow(r))
+}
+
+export function insertRule(rule: TriggerRule): number {
+  return dbManager.insert('trigger_rules', {
+    rule_type: rule.rule_type,
+    trigger_type: rule.trigger_type,
+    condition_json: rule.condition_json,
+    action_weights_json: rule.action_weights_json,
+    enabled: rule.enabled,
+    priority: rule.priority,
+    source: rule.source,
+    expires_at: rule.expires_at,
+    created_at: rule.created_at,
+    updated_at: rule.updated_at
+  })
+}
+
+export function updateRuleEnabled(id: number, enabled: number): void {
+  const now = Math.floor(Date.now() / 1000)
+  dbManager.update('trigger_rules', { enabled: enabled, updated_at: now }, 'id = ?', [id])
+}
+
+function mapRow(row: Map<string, any>): TriggerRule {
+  return {
+    id: row.get("id") as number,
+    rule_type: row.get("rule_type") as string,
+    trigger_type: row.get("trigger_type") as string,
+    condition_json: row.get("condition_json") as string,
+    action_weights_json: row.get("action_weights_json") as string,
+    enabled: row.get("enabled") as number,
+    priority: row.get("priority") as number,
+    source: row.get("source") as string,
+    expires_at: row.get("expires_at") as number | null,
+    created_at: row.get("created_at") as number,
+    updated_at: row.get("updated_at") as number
+  }
+}

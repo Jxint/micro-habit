@@ -1,0 +1,132 @@
+import { getHomepageData } from './ScoreCalculator'
+import { today, daysAgo } from '../utils/TimeUtils'
+import { callWeekly } from './CloudService'
+import { isNetworkAvailable } from '../utils/NetworkUtils'
+import { WeeklyReport, WeeklyReportStats } from '../models/WeeklyReport'
+
+type WeeklyLLMOutput = {
+  title: string
+  highlight: string
+  improvement: string
+  suggestions: string[]
+  nextWeekGoal: string
+  tone: string
+}
+
+export function generateWeeklyData(): WeeklyReportStats {
+  let totalCompleted = 0
+  let totalDurationSec = 0
+  let totalPenetration = 0
+  let totalGuardMinutes = 0
+  let bestDay = ''
+  let bestDayCount = -1
+  let worstDay = ''
+  let worstDayCount = 999999
+  let daysWithData = 0
+
+  for (let i = 6; i >= 0; i--) {
+    const d = daysAgo(i)
+    const data = getHomepageData(d)
+    totalCompleted += data.todayCompletedCount
+    totalDurationSec += data.guardMinutes * 60
+    totalPenetration += data.penetration
+    totalGuardMinutes += data.guardMinutes
+
+    if (data.todayCompletedCount > 0) {
+      daysWithData++
+    }
+
+    if (data.todayCompletedCount > bestDayCount) {
+      bestDayCount = data.todayCompletedCount
+      bestDay = d
+    }
+
+    if (data.todayCompletedCount < worstDayCount && data.todayCompletedCount >= 0) {
+      worstDayCount = data.todayCompletedCount
+      worstDay = d
+    }
+  }
+
+  if (daysWithData === 0) {
+    return {
+      totalCompleted: 0,
+      totalDurationSec: 0,
+      avgPenetration: 0,
+      avgGuardMinutes: 0,
+      bestDay: '',
+      bestDayCount: 0,
+      worstDay: '',
+      worstDayCount: 0
+    }
+  }
+
+  return {
+    totalCompleted: totalCompleted,
+    totalDurationSec: totalDurationSec,
+    avgPenetration: Math.round(totalPenetration / 7 * 100) / 100,
+    avgGuardMinutes: Math.round(totalGuardMinutes / 7),
+    bestDay: bestDay,
+    bestDayCount: bestDayCount,
+    worstDay: worstDay,
+    worstDayCount: worstDayCount
+  }
+}
+
+export function generateWeeklyReport(onComplete: (report: WeeklyReport) => void): void {
+  const stats = generateWeeklyData()
+
+  function buildLocal(): WeeklyReport {
+    const hasData = stats.totalCompleted > 0
+    if (hasData) {
+      return {
+        title: '本周健康小结',
+        highlight: '本周完成了' + stats.totalCompleted + '次微动作，累计守护' + stats.totalDurationSec + '秒',
+        improvement: '下周可以尝试更多样化的动作组合',
+        suggestions: [
+          '尝试每天固定时间做一个微动作',
+          '关注完成率最低的动作类型',
+          '给自己设定一个小奖励'
+        ],
+        nextWeekGoal: '每天至少完成3次微动作',
+        tone: stats.avgGuardMinutes >= 10 ? 'great' : 'okay',
+        stats: stats
+      }
+    }
+    return {
+      title: '本周健康报告',
+      highlight: '本周暂无数据，从今天开始吧',
+      improvement: '',
+      suggestions: ['完成第一次微动作', '开启无障碍服务以自动提醒', '设置你的健康偏好'],
+      nextWeekGoal: '开始你的第一个微动作',
+      tone: 'needs_care',
+      stats: stats
+    }
+  }
+
+  if (!isNetworkAvailable()) {
+    onComplete(buildLocal())
+    return
+  }
+
+  callWeekly(stats, (result: any) => {
+    try {
+      const jsonStr = JSON.stringify(result)
+      const obj = JSON.parse(jsonStr) as WeeklyLLMOutput
+      if (obj.title != null && obj.title.length > 0) {
+        onComplete({
+          title: obj.title,
+          highlight: obj.highlight,
+          improvement: obj.improvement,
+          suggestions: obj.suggestions,
+          nextWeekGoal: obj.nextWeekGoal,
+          tone: obj.tone,
+          stats: stats
+        })
+        return
+      }
+    } catch (_) {}
+    onComplete(buildLocal())
+  }, () => {
+    onComplete(buildLocal())
+  })
+}

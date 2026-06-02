@@ -1,0 +1,100 @@
+<template>
+  <view class="page">
+    <scroll-view class="scroll-area" scroll-y="true">
+      <view class="settings-section">
+        <text class="section-title">触发设置</text>
+        <view class="setting-item">
+          <text class="setting-label">连续使用提醒阈值</text>
+          <text class="setting-value">{{ durationThreshold }} 分钟</text>
+        </view>
+        <view class="setting-item">
+          <text class="setting-label">免打扰时段</text>
+          <text class="setting-value">{{ dndStart }} - {{ dndEnd }}</text>
+        </view>
+      </view>
+
+      <view class="settings-section">
+        <text class="section-title">微动作设置</text>
+        <view class="setting-item">
+          <text class="setting-label">默认时长偏好</text>
+          <text class="setting-value">{{ durationPref }} 秒</text>
+        </view>
+      </view>
+
+      <view class="settings-section">
+        <text class="section-title">关于</text>
+        <view class="setting-item" @tap="handleDebugTap">
+          <text class="setting-label">版本号</text>
+          <text class="setting-value">1.0.0</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { getInt, putInt } from '../../database/SettingsDao'
+
+const durationThreshold = ref(getInt('app_duration_threshold', 60))
+const dndStart = ref('22:00')
+const dndEnd = ref('07:00')
+const durationPref = ref(getInt('action_duration_pref', 15))
+
+let debugTapCount = 0
+let debugTapTimer: number | null = null
+
+function handleDebugTap(): void {
+  debugTapCount++
+  const timerId = debugTapTimer
+  if (timerId != null) {
+    clearTimeout(timerId)
+  }
+  debugTapTimer = setTimeout(() : void => {
+    debugTapCount = 0
+  }, 3000)
+  if (debugTapCount >= 5) {
+    debugTapCount = 0
+    putInt('app_duration_threshold', 1)
+    uni.showToast({
+      title: 'Debug模式激活，阈值设为1分钟',
+      position: 'bottom'
+    })
+  }
+}
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: #F5F6FA;
+}
+.scroll-area {
+  flex: 1;
+}
+.settings-section {
+  margin-top: 12px;
+  background-color: #FFFFFF;
+}
+.section-title {
+  font-size: 14px;
+  color: #7F8C8D;
+  padding: 12px 16px 4px 16px;
+}
+.setting-item {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+}
+.setting-label {
+  font-size: 15px;
+  color: #2C3E50;
+}
+.setting-value {
+  font-size: 14px;
+  color: #95A5A6;
+}
+</style>

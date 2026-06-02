@@ -1,0 +1,8 @@
+export type LlmCache = {
+  cache_key: string
+  cache_type: string
+  response: string
+  model: string
+  created_at: number
+  expires_at: number
+}

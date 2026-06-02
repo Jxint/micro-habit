@@ -1,0 +1,167 @@
+<script setup lang="uts">
+import { dbManager } from './database/DatabaseManager'
+import { onCreate } from './database/DatabaseHelper'
+import { saveTodaySummary } from './services/ScoreCalculator'
+import { shouldTrigger, onActionResolved, onUserAccepted, getCurrentState } from './services/TriggerEngine'
+import { insertActionLog } from './database/ActionLogDao'
+import { getInt } from './database/SettingsDao'
+import { getActionById } from './constants/Actions'
+import { getRandomEncourage } from './constants/EncourageTexts'
+import { shortVibrate } from './utils/VibrateUtils'
+import { speakSystemTts } from './uni_modules/uts-audio-player/utssdk/app-android/SystemTts'
+import { startMonitorService, AppForegroundInfo, MonitorCallbacks } from './uni_modules/uts-accessibility-service/utssdk/app-android/AppMonitorService'
+import { showOverlay, dismissOverlay, OverlayConfig, OverlayCallbacks } from './uni_modules/uts-floating-overlay/utssdk/app-android/FloatingOverlay'
+
+let firstBackTime = 0
+let triggeredActionId: string = ''
+
+onLaunch(() => {
+  try {
+    dbManager.init()
+    onCreate(dbManager)
+    const callbacks: MonitorCallbacks = {
+      onAppDurationTrigger: (info: AppForegroundInfo): void => {
+        const threshold = getInt('app_duration_threshold', 60) * 1000
+        if (info.continuousMs < threshold) return
+        try {
+          const decision = shouldTrigger({
+            appPackage: info.packageName,
+            appLabel: info.packageName,
+            continuousMinutes: Math.floor(info.continuousMs / 60000),
+            triggerType: 'app_duration'
+          })
+          if (decision != null) {
+            triggeredActionId = decision.actionId
+            const actionForEncourage = getActionById(triggeredActionId)
+            const encourageText = actionForEncourage != null ? getRandomEncourage(actionForEncourage.category) : '又完成一次！'
+            const cfg: OverlayConfig = {
+              level: decision.triggerLevel as 'gentle' | 'strong',
+              actionName: decision.actionName,
+              ttsText: decision.ttsText,
+              durationMs: decision.durationMs,
+              lottieAssetPath: null,
+              encourageText: encourageText
+            }
+            const cbs: OverlayCallbacks = {
+              onAgree: (): void => {
+                onUserAccepted()
+                dismissOverlay()
+                const aid = triggeredActionId
+                uni.navigateTo({
+                  url: '/pages/action/execute?actionId=' + aid
+                })
+              },
+              onSelfReported: (): void => {
+                const action = getActionById(triggeredActionId)
+                if (action != null) {
+                  insertActionLog({
+                    id: 0,
+                    action_id: action.id,
+                    action_type: action.category,
+                    result: 'self_reported',
+                    skip_reason: null,
+                    trigger_type: 'app_duration',
+                    trigger_level: decision.triggerLevel,
+                    duration_ms: 0,
+                    target_ms: action.defaultDurationMs,
+                    triggered_at: Math.floor(Date.now() / 1000),
+                    completed_at: Math.floor(Date.now() / 1000),
+                    created_at: Math.floor(Date.now() / 1000)
+                  })
+                }
+                onActionResolved()
+              },
+              onBusyRemindLater: (): void => {
+                const action = getActionById(triggeredActionId)
+                if (action != null) {
+                  insertActionLog({
+                    id: 0,
+                    action_id: action.id,
+                    action_type: action.category,
+                    result: 'skipped',
+                    skip_reason: 'busy',
+                    trigger_type: 'app_duration',
+                    trigger_level: decision.triggerLevel,
+                    duration_ms: 0,
+                    target_ms: action.defaultDurationMs,
+                    triggered_at: Math.floor(Date.now() / 1000),
+                    completed_at: Math.floor(Date.now() / 1000),
+                    created_at: Math.floor(Date.now() / 1000)
+                  })
+                }
+                onActionResolved()
+              },
+              onSkipDuringExec: (): void => {
+                onActionResolved()
+              },
+              onCountdownTick: (remaining: number): void => {},
+              onCountdownFinish: (): void => {
+                shortVibrate(2)
+                speakSystemTts(encourageText)
+                const action = getActionById(triggeredActionId)
+                if (action != null) {
+                  insertActionLog({
+                    id: 0,
+                    action_id: action.id,
+                    action_type: action.category,
+                    result: 'completed',
+                    skip_reason: null,
+                    trigger_type: 'app_duration',
+                    trigger_level: decision.triggerLevel,
+                    duration_ms: action.defaultDurationMs,
+                    target_ms: action.defaultDurationMs,
+                    triggered_at: Math.floor(Date.now() / 1000),
+                    completed_at: Math.floor(Date.now() / 1000),
+                    created_at: Math.floor(Date.now() / 1000)
+                  })
+                }
+                onActionResolved()
+              },
+              onPartialCompletion: (completed: number, total: number): void => {}
+            }
+            showOverlay(cfg, cbs)
+          }
+        } catch (_) {}
+      },
+      onAppSwitch: (from: string, to: string): void => {},
+      onTimePeriodTrigger: (name: string): void => {}
+    }
+    startMonitorService(callbacks)
+  } catch (e) {
+    console.error('App init error: ' + JSON.stringify(e))
+  }
+  console.log('App Launch')
+})
+
+onAppShow(() => {
+  try { saveTodaySummary() } catch (_) {}
+  console.log('App Show')
+})
+
+onAppHide(() => {
+  console.log('App Hide')
+})
+
+onLastPageBackPress(() => {
+  if (firstBackTime == 0) {
+    uni.showToast({ title: '再按一次退出应用', position: 'bottom' })
+    firstBackTime = Date.now()
+    setTimeout(() : void => {
+      firstBackTime = 0
+    }, 2000)
+  } else if (Date.now() - firstBackTime < 2000) {
+    firstBackTime = Date.now()
+    uni.exit()
+  }
+})
+
+onExit(() => {
+  dbManager.close()
+  console.log('App Exit')
+})
+</script>
+
+<style>
+.uni-row { flex-direction: row; }
+.uni-column { flex-direction: column; }
+</style>

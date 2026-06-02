@@ -1,0 +1,23 @@
+import { dbManager } from './DatabaseManager'
+import { HeartbeatLog } from '../models/HeartbeatLog'
+
+export function insertHeartbeat(status: string): void {
+  dbManager.insert('heartbeat_logs', {
+    service_status: status,
+    timestamp: Date.now()
+  })
+}
+
+export function getRecentHeartbeats(limit: number): HeartbeatLog[] {
+  const rows = dbManager.query('SELECT * FROM heartbeat_logs ORDER BY timestamp DESC LIMIT ?', [limit])
+  return rows.map((row: Map<string, any>): HeartbeatLog => ({
+    id: row.get("id") as number,
+    service_status: row.get("service_status") as string,
+    timestamp: row.get("timestamp") as number
+  }))
+}
+
+export function cleanOldHeartbeats(): void {
+  const sevenDaysAgo = Date.now() - 7 * 86400000
+  dbManager.delete('heartbeat_logs', 'timestamp < ?', [sevenDaysAgo])
+}

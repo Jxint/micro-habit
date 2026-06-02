@@ -1,0 +1,42 @@
+import { MicroAction } from '../models/MicroAction'
+import { ALL_ACTIONS, getActionById as getCachedAction } from '../constants/Actions'
+import { getSetting, putSetting } from '../database/SettingsDao'
+import { currentHour } from '../utils/TimeUtils'
+
+const DISABLED_ACTIONS_KEY = 'disabled_action_ids'
+
+export function getEnabledActions(): MicroAction[] {
+  const disabledStr = getSetting(DISABLED_ACTIONS_KEY, '[]')
+  let disabledIds: string[] = []
+  try {
+    disabledIds = JSON.parse(disabledStr) as string[]
+  } catch (_) {}
+  return ALL_ACTIONS.filter(a => disabledIds.indexOf(a.id) < 0)
+}
+
+export function getActionById(id: string): MicroAction | null {
+  return getCachedAction(id)
+}
+
+export function isSuitableForContext(action: MicroAction, triggerType: string): boolean {
+  const hour = currentHour()
+  if (hour >= 22 || hour < 7) {
+    if (action.category === '核心') return false
+  }
+  return true
+}
+
+export function toggleActionEnabled(id: string, enabled: boolean): void {
+  const disabledStr = getSetting(DISABLED_ACTIONS_KEY, '[]')
+  let disabledIds: string[] = []
+  try {
+    disabledIds = JSON.parse(disabledStr) as string[]
+  } catch (_) {}
+  const idx = disabledIds.indexOf(id)
+  if (enabled && idx >= 0) {
+    disabledIds.splice(idx, 1)
+  } else if (!enabled && idx < 0) {
+    disabledIds.push(id)
+  }
+  putSetting(DISABLED_ACTIONS_KEY, JSON.stringify(disabledIds))
+}

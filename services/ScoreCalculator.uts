@@ -1,0 +1,211 @@
+import { ThreeStatus, StatusLevel } from '../models/ThreeStatus'
+import { MicroAction } from '../models/MicroAction'
+import { getCompletedLogsByDateAndActions, getTotalCompletedDurationSec, getTodayCompletedLogs, countCompletedToday, countSkippedToday, BarItem, getHourlyCompletionData } from '../database/ActionLogDao'
+import { countTriggersByDateAndActionIds } from '../database/TriggerLogDao'
+import { getTodayTotalUsageMinutes } from '../database/AppUsageDao'
+import { getRecent28Days, insertOrUpdateSummary } from '../database/DailySummaryDao'
+import { EYE_ACTION_IDS, POSTURE_ACTION_IDS, VITALITY_ACTION_IDS } from '../constants/CategoryMapping'
+import { getActionById } from '../constants/Actions'
+import { DailyCount } from '../models/DailyCount'
+import { daysAgo, today, formatDate } from '../utils/TimeUtils'
+
+export function calculateThreeStatus(date: string): ThreeStatus {
+  const eyeScore = calcCategoryScore(date, EYE_ACTION_IDS)
+  const postureScore = calcCategoryScore(date, POSTURE_ACTION_IDS)
+  const vitalityScore = calcCategoryScore(date, VITALITY_ACTION_IDS)
+
+  return {
+    eyeScore: eyeScore,
+    eyeLevel: getStatusLevel(eyeScore),
+    postureScore: postureScore,
+    postureLevel: getStatusLevel(postureScore),
+    vitalityScore: vitalityScore,
+    vitalityLevel: getStatusLevel(vitalityScore)
+  }
+}
+
+function calcCategoryScore(date: string, actionIds: string[]): number {
+  const logs = getCompletedLogsByDateAndActions(date, actionIds)
+  if (logs.length === 0) return -1
+
+  let totalDurationSec = 0
+  for (const log of logs) {
+    totalDurationSec += Math.floor(log.duration_ms / 1000)
+  }
+
+  const triggerCount = countTriggersByDateAndActionIds(date, actionIds)
+  const avgDurationSec = calcAvgDuration(actionIds)
+
+  if (triggerCount === 0 || avgDurationSec === 0) return -1
+
+  const idealTotalSec = triggerCount * avgDurationSec
+  const score = (totalDurationSec / idealTotalSec) * 100
+  return Math.min(score, 100)
+}
+
+function calcAvgDuration(actionIds: string[]): number {
+  let totalDefaultMs = 0
+  for (const id of actionIds) {
+    const action = getActionById(id)
+    if (action != null) totalDefaultMs += action.defaultDurationMs
+  }
+  if (actionIds.length === 0) return 0
+  return Math.floor(totalDefaultMs / actionIds.length / 1000)
+}
+
+export function getStatusLevel(score: number): StatusLevel {
+  if (score < 0) return 'no_data'
+  if (score >= 70) return 'good'
+  if (score >= 40) return 'normal'
+  return 'warning'
+}
+
+export function calcPenetration(date: string): number {
+  const totalActionSec = getTotalCompletedDurationSec(date)
+  const phoneUsageMin = getTodayTotalUsageMinutes()
+  if (phoneUsageMin === 0) return 0
+  return (totalActionSec / 60 / phoneUsageMin) * 1000
+}
+
+export type HomepageData = {
+  eyeScore: number
+  eyeLevel: StatusLevel
+  postureScore: number
+  postureLevel: StatusLevel
+  vitalityScore: number
+  vitalityLevel: StatusLevel
+  guardMinutes: number
+  penetration: number
+  todayCompletedCount: number
+  heatmapData: DailyCount[]
+}
+
+
+
+export function getHomepageData(date: string): HomepageData {
+  const threeStatus = calculateThreeStatus(date)
+  const guardMinutes = Math.floor(getTotalCompletedDurationSec(date) / 60)
+  const penetration = calcPenetration(date)
+  const todayCompletedCount = countCompletedToday()
+  const heatmapData = getRecent28Days()
+
+  return {
+    eyeScore: threeStatus.eyeScore,
+    eyeLevel: threeStatus.eyeLevel,
+    postureScore: threeStatus.postureScore,
+    postureLevel: threeStatus.postureLevel,
+    vitalityScore: threeStatus.vitalityScore,
+    vitalityLevel: threeStatus.vitalityLevel,
+    guardMinutes: guardMinutes,
+    penetration: penetration,
+    todayCompletedCount: todayCompletedCount,
+    heatmapData: heatmapData
+  }
+}
+
+export function getHourlyData(date: string): BarItem[] {
+  return getHourlyCompletionData(date)
+}
+
+type WeekScoreRow = {
+  date: string
+  eye: number
+  posture: number
+  vitality: number
+}
+
+export function getWeeklyScores(): WeekScoreRow[] {
+  const result: WeekScoreRow[] = []
+  for (let i = 6; i >= 0; i--) {
+    const d = daysAgo(i)
+    const ts = calculateThreeStatus(d)
+    result.push({
+      date: d,
+      eye: Math.max(0, Math.round(ts.eyeScore)),
+      posture: Math.max(0, Math.round(ts.postureScore)),
+      vitality: Math.max(0, Math.round(ts.vitalityScore))
+    })
+  }
+  return result
+}
+
+export type LinePoint = {
+  label: string
+  value: number
+}
+
+export type LineSeries = {
+  name: string
+  color: string
+  points: LinePoint[]
+}
+
+export function getWeeklyTrend(): LineSeries[] {
+  const scores = getWeeklyScores()
+
+  const eyePoints: LinePoint[] = []
+  const posturePoints: LinePoint[] = []
+  const vitalityPoints: LinePoint[] = []
+
+  for (const s of scores) {
+    const parts = s.date.split('-')
+    const label = parts[1] + '/' + parts[2]
+    eyePoints.push({ label: label, value: s.eye })
+    posturePoints.push({ label: label, value: s.posture })
+    vitalityPoints.push({ label: label, value: s.vitality })
+  }
+
+  return [
+    { name: '护眼', color: '#2ECC71', points: eyePoints },
+    { name: '体态', color: '#3498DB', points: posturePoints },
+    { name: '活力', color: '#F39C12', points: vitalityPoints }
+  ]
+}
+
+export type ActionDetail = {
+  name: string
+  type: string
+  durationSec: number
+  time: string
+}
+
+export function getTodayDetail(): ActionDetail[] {
+  const logs = getTodayCompletedLogs()
+  const result: ActionDetail[] = []
+  for (const log of logs) {
+    const action = getActionById(log.action_id)
+    const name = action != null ? action.name : log.action_id
+    const type = action != null ? action.category : log.action_type
+    const durationSec = Math.floor(log.duration_ms / 1000)
+    const d = new Date(log.completed_at)
+    const h = d.getHours()
+    const m = d.getMinutes()
+    const time = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m
+    result.push({
+      name: name,
+      type: type,
+      durationSec: durationSec,
+      time: time
+    })
+  }
+  return result
+}
+
+export function saveTodaySummary(): void {
+  const date = today()
+  const threeStatus = calculateThreeStatus(date)
+  insertOrUpdateSummary({
+    id: 0,
+    date: date,
+    total_completed: countCompletedToday(),
+    total_skipped: countSkippedToday(),
+    total_duration_sec: getTotalCompletedDurationSec(date),
+    eye_score: Math.max(0, Math.round(threeStatus.eyeScore)),
+    posture_score: Math.max(0, Math.round(threeStatus.postureScore)),
+    vitality_score: Math.max(0, Math.round(threeStatus.vitalityScore)),
+    penetration: calcPenetration(date),
+    phone_usage_min: getTodayTotalUsageMinutes(),
+    guard_minutes: Math.floor(getTotalCompletedDurationSec(date) / 60),
+    created_at: Math.floor(Date.now() / 1000)
+  })
+}

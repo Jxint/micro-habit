@@ -1,0 +1,13 @@
+export type UserAction = 'completed' | 'self_reported' | 'skipped' | 'feedback' | 'ignored' | 'timeout' | 'busy_remind_later'
+
+export type TriggerLog = {
+  id: number
+  trigger_type: string
+  trigger_level: string
+  app_package: string | null
+  app_category: string | null
+  continuous_minutes: number
+  action_id: string | null
+  user_action: UserAction | null
+  created_at: number
+}

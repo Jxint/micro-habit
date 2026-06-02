@@ -1,0 +1,41 @@
+import { dbManager } from './DatabaseManager'
+
+export function getSetting(key: string, defaultValue: string = ''): string {
+  const row = dbManager.queryOne('SELECT value FROM user_settings WHERE key = ?', [key])
+  return row != null ? (row.get("value") as string) : defaultValue
+}
+
+export function getInt(key: string, defaultVal: number = 0): number {
+  const val = getSetting(key, '' + defaultVal)
+  const n = parseInt(val)
+  return isNaN(n) ? defaultVal : n
+}
+
+export function getLong(key: string, defaultVal: number = 0): number {
+  return getInt(key, defaultVal)
+}
+
+export function getFloat(key: string, defaultVal: number = 0): number {
+  const val = getSetting(key, '' + defaultVal)
+  const n = parseFloat(val)
+  return isNaN(n) ? defaultVal : n
+}
+
+export function getBool(key: string, defaultVal: boolean = false): boolean {
+  const val = getSetting(key, defaultVal ? '1' : '0')
+  return val === '1' || val === 'true'
+}
+
+export function putSetting(key: string, value: string): void {
+  const now = Math.floor(Date.now() / 1000)
+  const existing = dbManager.queryOne('SELECT key FROM user_settings WHERE key = ?', [key])
+  if (existing != null) {
+    dbManager.update('user_settings', { value: value, updated_at: now }, 'key = ?', [key])
+  } else {
+    dbManager.insert('user_settings', { key: key, value: value, updated_at: now })
+  }
+}
+
+export function putInt(key: string, value: number): void {
+  putSetting(key, '' + value)
+}

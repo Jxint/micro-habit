@@ -1,0 +1,14 @@
+export type DailySummary = {
+  id: number
+  date: string
+  total_completed: number
+  total_skipped: number
+  total_duration_sec: number
+  eye_score: number
+  posture_score: number
+  vitality_score: number
+  penetration: number
+  phone_usage_min: number
+  guard_minutes: number
+  created_at: number
+}

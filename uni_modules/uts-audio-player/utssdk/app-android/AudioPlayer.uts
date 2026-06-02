@@ -1,0 +1,162 @@
+import MediaPlayer from 'android.media.MediaPlayer'
+import Handler from 'android.os.Handler'
+import Looper from 'android.os.Looper'
+
+export type AudioPlayerCallbacks = {
+  onCompletion: () => void
+  onError: (error: string) => void
+  onProgress: (currentMs: number, totalMs: number) => void
+}
+
+let player: NativeAudioPlayer | null = null
+
+export function play(filePath: string, callbacks: AudioPlayerCallbacks): void {
+  ensurePlayer()
+  player!!.playFile(filePath, callbacks)
+}
+
+export function playUrl(url: string, callbacks: AudioPlayerCallbacks): void {
+  ensurePlayer()
+  player!!.playUrl(url, callbacks)
+}
+
+export function pause(): void {
+  if (player != null) player.pause()
+}
+
+export function resume(): void {
+  if (player != null) player.resume()
+}
+
+export function stop(): void {
+  if (player != null) {
+    player.stop()
+    player = null
+  }
+}
+
+export function setVolume(vol: number): void {
+  if (player != null) player.setVolume(vol)
+}
+
+export function isPlaying(): boolean {
+  return player != null && player.isPlaying()
+}
+
+function ensurePlayer(): void {
+  if (player == null) {
+    player = NativeAudioPlayer()
+  }
+}
+
+class NativeAudioPlayer {
+  private mp: MediaPlayer | null = null
+  private handler: Handler | null = null
+  private callbacks: AudioPlayerCallbacks | null = null
+
+  playFile(filePath: string, cbs: AudioPlayerCallbacks): void {
+    this.stop()
+    this.callbacks = cbs
+    this.mp = MediaPlayer()
+    try {
+      this.mp!!.setDataSource(filePath)
+      this.setup()
+      this.mp!!.prepare()
+      this.mp!!.start()
+      this.startProgress()
+    } catch (e) {
+      cbs.onError('playFile failed')
+    }
+  }
+
+  playUrl(url: string, cbs: AudioPlayerCallbacks): void {
+    this.stop()
+    this.callbacks = cbs
+    this.mp = MediaPlayer()
+    try {
+      this.mp!!.setDataSource(url)
+      this.setup()
+      this.mp!!.prepareAsync()
+      this.mp!!.setOnPreparedListener(MediaPlayer.OnPreparedListener({
+        onPrepared(mp: MediaPlayer): void {
+          mp.start()
+        }
+      }))
+      this.startProgress()
+    } catch (e) {
+      cbs.onError('playUrl failed')
+    }
+  }
+
+  pause(): void {
+    if (this.mp != null && this.mp!!.isPlaying()) {
+      this.mp!!.pause()
+    }
+  }
+
+  resume(): void {
+    if (this.mp != null && !this.mp!!.isPlaying()) {
+      this.mp!!.start()
+    }
+  }
+
+  stop(): void {
+    this.stopProgress()
+    if (this.mp != null) {
+      try {
+        this.mp!!.stop()
+        this.mp!!.release()
+      } catch (_) {}
+      this.mp = null
+    }
+    this.callbacks = null
+  }
+
+  setVolume(vol: number): void {
+    if (this.mp != null) {
+      this.mp!!.setVolume(vol, vol)
+    }
+  }
+
+  isPlaying(): boolean {
+    return this.mp != null && this.mp!!.isPlaying()
+  }
+
+  private setup(): void {
+    if (this.mp != null && this.callbacks != null) {
+      const cbs = this.callbacks
+      this.mp!!.setOnCompletionListener(MediaPlayer.OnCompletionListener({
+        onCompletion(mp: MediaPlayer): void {
+          cbs.onCompletion()
+        }
+      }))
+      this.mp!!.setOnErrorListener(MediaPlayer.OnErrorListener({
+        onError(mp: MediaPlayer, what: number, extra: number): boolean {
+          cbs.onError('error: ' + what + '/' + extra)
+          return true
+        }
+      }))
+    }
+  }
+
+  private startProgress(): void {
+    this.stopProgress()
+    this.handler = Handler(Looper.getMainLooper())
+    const self = this
+    this.handler!!.postDelayed(function(): void {
+      const mp = self.mp
+      const cbs = self.callbacks
+      if (mp != null && mp.isPlaying() && cbs != null) {
+        cbs.onProgress(mp.getCurrentPosition(), mp.getDuration())
+        self.startProgress()
+      }
+    }, 100)
+  }
+
+  private stopProgress(): void {
+    if (this.handler != null) {
+      this.handler.removeCallbacksAndMessages(null)
+      this.handler = null
+    }
+  }
+}
