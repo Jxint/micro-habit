@@ -1,4 +1,4 @@
-import { dbManager } from './DatabaseManager'
+import { dbManager, type SqlRow } from './DatabaseManager'
 
 export function getSetting(key: string, defaultValue: string = ''): string {
   const row = dbManager.queryOne('SELECT value FROM user_settings WHERE key = ?', [key])
@@ -30,9 +30,17 @@ export function putSetting(key: string, value: string): void {
   const now = Math.floor(Date.now() / 1000)
   const existing = dbManager.queryOne('SELECT key FROM user_settings WHERE key = ?', [key])
   if (existing != null) {
-    dbManager.update('user_settings', { value: value, updated_at: now }, 'key = ?', [key])
+    const row: SqlRow = {
+      columns: ['value', 'updated_at'],
+      values: [value, now]
+    }
+    dbManager.update('user_settings', row, 'key = ?', [key])
   } else {
-    dbManager.insert('user_settings', { key: key, value: value, updated_at: now })
+    const row: SqlRow = {
+      columns: ['key', 'value', 'updated_at'],
+      values: [key, value, now]
+    }
+    dbManager.insert('user_settings', row)
   }
 }
 

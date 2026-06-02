@@ -30,11 +30,17 @@
     </view>
 
     <view class="tab-bar">
-      <view class="tab" :class="{ active: currentTab === 'trigger' }" @tap="switchTabTrigger">
+      <view class="tab" :class="{ active: currentTab === 'trigger' }" @tap="switchTab('trigger')">
         <text class="tab-text">触发日志</text>
       </view>
-      <view class="tab" :class="{ active: currentTab === 'action' }" @tap="switchTabAction">
+      <view class="tab" :class="{ active: currentTab === 'action' }" @tap="switchTab('action')">
         <text class="tab-text">动作日志</text>
+      </view>
+      <view class="tab" :class="{ active: currentTab === 'db' }" @tap="switchTab('db')">
+        <text class="tab-text">数据库</text>
+      </view>
+      <view class="tab" :class="{ active: currentTab === 'config' }" @tap="switchTab('config')">
+        <text class="tab-text">配置</text>
       </view>
     </view>
 
@@ -96,6 +102,46 @@
           </view>
         </view>
       </view>
+
+      <view v-if="currentTab === 'db'">
+        <view class="section-header">
+          <text class="section-header-text">数据库表概览</text>
+        </view>
+        <view v-for="(info, idx) in dbTableInfos" :key="idx" class="db-table-card">
+          <view class="db-table-row">
+            <text class="db-table-name">{{ info.name }}</text>
+            <text class="db-table-count">{{ info.count }} 行</text>
+          </view>
+        </view>
+        <view class="section-header">
+          <text class="section-header-text">最新动作日志（最近5条）</text>
+        </view>
+        <view v-for="(log, idx) in dbRecentActions" :key="'ra-' + idx" class="log-item">
+          <view class="log-row1">
+            <text class="log-time">{{ formatTime(log.created_at) }}</text>
+            <text class="log-tag tag-manual">{{ log.action_id }}</text>
+            <text class="log-result" :class="'res-' + log.result">{{ formatResult(log.result) }}</text>
+          </view>
+          <view class="log-row2">
+            <text class="log-field-val">{{ log.action_type }} | {{ formatDuration(log.duration_ms) }} | {{ log.trigger_type }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="currentTab === 'config'">
+        <view class="section-header">
+          <text class="section-header-text">用户设置</text>
+        </view>
+        <view v-if="configList.length === 0" class="empty">
+          <text class="empty-text">暂无配置数据</text>
+        </view>
+        <view v-for="(item, idx) in configList" :key="idx" class="config-item">
+          <view class="config-row">
+            <text class="config-key">{{ item.key }}</text>
+            <text class="config-val">{{ item.value }}</text>
+          </view>
+        </view>
+      </view>
     </scroll-view>
   </view>
 </template>
@@ -105,12 +151,26 @@ import { getTodayTriggerLogs } from '../../database/TriggerLogDao'
 import { getTodayLogs, countCompletedToday, countSkippedToday } from '../../database/ActionLogDao'
 import { TriggerLog, UserAction } from '../../models/TriggerLog'
 import { ActionLog, ActionResult } from '../../models/ActionLog'
+import { dbManager } from '../../database/DatabaseManager'
 
 const triggerLogs = ref<TriggerLog[]>([])
 const actionLogs = ref<ActionLog[]>([])
 const completedCount = ref<number>(0)
 const skippedCount = ref<number>(0)
 const currentTab = ref<string>('trigger')
+
+const KNOWN_TABLES: string[] = [
+  'action_logs', 'trigger_logs', 'user_settings',
+  'daily_summaries', 'trigger_rules', 'app_usage_snapshots',
+  'tts_cache', 'heartbeat_logs', 'llm_cache'
+]
+
+type DbTableInfo = { name: string, count: number }
+const dbTableInfos = ref<DbTableInfo[]>([])
+const dbRecentActions = ref<ActionLog[]>([])
+
+type ConfigItem = { key: string, value: string }
+const configList = ref<ConfigItem[]>([])
 
 function pad2(n: number): string {
   return n < 10 ? '0' + n : '' + n
@@ -176,36 +236,85 @@ function formatResult(r: ActionResult): string {
   return r
 }
 
+function loadDbOverview(): void {
+  const infos: DbTableInfo[] = []
+    for (let i = 0; i < KNOWN_TABLES.length; i++) {
+    const t = KNOWN_TABLES[i]
+    try {
+      const row = dbManager.queryOne('SELECT COUNT(*) AS cnt FROM ' + t, [])
+      const rawCnt = row != null ? row.get("cnt") : null
+      const cnt: number = rawCnt != null ? parseFloat('' + rawCnt) : 0
+      infos.push({ name: t, count: cnt })
+    } catch (e) {
+      console.error('[debug] loadDbOverview count error for ' + t + ': ' + e)
+      infos.push({ name: t, count: 0 })
+    }
+  }
+  dbTableInfos.value = infos
+
+  try {
+    const raw = dbManager.query('SELECT * FROM action_logs ORDER BY created_at DESC LIMIT 5', [])
+    const logs: ActionLog[] = []
+    for (let i = 0; i < raw.length; i++) {
+      const r = raw[i]
+      logs.push({
+        id: r.get("id") as number,
+        action_id: r.get("action_id") as string,
+        action_type: r.get("action_type") as string,
+        result: r.get("result") as ActionResult,
+        skip_reason: r.get("skip_reason") as string | null,
+        trigger_type: r.get("trigger_type") as string,
+        trigger_level: r.get("trigger_level") as string,
+        duration_ms: r.get("duration_ms") as number,
+        target_ms: r.get("target_ms") as number,
+        triggered_at: r.get("triggered_at") as number,
+        completed_at: r.get("completed_at") as number,
+        created_at: r.get("created_at") as number
+      })
+    }
+    dbRecentActions.value = logs
+  } catch (_) {
+    dbRecentActions.value = []
+  }
+}
+
+function loadConfig(): void {
+  try {
+    const raw = dbManager.query('SELECT key, value FROM user_settings ORDER BY key ASC', [])
+    const items: ConfigItem[] = []
+    for (let i = 0; i < raw.length; i++) {
+      const r = raw[i]
+      items.push({ key: r.get("key") as string, value: r.get("value") as string })
+    }
+    configList.value = items
+  } catch (_) {
+    configList.value = []
+  }
+}
+
 function refresh(): void {
   try {
     triggerLogs.value = getTodayTriggerLogs()
-  } catch (_) {
+    console.log('[debug] triggerLogs count=' + triggerLogs.value.length)
+  } catch (e) {
+    console.error('[debug] getTodayTriggerLogs error: ' + e)
     triggerLogs.value = []
   }
   try {
     actionLogs.value = getTodayLogs()
-  } catch (_) {
+    console.log('[debug] actionLogs count=' + actionLogs.value.length)
+  } catch (e) {
+    console.error('[debug] getTodayLogs error: ' + e)
     actionLogs.value = []
   }
-  try {
-    completedCount.value = countCompletedToday()
-  } catch (_) {
-    completedCount.value = 0
-  }
-  try {
-    skippedCount.value = countSkippedToday()
-  } catch (_) {
-    skippedCount.value = 0
-  }
-  console.log('[debug] refresh triggerLogs=' + triggerLogs.value.length + ' actionLogs=' + actionLogs.value.length)
+  try { completedCount.value = countCompletedToday() } catch (e) { console.error('[debug] countCompletedToday error: ' + e); completedCount.value = 0 }
+  try { skippedCount.value = countSkippedToday() } catch (e) { console.error('[debug] countSkippedToday error: ' + e); skippedCount.value = 0 }
+  loadDbOverview()
+  loadConfig()
 }
 
-function switchTabTrigger(): void {
-  currentTab.value = 'trigger'
-}
-
-function switchTabAction(): void {
-  currentTab.value = 'action'
+function switchTab(tab: string): void {
+  currentTab.value = tab
 }
 
 function goBack(): void {
@@ -213,6 +322,7 @@ function goBack(): void {
 }
 
 onPageShow(() => {
+  console.log('[debug] onPageShow firing refresh')
   refresh()
 })
 </script>
@@ -428,5 +538,58 @@ onPageShow(() => {
 .log-skip-reason {
   font-size: 12px;
   color: #E67E22;
+}
+.section-header {
+  padding: 12px 4px 4px 4px;
+}
+.section-header-text {
+  font-size: 13px;
+  font-weight: bold;
+  color: #95A5A6;
+}
+.db-table-card {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+.db-table-row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.db-table-name {
+  font-size: 13px;
+  color: #2C3E50;
+  font-family: monospace;
+}
+.db-table-count {
+  font-size: 13px;
+  font-weight: bold;
+  color: #3498DB;
+}
+.config-item {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+}
+.config-row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.config-key {
+  font-size: 12px;
+  color: #2C3E50;
+  font-family: monospace;
+  flex: 1;
+}
+.config-val {
+  font-size: 12px;
+  color: #7F8C8D;
+  font-family: monospace;
+  text-align: right;
+  max-width: 160px;
 }
 </style>

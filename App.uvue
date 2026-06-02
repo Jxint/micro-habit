@@ -1,5 +1,5 @@
 <script setup lang="uts">
-import { dbManager } from './database/DatabaseManager'
+import { sqliteStore } from './uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore'
 import { onCreate } from './database/DatabaseHelper'
 import { saveTodaySummary } from './services/ScoreCalculator'
 import { shouldTrigger, onActionResolved, onUserAccepted, getCurrentState } from './services/TriggerEngine'
@@ -11,14 +11,14 @@ import { shortVibrate } from './utils/VibrateUtils'
 import { speakSystemTts } from './uni_modules/uts-audio-player/utssdk/app-android/SystemTts'
 import { startMonitorService, AppForegroundInfo, MonitorCallbacks } from './uni_modules/uts-accessibility-service/utssdk/app-android/AppMonitorService'
 import { showOverlay, dismissOverlay, OverlayConfig, OverlayCallbacks } from './uni_modules/uts-floating-overlay/utssdk/app-android/FloatingOverlay'
+import { setActionIdForNextPage } from './utils/NavigationHelper'
 
 let firstBackTime = 0
 let triggeredActionId: string = ''
 
 onLaunch(() => {
   try {
-    dbManager.init()
-    onCreate(dbManager)
+    sqliteStore.openDatabase('micro_habit_v2.db', 1, (): void => onCreate(), (oldV: number, newV: number): void => {})
     const callbacks: MonitorCallbacks = {
       onAppDurationTrigger: (info: AppForegroundInfo): void => {
         const threshold = getInt('app_duration_threshold', 60) * 1000
@@ -47,6 +47,7 @@ onLaunch(() => {
                 onUserAccepted()
                 dismissOverlay()
                 const aid = triggeredActionId
+                setActionIdForNextPage(aid)
                 uni.navigateTo({
                   url: '/pages/action/execute?actionId=' + aid
                 })
@@ -156,7 +157,7 @@ onLastPageBackPress(() => {
 })
 
 onExit(() => {
-  dbManager.close()
+  sqliteStore.close()
   console.log('App Exit')
 })
 </script>

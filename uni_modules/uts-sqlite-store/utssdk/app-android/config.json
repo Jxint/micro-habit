@@ -1,0 +1,6 @@
+{
+  "id": "uts-sqlite-store",
+  "name": "SQLite 存储",
+  "version": "1.0.0",
+  "dependencies": []
+}

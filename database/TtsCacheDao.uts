@@ -1,4 +1,4 @@
-import { dbManager } from './DatabaseManager'
+import { dbManager, type SqlRow } from './DatabaseManager'
 import { TtsCache } from '../models/TtsCache'
 
 export function getByHash(hash: string): TtsCache | null {
@@ -8,14 +8,11 @@ export function getByHash(hash: string): TtsCache | null {
 }
 
 export function save(textHash: string, textContent: string, filePath: string, fileSize: number, source: string): void {
-  dbManager.insert('tts_cache', {
-    text_hash: textHash,
-    text_content: textContent,
-    file_path: filePath,
-    file_size: fileSize,
-    source: source,
-    created_at: Math.floor(Date.now() / 1000)
-  })
+  const row: SqlRow = {
+    columns: ['text_hash', 'text_content', 'file_path', 'file_size', 'source', 'created_at'],
+    values: [textHash, textContent, filePath, fileSize, source, Math.floor(Date.now() / 1000)]
+  }
+  dbManager.insert('tts_cache', row)
 }
 
 function mapRow(row: Map<string, any>): TtsCache {

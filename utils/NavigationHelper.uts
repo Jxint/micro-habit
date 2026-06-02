@@ -1,0 +1,11 @@
+let pendingActionId: string = ''
+
+export function setActionIdForNextPage(id: string): void {
+  pendingActionId = id
+}
+
+export function takeActionId(): string {
+  const id = pendingActionId
+  pendingActionId = ''
+  return id
+}

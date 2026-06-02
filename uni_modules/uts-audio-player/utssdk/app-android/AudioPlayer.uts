@@ -40,7 +40,7 @@ export function setVolume(vol: number): void {
 }
 
 export function isPlaying(): boolean {
-  return player != null && player.isPlaying()
+  return player != null && player!!.isPlaying()
 }
 
 function ensurePlayer(): void {
@@ -155,7 +155,7 @@ class NativeAudioPlayer {
 
   private stopProgress(): void {
     if (this.handler != null) {
-      this.handler.removeCallbacksAndMessages(null)
+      this.handler!!.removeCallbacksAndMessages(null)
       this.handler = null
     }
   }

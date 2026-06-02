@@ -58,6 +58,7 @@ import { insertActionLog } from '../../database/ActionLogDao'
 import { insertRule } from '../../database/RuleDao'
 import { onCompleted, onConsecutiveSkip } from '../../services/RuleEngine'
 import { callRuleSuggest } from '../../services/CloudService'
+import { takeActionId } from '../../utils/NavigationHelper'
 
 const actionId = ref<string>('')
 const action = ref<MicroAction | null>(null)
@@ -121,13 +122,18 @@ const iconEmoji = computed<string>((): string => {
 
 /* ---------- leaf functions (no deps) ---------- */
 
-function parseActionId(source: any): string {
+function getActionIdFromOption(source: any): string {
   if (source == null) return ''
-  const obj = source as UTSJSONObject
-  const raw = obj['actionId']
-  if (raw == null) return ''
-  const str = raw as string
-  return str.length > 0 ? str : ''
+  try {
+    const obj = source as UTSJSONObject
+    if (obj == null) return ''
+    const raw = obj['actionId']
+    if (raw == null) return ''
+    const str = raw as string
+    return str
+  } catch (_) {
+    return ''
+  }
 }
 
 function clearCountdown(): void {
@@ -139,8 +145,12 @@ function clearCountdown(): void {
 }
 
 function recordAction(result: string, skipReason: string = ''): void {
+  console.log('[execute] recordAction enter, result=' + result)
   const a = action.value
-  if (a == null) return
+  if (a == null) {
+    console.log('[execute] recordAction SKIP: action.value is null')
+    return
+  }
   const nowMs = Date.now()
   const dur = result === 'completed' ? a.defaultDurationMs : Math.floor(a.defaultDurationMs - remainingMs.value)
   const log: ActionLog = {
@@ -157,7 +167,8 @@ function recordAction(result: string, skipReason: string = ''): void {
     completed_at: nowMs,
     created_at: Math.floor(nowMs / 1000)
   }
-  insertActionLog(log)
+  const insertId = insertActionLog(log)
+  console.log('[execute] insertActionLog returned id=' + insertId)
 }
 
 function onRejectRule(): void {
@@ -292,15 +303,19 @@ function onFeedbackCancel(): void {
 
 onLoad((option) => {
   console.log('[execute] onLoad begin')
-  let aid = parseActionId(option)
-  console.log('[execute] option parsed aid=' + aid)
+  let aid = takeActionId()
+  console.log('[execute] from helper aid=' + aid)
+  if (aid.length === 0) {
+    aid = getActionIdFromOption(option)
+    console.log('[execute] from option aid=' + aid)
+  }
   actionId.value = aid
   if (aid.length > 0) {
     const found = getActionById(aid)
     action.value = found
     console.log('[execute] found action=' + (found != null ? found.name : 'null'))
   } else {
-    console.log('[execute] no actionId from option')
+    console.log('[execute] no actionId')
   }
 })
 

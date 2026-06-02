@@ -1,0 +1,268 @@
+import Context from 'android.content.Context'
+import Cursor from 'android.database.Cursor'
+import SQLiteDatabase from 'android.database.sqlite.SQLiteDatabase'
+import SQLiteOpenHelper from 'android.database.sqlite.SQLiteOpenHelper'
+import SQLiteStatement from 'android.database.sqlite.SQLiteStatement'
+
+class MicroHabitSqliteHelper extends SQLiteOpenHelper {
+  private onCreateCallback: ((db: SQLiteDatabase) => void) | null = null
+  private onUpgradeCallback: ((db: SQLiteDatabase, oldV: number, newV: number) => void) | null = null
+
+  constructor(
+    ctx: Context,
+    name: string,
+    version: number,
+    onCreate: (db: SQLiteDatabase) => void,
+    onUpgrade: (db: SQLiteDatabase, oldV: number, newV: number) => void
+  ) {
+    super(ctx, name, null, version.toInt())
+    this.onCreateCallback = onCreate
+    this.onUpgradeCallback = onUpgrade
+  }
+
+  override onCreate(db: SQLiteDatabase): void {
+    const cb = this.onCreateCallback
+    if (cb != null) cb(db)
+  }
+
+  override onUpgrade(db: SQLiteDatabase, oldV: Int, newV: Int): void {
+    const cb = this.onUpgradeCallback
+    if (cb != null) cb(db, oldV, newV)
+  }
+}
+
+type KV = { k: string, v: any }
+
+class SqliteStore {
+  private helper: MicroHabitSqliteHelper | null = null
+  private db: SQLiteDatabase | null = null
+
+  openDatabase(
+    name: string,
+    version: number,
+    onCreate: () => void,
+    onUpgrade: (oldV: number, newV: number) => void
+  ): void {
+    if (this.db != null) return
+    const ctx: Context = UTSAndroid.getAppContext()!!
+    this.helper = new MicroHabitSqliteHelper(ctx!!, name, version,
+      (db: SQLiteDatabase): void => {
+        this.db = db
+        onCreate()
+      },
+      (db: SQLiteDatabase, oldV: number, newV: number): void => {
+        this.db = db
+        onUpgrade(oldV, newV)
+      }
+    )
+    this.db = this.helper!!.getWritableDatabase()
+  }
+
+  execSql(sql: string, params: any[] = []): void {
+    const d = this.db
+    if (d == null) return
+    if (params.length === 0) {
+      d.execSQL(sql)
+      return
+    }
+    const stmt = d.compileStatement(sql)
+    try {
+      this.bindArgs(stmt, params)
+      stmt.execute()
+    } finally {
+      stmt.close()
+    }
+  }
+
+  query(sql: string, params: any[] = []): Map<string, any>[] {
+    const d = this.db
+    if (d == null) return []
+    const args: Array<String> = this.toStringArgs(params)
+    const cursor: Cursor = d.rawQuery(sql, args.toTypedArray())
+    const out: Map<string, any>[] = []
+    try {
+      const nCols: Int = cursor.getColumnCount()
+      while (cursor.moveToNext()) {
+        const m: Map<string, any> = new Map()
+        for (let c: Int = 0; c < nCols; c++) {
+          const name: string = cursor.getColumnName(c) as string
+          const idx: Int = c
+          if (!cursor.isNull(idx)) {
+            const val: string = cursor.getString(idx) as string
+            m.set(name, val as any)
+          }
+        }
+        out.push(m)
+      }
+    } finally {
+      cursor.close()
+    }
+    return out
+  }
+
+  queryOne(sql: string, params: any[] = []): Map<string, any> | null {
+    const rows = this.query(sql, params)
+    return rows.length > 0 ? rows[0] : null
+  }
+
+  insert(table: string, data: any): number {
+    const d = this.db
+    if (d == null) return -1
+    const pairs: KV[] = this.dataToKVs(data, false)
+    if (pairs.length === 0) return -1
+    const keys: string[] = []
+    for (let i = 0; i < pairs.length; i++) keys.push(pairs[i].k)
+    const placeholders: string[] = []
+    for (let i = 0; i < keys.length; i++) placeholders.push('?')
+    const sql = 'INSERT INTO ' + table + ' (' + keys.join(',') + ') VALUES (' + placeholders.join(',') + ')'
+    const stmt = d.compileStatement(sql)
+    try {
+      for (let i = 0; i < pairs.length; i++) {
+        this.bindValue(stmt, i + 1, pairs[i].v)
+      }
+      const rid: number = stmt.executeInsert()
+      return rid
+    } finally {
+      stmt.close()
+    }
+  }
+
+  update(table: string, data: any, where: string, whereArgs: any[] = []): number {
+    const d = this.db
+    if (d == null) return 0
+    const pairs: KV[] = this.dataToKVs(data, true)
+    if (pairs.length === 0) return 0
+    const sets: string[] = []
+    for (let i = 0; i < pairs.length; i++) sets.push(pairs[i].k + ' = ?')
+    const sql = 'UPDATE ' + table + ' SET ' + sets.join(',') + ' WHERE ' + where
+    const stmt = d.compileStatement(sql)
+    try {
+      let idx: number = 1
+      for (let i = 0; i < pairs.length; i++) {
+        this.bindValue(stmt, idx, pairs[i].v)
+        idx++
+      }
+      for (let i = 0; i < whereArgs.length; i++) {
+        this.bindValue(stmt, idx, whereArgs[i])
+        idx++
+      }
+      return stmt.executeUpdateDelete()
+    } finally {
+      stmt.close()
+    }
+  }
+
+  delete(table: string, where: string, whereArgs: any[] = []): number {
+    const d = this.db
+    if (d == null) return 0
+    const sql = 'DELETE FROM ' + table + ' WHERE ' + where
+    const stmt = d.compileStatement(sql)
+    try {
+      for (let i = 0; i < whereArgs.length; i++) {
+        this.bindValue(stmt, i + 1, whereArgs[i])
+      }
+      return stmt.executeUpdateDelete()
+    } finally {
+      stmt.close()
+    }
+  }
+
+  close(): void {
+    if (this.db != null) {
+      this.db!!.close()
+      this.db = null
+    }
+    if (this.helper != null) {
+      this.helper!!.close()
+      this.helper = null
+    }
+  }
+
+  private toStringArgs(params: any[]): Array<String> {
+    const out: Array<String> = []
+    for (let i = 0; i < params.length; i++) {
+      const p = params[i]
+      if (p == null) out.push('')
+      else out.push('' + p)
+    }
+    return out
+  }
+
+  private bindArgs(stmt: SQLiteStatement, params: any[]): void {
+    for (let i = 0; i < params.length; i++) {
+      this.bindValue(stmt, i + 1, params[i])
+    }
+  }
+
+  private bindValue(stmt: SQLiteStatement, index: number, v: any): void {
+    if (v == null) {
+      stmt.bindNull(index.toInt())
+    } else {
+      stmt.bindString(index.toInt(), '' + v)
+    }
+  }
+
+  private dataToKVs(data: any, skipId: boolean): KV[] {
+    const out: KV[] = []
+    const jsonStr = JSON.stringify(data)
+    if (jsonStr == null) return out
+    if (jsonStr.length < 2) return out
+    if (jsonStr.substring(0, 1) != '{') return out
+    const inner = jsonStr.substring(1, jsonStr.length - 1)
+    if (inner.length === 0) return out
+    const pairs = this.splitTopLevelCommas(inner)
+    for (let i = 0; i < pairs.length; i++) {
+      const p = pairs[i]
+      const colonIdx = this.findTopLevelColon(p)
+      if (colonIdx < 0) continue
+      let key = p.substring(0, colonIdx).trim()
+      if (key.length >= 2 && key.substring(0, 1) === '"' && key.substring(key.length - 1) === '"') {
+        key = key.substring(1, key.length - 1)
+      }
+      if (skipId && key === 'id') continue
+      const valStr = p.substring(colonIdx + 1).trim()
+      out.push({ k: key, v: valStr })
+    }
+    return out
+  }
+
+  private splitTopLevelCommas(content: string): string[] {
+    const result: string[] = []
+    let depth = 0
+    let start = 0
+    let inStr = false
+    for (let i = 0; i < content.length; i++) {
+      const ch = content.substring(i, i + 1)
+      if (ch === '"' && (i === 0 || content.substring(i - 1, i) !== '\\')) {
+        inStr = !inStr
+      } else if (!inStr) {
+        if (ch === '{' || ch === '[') depth++
+        else if (ch === '}' || ch === ']') depth--
+        else if (ch === ',' && depth === 0) {
+          result.push(content.substring(start, i).trim())
+          start = i + 1
+        }
+      }
+    }
+    if (start < content.length) {
+      const last = content.substring(start).trim()
+      if (last.length > 0) result.push(last)
+    }
+    return result
+  }
+
+  private findTopLevelColon(s: string): number {
+    let inStr = false
+    for (let i = 0; i < s.length; i++) {
+      const ch = s.substring(i, i + 1)
+      if (ch === '"' && (i === 0 || s.substring(i - 1, i) !== '\\')) {
+        inStr = !inStr
+      } else if (!inStr && ch === ':') {
+        return i
+      }
+    }
+    return -1
+  }
+}
+
+export const sqliteStore = new SqliteStore()

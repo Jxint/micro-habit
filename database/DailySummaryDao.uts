@@ -1,4 +1,4 @@
-import { dbManager } from './DatabaseManager'
+import { dbManager, type SqlRow } from './DatabaseManager'
 import { DailySummary } from '../models/DailySummary'
 import { daysAgo } from '../utils/TimeUtils'
 import { DailyCount } from '../models/DailyCount'
@@ -6,31 +6,33 @@ import { DailyCount } from '../models/DailyCount'
 export function insertOrUpdateSummary(summary: DailySummary): void {
   const existing = dbManager.queryOne('SELECT id FROM daily_summaries WHERE date = ?', [summary.date])
   if (existing != null) {
-    dbManager.update('daily_summaries', {
-      total_completed: summary.total_completed,
-      total_skipped: summary.total_skipped,
-      total_duration_sec: summary.total_duration_sec,
-      eye_score: summary.eye_score,
-      posture_score: summary.posture_score,
-      vitality_score: summary.vitality_score,
-      penetration: summary.penetration,
-      phone_usage_min: summary.phone_usage_min,
-      guard_minutes: summary.guard_minutes
-    }, 'date = ?', [summary.date])
+    const row: SqlRow = {
+      columns: [
+        'total_completed', 'total_skipped', 'total_duration_sec',
+        'eye_score', 'posture_score', 'vitality_score',
+        'penetration', 'phone_usage_min', 'guard_minutes'
+      ],
+      values: [
+        summary.total_completed, summary.total_skipped, summary.total_duration_sec,
+        summary.eye_score, summary.posture_score, summary.vitality_score,
+        summary.penetration, summary.phone_usage_min, summary.guard_minutes
+      ]
+    }
+    dbManager.update('daily_summaries', row, 'date = ?', [summary.date])
   } else {
-    dbManager.insert('daily_summaries', {
-      date: summary.date,
-      total_completed: summary.total_completed,
-      total_skipped: summary.total_skipped,
-      total_duration_sec: summary.total_duration_sec,
-      eye_score: summary.eye_score,
-      posture_score: summary.posture_score,
-      vitality_score: summary.vitality_score,
-      penetration: summary.penetration,
-      phone_usage_min: summary.phone_usage_min,
-      guard_minutes: summary.guard_minutes,
-      created_at: Math.floor(Date.now() / 1000)
-    })
+    const row: SqlRow = {
+      columns: [
+        'date', 'total_completed', 'total_skipped', 'total_duration_sec',
+        'eye_score', 'posture_score', 'vitality_score',
+        'penetration', 'phone_usage_min', 'guard_minutes', 'created_at'
+      ],
+      values: [
+        summary.date, summary.total_completed, summary.total_skipped, summary.total_duration_sec,
+        summary.eye_score, summary.posture_score, summary.vitality_score,
+        summary.penetration, summary.phone_usage_min, summary.guard_minutes, Math.floor(Date.now() / 1000)
+      ]
+    }
+    dbManager.insert('daily_summaries', row)
   }
 }
 

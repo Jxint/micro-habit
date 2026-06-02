@@ -165,6 +165,7 @@ open class GenPagesHomeIndex : BasePage {
             }
             )
             fun gen_startAction_fn(actionId: String): Unit {
+                setActionIdForNextPage(actionId)
                 uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + actionId))
             }
             val startAction = ::gen_startAction_fn

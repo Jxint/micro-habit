@@ -1,7 +1,7 @@
 import { DEFAULT_SETTINGS } from '../constants/DefaultSettings'
-import { dbManager } from './DatabaseManager'
+import { sqliteStore } from '../uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore'
 
-const DB_NAME = 'micro_habit.db'
+const DB_NAME = 'micro_habit_v2.db'
 const DB_VERSION = 1
 
 export function getDbName(): string {
@@ -13,10 +13,10 @@ export function getDbVersion(): number {
 }
 
 function runSql(sql: string, params: any[] = []): void {
-  dbManager.execSql(sql, params)
+  sqliteStore.execSql(sql, params)
 }
 
-export function onCreate(db: any): void {
+export function onCreate(): void {
   createTables()
   insertDefaultSettings()
 }

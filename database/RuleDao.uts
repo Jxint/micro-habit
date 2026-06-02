@@ -1,4 +1,4 @@
-import { dbManager } from './DatabaseManager'
+import { dbManager, type SqlRow } from './DatabaseManager'
 import { TriggerRule } from '../models/TriggerRule'
 
 export function getAllEnabledRules(): TriggerRule[] {
@@ -17,23 +17,28 @@ export function getRulesByTriggerType(triggerType: string): TriggerRule[] {
 }
 
 export function insertRule(rule: TriggerRule): number {
-  return dbManager.insert('trigger_rules', {
-    rule_type: rule.rule_type,
-    trigger_type: rule.trigger_type,
-    condition_json: rule.condition_json,
-    action_weights_json: rule.action_weights_json,
-    enabled: rule.enabled,
-    priority: rule.priority,
-    source: rule.source,
-    expires_at: rule.expires_at,
-    created_at: rule.created_at,
-    updated_at: rule.updated_at
-  })
+  const row: SqlRow = {
+    columns: [
+      'rule_type', 'trigger_type', 'condition_json', 'action_weights_json',
+      'enabled', 'priority', 'source', 'expires_at',
+      'created_at', 'updated_at'
+    ],
+    values: [
+      rule.rule_type, rule.trigger_type, rule.condition_json, rule.action_weights_json,
+      rule.enabled, rule.priority, rule.source, rule.expires_at,
+      rule.created_at, rule.updated_at
+    ]
+  }
+  return dbManager.insert('trigger_rules', row)
 }
 
 export function updateRuleEnabled(id: number, enabled: number): void {
   const now = Math.floor(Date.now() / 1000)
-  dbManager.update('trigger_rules', { enabled: enabled, updated_at: now }, 'id = ?', [id])
+  const row: SqlRow = {
+    columns: ['enabled', 'updated_at'],
+    values: [enabled, now]
+  }
+  dbManager.update('trigger_rules', row, 'id = ?', [id])
 }
 
 function mapRow(row: Map<string, any>): TriggerRule {

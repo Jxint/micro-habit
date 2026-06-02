@@ -162,7 +162,7 @@ class AppMonitorService extends AccessibilityService {
 
   private stopCheck(): void {
     if (this.handler != null) {
-      this.handler.removeCallbacksAndMessages(null)
+      this.handler!!.removeCallbacksAndMessages(null)
       this.handler = null
     }
   }

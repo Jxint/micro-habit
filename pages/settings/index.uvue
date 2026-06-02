@@ -22,6 +22,40 @@
       </view>
 
       <view class="settings-section">
+        <text class="section-title">触发规则（{{ rules.length }} 条）</text>
+        <view v-if="rules.length === 0" class="empty-rules">
+          <text class="empty-text">暂无启用的触发规则</text>
+        </view>
+        <view v-for="(rule, idx) in rules" :key="rule.id" class="rule-card">
+          <view class="rule-row1">
+            <text class="rule-type">{{ formatRuleType(rule.rule_type) }}</text>
+            <text class="rule-trigger">{{ formatTriggerLabel(rule.trigger_type) }}</text>
+            <text class="rule-priority">优先级 {{ rule.priority }}</text>
+          </view>
+          <view class="rule-row2">
+            <text class="rule-source">{{ formatSource(rule.source) }}</text>
+            <text class="rule-cond">{{ formatCondition(rule.condition_json) }}</text>
+          </view>
+          <view class="rule-row3">
+            <text class="rule-time">创建 {{ formatTime(rule.created_at) }}</text>
+            <text class="rule-time">更新 {{ formatTime(rule.updated_at) }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="settings-section">
+        <text class="section-title">调试</text>
+        <view class="setting-item" @tap="goDebugLogs">
+          <text class="setting-label">查看触发/动作日志</text>
+          <text class="setting-value">→</text>
+        </view>
+        <view class="setting-item" @tap="goDebugDB">
+          <text class="setting-label">数据库巡检 & 配置</text>
+          <text class="setting-value">→</text>
+        </view>
+      </view>
+
+      <view class="settings-section">
         <text class="section-title">关于</text>
         <view class="setting-item" @tap="handleDebugTap">
           <text class="setting-label">版本号</text>
@@ -34,11 +68,69 @@
 
 <script setup lang="uts">
 import { getInt, putInt } from '../../database/SettingsDao'
+import { getAllEnabledRules } from '../../database/RuleDao'
+import { TriggerRule } from '../../models/TriggerRule'
 
 const durationThreshold = ref(getInt('app_duration_threshold', 60))
 const dndStart = ref('22:00')
 const dndEnd = ref('07:00')
 const durationPref = ref(getInt('action_duration_pref', 15))
+const rules = ref<TriggerRule[]>([])
+
+function pad2(n: number): string {
+  return n < 10 ? '0' + n : '' + n
+}
+
+function formatTime(t: number): string {
+  if (t <= 0) return '-'
+  const d = new Date(t * 1000)
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes())
+}
+
+function formatRuleType(t: string): string {
+  if (t === 'frequency') return '频率控制'
+  if (t === 'duration') return '时长控制'
+  if (t === 'time_window') return '时间窗口'
+  return t
+}
+
+function formatTriggerLabel(t: string): string {
+  if (t === 'app_duration') return 'APP使用时长'
+  if (t === 'manual') return '手动触发'
+  if (t === 'scheduled') return '定时触发'
+  return t
+}
+
+function formatSource(s: string): string {
+  if (s === 'ai_suggest') return '🤖 AI建议'
+  if (s === 'default') return '📦 默认'
+  if (s === 'manual') return '👤 手动'
+  return s
+}
+
+function formatCondition(json: string): string {
+  if (json === '{}' || json.length === 0) return '无条件'
+  try {
+    const obj = JSON.parse(json) as UTSJSONObject
+    if (obj == null) return json.substring(0, 20)
+    const hourMin = obj.get('hour_min')
+    const hourMax = obj.get('hour_max')
+    if (hourMin != null && hourMax != null) {
+      return '时段 ' + hourMin + ':00-' + hourMax + ':00'
+    }
+    return json.substring(0, 20)
+  } catch (_) {
+    return json.substring(0, 20)
+  }
+}
+
+function goDebugLogs(): void {
+  uni.navigateTo({ url: '/pages/debug/logs' })
+}
+
+function goDebugDB(): void {
+  uni.navigateTo({ url: '/pages/debug/logs' })
+}
 
 let debugTapCount = 0
 let debugTapTimer: number | null = null
@@ -46,21 +138,18 @@ let debugTapTimer: number | null = null
 function handleDebugTap(): void {
   debugTapCount++
   const timerId = debugTapTimer
-  if (timerId != null) {
-    clearTimeout(timerId)
-  }
-  debugTapTimer = setTimeout(() : void => {
-    debugTapCount = 0
-  }, 3000)
+  if (timerId != null) { clearTimeout(timerId) }
+  debugTapTimer = setTimeout((): void => { debugTapCount = 0 }, 3000)
   if (debugTapCount >= 5) {
     debugTapCount = 0
     putInt('app_duration_threshold', 1)
-    uni.showToast({
-      title: 'Debug模式激活，阈值设为1分钟',
-      position: 'bottom'
-    })
+    uni.showToast({ title: 'Debug模式激活，阈值1分钟', position: 'bottom' })
   }
 }
+
+onPageShow(() => {
+  try { rules.value = getAllEnabledRules() } catch (_) { rules.value = [] }
+})
 </script>
 
 <style scoped>
@@ -96,5 +185,70 @@ function handleDebugTap(): void {
 .setting-value {
   font-size: 14px;
   color: #95A5A6;
+}
+.empty-rules {
+  align-items: center;
+  padding: 20px 0;
+}
+.empty-text {
+  font-size: 13px;
+  color: #BDC3C7;
+}
+.rule-card {
+  padding: 12px 16px;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+}
+.rule-row1 {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.rule-type {
+  font-size: 13px;
+  font-weight: bold;
+  color: #2C3E50;
+  background-color: #EBF5FB;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-right: 6px;
+}
+.rule-trigger {
+  font-size: 11px;
+  color: #7F8C8D;
+  background-color: #F0F3F4;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.rule-priority {
+  font-size: 11px;
+  color: #3498DB;
+  margin-left: auto;
+}
+.rule-row2 {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 4px;
+}
+.rule-source {
+  font-size: 11px;
+  color: #27AE60;
+  margin-right: 8px;
+}
+.rule-cond {
+  font-size: 11px;
+  color: #95A5A6;
+  flex: 1;
+}
+.rule-row3 {
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.rule-time {
+  font-size: 10px;
+  color: #BDC3C7;
+  font-family: monospace;
 }
 </style>

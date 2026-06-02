@@ -90,6 +90,7 @@ import { MicroAction } from '../../models/MicroAction'
 import { currentHour } from '../../utils/TimeUtils'
 import { getEnabledActions } from '../../services/ActionManager'
 import { getSetting } from '../../database/SettingsDao'
+import { setActionIdForNextPage } from '../../utils/NavigationHelper'
 
 const store = useAppStore()
 
@@ -153,6 +154,7 @@ onPageShow(() => {
 })
 
 function startAction(actionId: string): void {
+  setActionIdForNextPage(actionId)
   uni.navigateTo({
     url: '/pages/action/execute?actionId=' + actionId
   })

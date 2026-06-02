@@ -4,6 +4,10 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import android.database.sqlite.SQLiteStatement
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
@@ -38,10 +42,8 @@ import android.view.WindowManager.LayoutParams as WindowManagerLayoutParams
 import io.dcloud.uniapp.extapi.connectSocket as uni_connectSocket
 import io.dcloud.uniapp.extapi.exit as uni_exit
 import io.dcloud.uniapp.extapi.getFileSystemManager as uni_getFileSystemManager
-import io.dcloud.uniapp.extapi.getStorageSync as uni_getStorageSync
 import io.dcloud.uniapp.extapi.navigateTo as uni_navigateTo
 import io.dcloud.uniapp.extapi.request as uni_request
-import io.dcloud.uniapp.extapi.setStorageSync as uni_setStorageSync
 import io.dcloud.uniapp.extapi.showToast as uni_showToast
 import io.dcloud.uniapp.extapi.vibrateShort as uni_vibrateShort
 val runBlock1 = run {
@@ -130,7 +132,7 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
 fun initRuntimeSocketService(): UTSPromise<Boolean> {
     val hosts: String = "192.168.3.87,127.0.0.1"
     val port: String = "8090"
-    val id: String = "app-android_6lVZbf"
+    val id: String = "app-android_O7vLjE"
     if (hosts == "" || port == "" || id == "") {
         return UTSPromise.resolve(false)
     }
@@ -168,10 +170,136 @@ open class TriggerLog (
     open var user_action: UserAction? = null,
     @JsonNotNull
     open var created_at: Number,
-) : UTSObject(), IUTSSourceMap {
+) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
         return UTSSourceMapPosition("TriggerLog", "models/TriggerLog.uts", 2, 13)
     }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return TriggerLogReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class TriggerLogReactiveObject : TriggerLog, IUTSReactive<TriggerLog> {
+    override var __v_raw: TriggerLog
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: TriggerLog, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(id = __v_raw.id, trigger_type = __v_raw.trigger_type, trigger_level = __v_raw.trigger_level, app_package = __v_raw.app_package, app_category = __v_raw.app_category, continuous_minutes = __v_raw.continuous_minutes, action_id = __v_raw.action_id, user_action = __v_raw.user_action, created_at = __v_raw.created_at) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): TriggerLogReactiveObject {
+        return TriggerLogReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var id: Number
+        get() {
+            return _tRG(__v_raw, "id", __v_raw.id, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("id")) {
+                return
+            }
+            val oldValue = __v_raw.id
+            __v_raw.id = value
+            _tRS(__v_raw, "id", oldValue, value)
+        }
+    override var trigger_type: String
+        get() {
+            return _tRG(__v_raw, "trigger_type", __v_raw.trigger_type, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("trigger_type")) {
+                return
+            }
+            val oldValue = __v_raw.trigger_type
+            __v_raw.trigger_type = value
+            _tRS(__v_raw, "trigger_type", oldValue, value)
+        }
+    override var trigger_level: String
+        get() {
+            return _tRG(__v_raw, "trigger_level", __v_raw.trigger_level, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("trigger_level")) {
+                return
+            }
+            val oldValue = __v_raw.trigger_level
+            __v_raw.trigger_level = value
+            _tRS(__v_raw, "trigger_level", oldValue, value)
+        }
+    override var app_package: String?
+        get() {
+            return _tRG(__v_raw, "app_package", __v_raw.app_package, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("app_package")) {
+                return
+            }
+            val oldValue = __v_raw.app_package
+            __v_raw.app_package = value
+            _tRS(__v_raw, "app_package", oldValue, value)
+        }
+    override var app_category: String?
+        get() {
+            return _tRG(__v_raw, "app_category", __v_raw.app_category, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("app_category")) {
+                return
+            }
+            val oldValue = __v_raw.app_category
+            __v_raw.app_category = value
+            _tRS(__v_raw, "app_category", oldValue, value)
+        }
+    override var continuous_minutes: Number
+        get() {
+            return _tRG(__v_raw, "continuous_minutes", __v_raw.continuous_minutes, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("continuous_minutes")) {
+                return
+            }
+            val oldValue = __v_raw.continuous_minutes
+            __v_raw.continuous_minutes = value
+            _tRS(__v_raw, "continuous_minutes", oldValue, value)
+        }
+    override var action_id: String?
+        get() {
+            return _tRG(__v_raw, "action_id", __v_raw.action_id, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("action_id")) {
+                return
+            }
+            val oldValue = __v_raw.action_id
+            __v_raw.action_id = value
+            _tRS(__v_raw, "action_id", oldValue, value)
+        }
+    override var user_action: UserAction?
+        get() {
+            return _tRG(__v_raw, "user_action", __v_raw.user_action, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("user_action")) {
+                return
+            }
+            val oldValue = __v_raw.user_action
+            __v_raw.user_action = value
+            _tRS(__v_raw, "user_action", oldValue, value)
+        }
+    override var created_at: Number
+        get() {
+            return _tRG(__v_raw, "created_at", __v_raw.created_at, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("created_at")) {
+                return
+            }
+            val oldValue = __v_raw.created_at
+            __v_raw.created_at = value
+            _tRS(__v_raw, "created_at", oldValue, value)
+        }
 }
 typealias ActionCategory = String
 typealias DifficultyLevel = Number
@@ -316,907 +444,311 @@ fun getActionById(id: String): MicroAction? {
     }
     return null
 }
-open class RowEntry (
+open class SqlRow (
     @JsonNotNull
-    open var cols: UTSArray<String>,
+    open var columns: UTSArray<String>,
     @JsonNotNull
-    open var vals: UTSArray<Any>,
+    open var values: UTSArray<Any?>,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("RowEntry", "database/DatabaseManager.uts", 1, 6)
+        return UTSSourceMapPosition("SqlRow", "uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore.uts", 6, 13)
     }
 }
-open class TableEntry (
-    @JsonNotNull
-    open var name: String,
-    @JsonNotNull
-    open var rows: UTSArray<RowEntry>,
-) : UTSObject(), IUTSSourceMap {
+open class MicroHabitSqliteHelper : SQLiteOpenHelper, IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("TableEntry", "database/DatabaseManager.uts", 5, 6)
+        return UTSSourceMapPosition("MicroHabitSqliteHelper", "uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore.uts", 10, 7)
     }
-}
-open class AutoIncrementEntry (
-    @JsonNotNull
-    open var name: String,
-    @JsonNotNull
-    open var value: Number,
-) : UTSObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("AutoIncrementEntry", "database/DatabaseManager.uts", 9, 6)
+    private var onCreateCallback: ((db: SQLiteDatabase) -> Unit)? = null
+    private var onUpgradeCallback: ((db: SQLiteDatabase, oldV: Number, newV: Number) -> Unit)? = null
+    constructor(ctx: Context, name: String, version: Number, onCreate: (db: SQLiteDatabase) -> Unit, onUpgrade: (db: SQLiteDatabase, oldV: Number, newV: Number) -> Unit) : super(ctx, name, null, version.toInt()) {
+        this.onCreateCallback = onCreate
+        this.onUpgradeCallback = onUpgrade
     }
-}
-open class MicroHabitDB : IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("MicroHabitDB", "database/DatabaseManager.uts", 13, 7)
-    }
-    private var tables: UTSArray<TableEntry>
-    private var autoIncrement: UTSArray<AutoIncrementEntry>
-    private constructor(){
-        this.tables = _uA()
-        this.autoIncrement = _uA()
-    }
-    open fun init(): Unit {
-        try {
-            this.loadFromStorage()
+    override fun onCreate(db: SQLiteDatabase): Unit {
+        val cb = this.onCreateCallback
+        if (cb != null) {
+            cb(db)
         }
-         catch (e: Throwable) {
-            console.error("DatabaseManager.init error: " + e, " at database/DatabaseManager.uts:37")
+    }
+    override fun onUpgrade(db: SQLiteDatabase, oldV: Int, newV: Int): Unit {
+        val cb = this.onUpgradeCallback
+        if (cb != null) {
+            cb(db, oldV, newV)
         }
+    }
+}
+open class SqliteStore : IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("SqliteStore", "uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore.uts", 29, 7)
+    }
+    private var helper: MicroHabitSqliteHelper? = null
+    private var db: SQLiteDatabase? = null
+    open fun openDatabase(name: String, version: Number, onCreate: () -> Unit, onUpgrade: (oldV: Number, newV: Number) -> Unit): Unit {
+        if (this.db != null) {
+            return
+        }
+        val ctx: Context = UTSAndroid.getAppContext()!!!!
+        this.helper = MicroHabitSqliteHelper(ctx!!!!, name, version, fun(db: SQLiteDatabase): Unit {
+            this.db = db
+            onCreate()
+        }
+        , fun(db: SQLiteDatabase, oldV: Number, newV: Number): Unit {
+            this.db = db
+            onUpgrade(oldV, newV)
+        }
+        )
+        this.db = this.helper!!!!.getWritableDatabase()
     }
     open fun execSql(sql: String, params: UTSArray<Any> = _uA()): Unit {
-        val upper = sql.toUpperCase().trim()
-        if (upper.startsWith("PRAGMA")) {
+        val d = this.db
+        if (d == null) {
             return
         }
-        if (upper.startsWith("CREATE TABLE")) {
-            val nameMatch = sql.match(UTSRegExp("CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(\\w+)", "i"))
-            if (nameMatch != null) {
-                val tableName = nameMatch[1] as String
-                if (this.findTable(tableName) == null) {
-                    val tableEntry = TableEntry(name = tableName, rows = _uA())
-                    this.tables.push(tableEntry)
-                    val autoIncEntry = AutoIncrementEntry(name = tableName, value = 1)
-                    this.autoIncrement.push(autoIncEntry)
-                }
-            }
+        if (params.length === 0) {
+            d.execSQL(sql)
             return
         }
-        if (upper.startsWith("CREATE INDEX") || upper.startsWith("CREATE UNIQUE INDEX")) {
-            return
-        }
-        if (upper.startsWith("INSERT INTO")) {
-            val nameMatch = sql.match(UTSRegExp("INSERT\\s+INTO\\s+(\\w+)", "i"))
-            if (nameMatch != null) {
-                val tableName = nameMatch[1] as String
-                val entry = this.findTable(tableName)
-                if (entry == null) {
-                    return
-                }
-                val colsMatch = sql.match(UTSRegExp("\\(([^)]+)\\)\\s*VALUES", "i"))
-                if (colsMatch == null) {
-                    return
-                }
-                val colsParts = (colsMatch[1] as String).split(",")
-                val row = RowEntry(cols = _uA(
-                    "id"
-                ), vals = _uA(
-                    this.getNextId(tableName)
-                ))
-                run {
-                    var c: Number = 0
-                    while(c < colsParts.length && c < params.length){
-                        val col = colsParts[c].trim()
-                        row.cols.push(col)
-                        row.vals.push(params[c])
-                        c++
-                    }
-                }
-                entry.rows.push(row)
-                this.saveToStorage()
-            }
-            return
-        }
-        if (upper.startsWith("UPDATE")) {
-            val nameMatch = sql.match(UTSRegExp("UPDATE\\s+(\\w+)", "i"))
-            if (nameMatch != null) {
-                val tableName = nameMatch[1] as String
-                val entry = this.findTable(tableName)
-                if (entry == null) {
-                    return
-                }
-                val setMatch = sql.match(UTSRegExp("SET\\s+(.+?)(?:\\s+WHERE\\s|\$)", "i"))
-                val whereMatch = sql.match(UTSRegExp("WHERE\\s+(.+)\$", "i"))
-                if (setMatch == null) {
-                    return
-                }
-                val setParts = (setMatch[1] as String).split(",")
-                val setCols: UTSArray<String> = _uA()
-                run {
-                    var c: Number = 0
-                    while(c < setParts.length){
-                        val eqParts = setParts[c].trim().split("=")
-                        if (eqParts.length >= 1) {
-                            setCols.push(eqParts[0].trim())
-                        }
-                        c++
-                    }
-                }
-                var paramIdx: Number = 0
-                run {
-                    var r: Number = 0
-                    while(r < entry.rows.length){
-                        if (whereMatch != null) {
-                            val whereParams: UTSArray<Any> = _uA()
-                            run {
-                                var w = setCols.length
-                                while(w < params.length){
-                                    whereParams.push(params[w])
-                                    w++
-                                }
-                            }
-                            if (!this.matchWhere(entry.rows[r], whereMatch[1] as String, whereParams)) {
-                                r++
-                                continue
-                            }
-                        }
-                        run {
-                            var c: Number = 0
-                            while(c < setCols.length){
-                                this.setColVal(entry.rows[r], setCols[c], params[paramIdx + c])
-                                c++
-                            }
-                        }
-                        paramIdx += setCols.length
-                        r++
-                    }
-                }
-                this.saveToStorage()
-            }
-            return
-        }
-        if (upper.startsWith("DELETE FROM") || upper.startsWith("DELETE")) {
-            val nameMatch = sql.match(UTSRegExp("DELETE\\s+FROM\\s+(\\w+)", "i"))
-            if (nameMatch != null) {
-                val tableName = nameMatch[1] as String
-                val entry = this.findTable(tableName)
-                if (entry == null) {
-                    return
-                }
-                val whereMatch = sql.match(UTSRegExp("WHERE\\s+(.+)\$", "i"))
-                if (whereMatch != null) {
-                    val toRemove: UTSArray<Number> = _uA()
-                    run {
-                        var i: Number = 0
-                        while(i < entry.rows.length){
-                            if (this.matchWhere(entry.rows[i], whereMatch[1] as String, params)) {
-                                toRemove.push(i)
-                            }
-                            i++
-                        }
-                    }
-                    run {
-                        var i = toRemove.length - 1
-                        while(i >= 0){
-                            entry.rows.splice(toRemove[i], 1)
-                            i--
-                        }
-                    }
-                } else {
-                    entry.rows = _uA()
-                }
-                this.saveToStorage()
-            }
-            return
-        }
-    }
-    open fun query(sql: String, params: UTSArray<Any> = _uA()): UTSArray<Map<String, Any>> {
-        val upper = sql.toUpperCase().trim()
-        if (upper.startsWith("SELECT")) {
-            val nameMatch = sql.match(UTSRegExp("FROM\\s+(\\w+)", "i"))
-            if (nameMatch == null) {
-                return _uA()
-            }
-            val tableName = nameMatch[1] as String
-            val entry = this.findTable(tableName)
-            if (entry == null) {
-                return _uA()
-            }
-            val whereMatch = sql.match(UTSRegExp("WHERE\\s+(.+?)(?:\\s+ORDER\\s+BY|\$)", "i"))
-            val orderMatch = sql.match(UTSRegExp("ORDER\\s+BY\\s+(.+)\$", "i"))
-            var results: UTSArray<RowEntry> = _uA()
-            if (whereMatch != null) {
-                run {
-                    var i: Number = 0
-                    while(i < entry.rows.length){
-                        if (this.matchWhere(entry.rows[i], whereMatch[1] as String, params)) {
-                            results.push(this.cloneRow(entry.rows[i]))
-                        }
-                        i++
-                    }
-                }
-            } else {
-                run {
-                    var i: Number = 0
-                    while(i < entry.rows.length){
-                        results.push(this.cloneRow(entry.rows[i]))
-                        i++
-                    }
-                }
-            }
-            if (orderMatch != null) {
-                val orderParts = (orderMatch[1] as String).trim().split(UTSRegExp("\\s+", ""))
-                val orderCol = orderParts[0]
-                val orderDir = if (orderParts.length > 1) {
-                    orderParts[1].toUpperCase()
-                } else {
-                    "ASC"
-                }
-                this.sortResults(results, orderCol, orderDir)
-            }
-            val selectMatch = sql.match(UTSRegExp("SELECT\\s+(.+?)\\s+FROM", "i"))
-            if (selectMatch != null) {
-                val selectPart = (selectMatch[1] as String).trim()
-                if (selectPart === "last_insert_rowid() as id") {
-                    val out: UTSArray<Map<String, Any>> = _uA()
-                    run {
-                        var i: Number = 0
-                        while(i < results.length){
-                            out.push(this.rowToMap(results[i]))
-                            i++
-                        }
-                    }
-                    return out
-                }
-                if (selectPart !== "*") {
-                    val aggMatch = selectPart.match(UTSRegExp("(\\w+)\\((\\w+)\\)", "i"))
-                    if (aggMatch != null) {
-                        val aggFn = (aggMatch[1] as String).toUpperCase()
-                        val aggCol = aggMatch[2] as String
-                        if (aggFn === "COUNT") {
-                            val row = RowEntry(cols = _uA(), vals = _uA())
-                            row.cols.push("COUNT(*)")
-                            row.vals.push(results.length)
-                            return _uA(
-                                this.rowToMap(row)
-                            )
-                        }
-                        if (aggFn === "SUM") {
-                            var sum: Number = 0
-                            run {
-                                var i: Number = 0
-                                while(i < results.length){
-                                    val v = this.getColVal(results[i], aggCol)
-                                    val n = parseFloat(this.toStr(v))
-                                    if (!isNaN(n)) {
-                                        sum += n
-                                    }
-                                    i++
-                                }
-                            }
-                            val row = RowEntry(cols = _uA(), vals = _uA())
-                            row.cols.push("SUM(" + aggCol + ")")
-                            row.vals.push(sum)
-                            return _uA(
-                                this.rowToMap(row)
-                            )
-                        }
-                    }
-                }
-            }
-            val out: UTSArray<Map<String, Any>> = _uA()
+        val stmt = d.compileStatement(sql)
+        try {
             run {
                 var i: Number = 0
-                while(i < results.length){
-                    out.push(this.rowToMap(results[i]))
+                while(i < params.length){
+                    this.bindValue(stmt, i + 1, params[i])
                     i++
                 }
             }
-            return out
+            stmt.execute()
         }
-        return _uA()
+         finally {
+            stmt.close()
+        }
+    }
+    open fun query(sql: String, params: UTSArray<Any> = _uA()): UTSArray<Map<String, Any>> {
+        val d = this.db
+        if (d == null) {
+            return _uA()
+        }
+        val args: UTSArray<String> = this.toStringArgs(params)
+        val cursor: Cursor = d.rawQuery(sql, args.toTypedArray())
+        val out: UTSArray<Map<String, Any>> = _uA()
+        try {
+            val nCols: Int = cursor.getColumnCount()
+            while(cursor.moveToNext()){
+                val m: Map<String, Any> = Map()
+                run {
+                    var c: Int = 0
+                    while(c < nCols){
+                        val name: String = cursor.getColumnName(c) as String
+                        val idx: Int = c
+                        if (cursor.isNull(idx)) {
+                            c++
+                            continue
+                        }
+                        val colType: Int = cursor.getType(idx)
+                        if (colType == 1) {
+                            val n: Long = cursor.getLong(idx) as Long
+                            m.set(name, n as Any)
+                        } else if (colType == 2) {
+                            val n: Double = cursor.getDouble(idx) as Double
+                            m.set(name, n as Any)
+                        } else {
+                            val s: String = cursor.getString(idx) as String
+                            m.set(name, s as Any)
+                        }
+                        c++
+                    }
+                }
+                out.push(m)
+            }
+        }
+         finally {
+            cursor.close()
+        }
+        return out
     }
     open fun queryOne(sql: String, params: UTSArray<Any> = _uA()): Map<String, Any>? {
-        val results = this.query(sql, params)
-        return if (results.length > 0) {
-            results[0]
+        val rows = this.query(sql, params)
+        return if (rows.length > 0) {
+            rows[0]
         } else {
             null
         }
     }
-    open fun insert(table: String, data: Any): Number {
-        val entry = this.findTable(table)
-        if (entry == null) {
+    open fun insert(table: String, row: SqlRow): Number {
+        val d = this.db
+        if (d == null) {
             return -1
         }
-        val id = this.getNextId(table)
-        val row = RowEntry(cols = _uA(), vals = _uA())
-        row.cols.push("id")
-        row.vals.push(id)
-        val dataRow = this.objToRow(data)
-        run {
-            var d: Number = 0
-            while(d < dataRow.cols.length){
-                row.cols.push(dataRow.cols[d])
-                row.vals.push(dataRow.vals[d])
-                d++
-            }
+        val columns: UTSArray<String> = row.columns
+        val values: UTSArray<Any?> = row.values
+        val n: Number = columns.length
+        if (n === 0) {
+            return -1
         }
-        entry.rows.push(row)
-        this.saveToStorage()
-        return id
-    }
-    open fun update(table: String, data: Any, where: String, whereArgs: UTSArray<Any> = _uA()): Unit {
-        val entry = this.findTable(table)
-        if (entry == null) {
-            return
+        if (values.length !== n) {
+            return -1
         }
-        val dataRow = this.objToRow(data)
+        val placeholders: UTSArray<String> = _uA()
         run {
             var i: Number = 0
-            while(i < entry.rows.length){
-                if (this.matchWhere(entry.rows[i], where, whereArgs)) {
-                    run {
-                        var d: Number = 0
-                        while(d < dataRow.cols.length){
-                            this.setColVal(entry.rows[i], dataRow.cols[d], dataRow.vals[d])
-                            d++
-                        }
-                    }
-                }
+            while(i < n){
+                placeholders.push("?")
                 i++
             }
         }
-        this.saveToStorage()
-    }
-    open fun `delete`(table: String, where: String, whereArgs: UTSArray<Any> = _uA()): Unit {
-        val entry = this.findTable(table)
-        if (entry == null) {
-            return
-        }
-        val toRemove: UTSArray<Number> = _uA()
-        run {
-            var i: Number = 0
-            while(i < entry.rows.length){
-                if (this.matchWhere(entry.rows[i], where, whereArgs)) {
-                    toRemove.push(i)
-                }
-                i++
-            }
-        }
-        run {
-            var i = toRemove.length - 1
-            while(i >= 0){
-                entry.rows.splice(toRemove[i], 1)
-                i--
-            }
-        }
-        this.saveToStorage()
-    }
-    open fun close(): Unit {
-        this.saveToStorage()
-    }
-    private fun findTable(name: String): TableEntry? {
-        run {
-            var i: Number = 0
-            while(i < this.tables.length){
-                if (this.tables[i].name === name) {
-                    return this.tables[i]
-                }
-                i++
-            }
-        }
-        return null
-    }
-    private fun getNextId(tableName: String): Number {
-        run {
-            var i: Number = 0
-            while(i < this.autoIncrement.length){
-                if (this.autoIncrement[i].name === tableName) {
-                    val id = this.autoIncrement[i].value
-                    this.autoIncrement[i].value = this.autoIncrement[i].value + 1
-                    return id
-                }
-                i++
-            }
-        }
-        return 1
-    }
-    private fun toStr(v: Any?): String {
-        if (v == null) {
-            return "null"
-        }
-        return "" + v
-    }
-    private fun getColVal(row: RowEntry, col: String): Any? {
-        run {
-            var i: Number = 0
-            while(i < row.cols.length){
-                if (row.cols[i] === col) {
-                    return row.vals[i]
-                }
-                i++
-            }
-        }
-        return null
-    }
-    private fun setColVal(row: RowEntry, col: String, kVal: Any): Unit {
-        run {
-            var i: Number = 0
-            while(i < row.cols.length){
-                if (row.cols[i] === col) {
-                    row.vals[i] = kVal
-                    return
-                }
-                i++
-            }
-        }
-        row.cols.push(col)
-        row.vals.push(kVal)
-    }
-    private fun cloneRow(row: RowEntry): RowEntry {
-        val clone = RowEntry(cols = _uA(), vals = _uA())
-        run {
-            var i: Number = 0
-            while(i < row.cols.length){
-                clone.cols.push(row.cols[i])
-                clone.vals.push(row.vals[i])
-                i++
-            }
-        }
-        return clone
-    }
-    private fun rowToMap(row: RowEntry): Map<String, Any> {
-        val map: Map<String, Any> = Map()
-        run {
-            var i: Number = 0
-            while(i < row.cols.length){
-                map.set(row.cols[i], row.vals[i])
-                i++
-            }
-        }
-        return map
-    }
-    private fun rowToObj(row: RowEntry): Any {
-        val pairs: UTSArray<String> = _uA()
-        run {
-            var i: Number = 0
-            while(i < row.cols.length){
-                pairs.push("\"" + row.cols[i] + "\":" + JSON.stringify(row.vals[i]))
-                i++
-            }
-        }
-        val jsonStr = "{" + pairs.join(",") + "}"
-        return UTSAndroid.consoleDebugError(JSON.parse(jsonStr), " at database/DatabaseManager.uts:330") as Any
-    }
-    private fun objToRow(obj: Any): RowEntry {
-        val row = RowEntry(cols = _uA(), vals = _uA())
-        val jsonStr = JSON.stringify(obj)
-        if (jsonStr != null && jsonStr.length > 0 && jsonStr.substring(0, 1) === "{") {
-            val inner = this.extractJsonPairs(jsonStr)
-            run {
-                var p: Number = 0
-                while(p < inner.length){
-                    val kv = this.splitPair(inner[p])
-                    if (kv != null) {
-                        row.cols.push(kv[0] as String)
-                        row.vals.push(kv[1])
-                    }
-                    p++
-                }
-            }
-        }
-        return row
-    }
-    private fun extractJsonPairs(jsonStr: String): UTSArray<String> {
-        val result: UTSArray<String> = _uA()
-        val content = jsonStr.substring(1, jsonStr.length - 1)
-        var depth: Number = 0
-        var start: Number = 0
-        var inStr = false
-        run {
-            var i: Number = 0
-            while(i < content.length){
-                val ch = content.substring(i, i + 1)
-                if (ch === "\"" && (i === 0 || content.substring(i - 1, i) !== "\\")) {
-                    inStr = !inStr
-                } else if (!inStr) {
-                    if (ch === "{" || ch === "[") {
-                        depth++
-                    } else if (ch === "}" || ch === "]") {
-                        depth--
-                    } else if (ch === "," && depth === 0) {
-                        result.push(content.substring(start, i).trim())
-                        start = i + 1
-                    }
-                }
-                i++
-            }
-        }
-        if (start < content.length) {
-            result.push(content.substring(start).trim())
-        }
-        return result
-    }
-    private fun splitPair(pair: String): UTSArray<Any>? {
-        var colonIdx: Number = -1
-        var inStr = false
-        run {
-            var i: Number = 0
-            while(i < pair.length){
-                val ch = pair.substring(i, i + 1)
-                if (ch === "\"" && (i === 0 || pair.substring(i - 1, i) !== "\\")) {
-                    inStr = !inStr
-                } else if (!inStr && ch === ":") {
-                    colonIdx = i
-                }
-                i++
-            }
-        }
-        if (colonIdx < 0) {
-            return null
-        }
-        val keyPart = pair.substring(0, colonIdx).trim()
-        var key = keyPart
-        if (key.length >= 2 && key.substring(0, 1) === "\"" && key.substring(key.length - 1) === "\"") {
-            key = key.substring(1, key.length - 1)
-        }
-        val valPart = pair.substring(colonIdx + 1).trim()
-        var kVal: Any = valPart
-        if (valPart === "true") {
-            kVal = true
-        } else if (valPart === "false") {
-            kVal = false
-        } else if (valPart.length >= 2 && valPart.substring(0, 1) === "\"" && valPart.substring(valPart.length - 1) === "\"") {
-            kVal = valPart.substring(1, valPart.length - 1)
-        } else {
-            val parsedNum = parseFloat(valPart)
-            if (!isNaN(parsedNum) && this.isNumericStr(valPart)) {
-                kVal = parsedNum
-            }
-        }
-        return _uA(
-            key,
-            kVal
-        )
-    }
-    private fun isNumericStr(s: String): Boolean {
-        if (s.length === 0) {
-            return false
-        }
-        var dots: Number = 0
-        run {
-            var i: Number = 0
-            while(i < s.length){
-                val ch = s.substring(i, i + 1)
-                if (ch === "-" && i === 0) {
-                    i++
-                    continue
-                }
-                if (ch === ".") {
-                    dots++
-                    if (dots > 1) {
-                        return false
-                    }
-                    i++
-                    continue
-                }
-                val digitMatch = ch.match(UTSRegExp("[0-9]", ""))
-                if (digitMatch == null) {
-                    return false
-                }
-                i++
-            }
-        }
-        return true
-    }
-    private fun sortResults(results: UTSArray<RowEntry>, col: String, dir: String): Unit {
-        val n = results.length
-        run {
-            var i: Number = 0
-            while(i < n - 1){
-                run {
-                    var j: Number = 0
-                    while(j < n - i - 1){
-                        val va = this.getColVal(results[j], col)
-                        val vb = this.getColVal(results[j + 1], col)
-                        var shouldSwap = false
-                        if (va == null && vb != null) {
-                            shouldSwap = true
-                        } else if (va != null && vb == null) {
-                            shouldSwap = false
-                        } else {
-                            val na = parseFloat(this.toStr(va))
-                            val nb = parseFloat(this.toStr(vb))
-                            if (!isNaN(na) && !isNaN(nb)) {
-                                shouldSwap = if (dir === "ASC") {
-                                    na > nb
-                                } else {
-                                    na < nb
-                                }
-                            } else {
-                                val sa = this.toStr(va)
-                                val sb = this.toStr(vb)
-                                shouldSwap = if (dir === "ASC") {
-                                    sa > sb
-                                } else {
-                                    sa < sb
-                                }
-                            }
-                        }
-                        if (shouldSwap) {
-                            val tmp = results[j]
-                            results[j] = results[j + 1]
-                            results[j + 1] = tmp
-                        }
-                        j++
-                    }
-                }
-                i++
-            }
-        }
-    }
-    private fun matchWhere(row: RowEntry, whereClause: String, params: UTSArray<Any>): Boolean {
-        val trimmed = whereClause.trim()
-        if (trimmed === "1" || trimmed === "1=1") {
-            return true
-        }
-        val parts = trimmed.split(UTSRegExp("\\s+(?:AND|and)\\s+", ""))
-        var paramIdx: Number = 0
-        run {
-            var p: Number = 0
-            while(p < parts.length){
-                val part = parts[p]
-                val eqMatch = part.match(UTSRegExp("(\\w+)\\s*=\\s*\\?", ""))
-                if (eqMatch != null) {
-                    val col = eqMatch[1] as String
-                    val kVal = params[paramIdx]
-                    paramIdx++
-                    if (this.getColVal(row, col) != kVal) {
-                        return false
-                    }
-                    p++
-                    continue
-                }
-                val neqMatch = part.match(UTSRegExp("(\\w+)\\s*(!=|<>)\\s*\\?", ""))
-                if (neqMatch != null) {
-                    val col = neqMatch[1] as String
-                    val kVal = params[paramIdx]
-                    paramIdx++
-                    if (this.getColVal(row, col) == kVal) {
-                        return false
-                    }
-                    p++
-                    continue
-                }
-                val gteMatch = part.match(UTSRegExp("(\\w+)\\s*>=\\s*\\?", ""))
-                if (gteMatch != null) {
-                    val col = gteMatch[1] as String
-                    val kVal = params[paramIdx] as Number
-                    paramIdx++
-                    val rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
-                    if (isNaN(rowVal) || rowVal < kVal) {
-                        return false
-                    }
-                    p++
-                    continue
-                }
-                val gtMatch = part.match(UTSRegExp("(\\w+)\\s*>\\s*\\?", ""))
-                if (gtMatch != null) {
-                    val col = gtMatch[1] as String
-                    val kVal = params[paramIdx] as Number
-                    paramIdx++
-                    val rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
-                    if (isNaN(rowVal) || rowVal <= kVal) {
-                        return false
-                    }
-                    p++
-                    continue
-                }
-                val lteMatch = part.match(UTSRegExp("(\\w+)\\s*<=\\s*\\?", ""))
-                if (lteMatch != null) {
-                    val col = lteMatch[1] as String
-                    val kVal = params[paramIdx] as Number
-                    paramIdx++
-                    val rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
-                    if (isNaN(rowVal) || rowVal > kVal) {
-                        return false
-                    }
-                    p++
-                    continue
-                }
-                val ltMatch = part.match(UTSRegExp("(\\w+)\\s*<\\s*\\?", ""))
-                if (ltMatch != null) {
-                    val col = ltMatch[1] as String
-                    val kVal = params[paramIdx] as Number
-                    paramIdx++
-                    val rowVal = parseFloat(this.toStr(this.getColVal(row, col)))
-                    if (isNaN(rowVal) || rowVal >= kVal) {
-                        return false
-                    }
-                    p++
-                    continue
-                }
-                paramIdx++
-                p++
-            }
-        }
-        return true
-    }
-    private fun loadFromStorage(): Unit {
+        val sql = "INSERT INTO " + table + " (" + columns.join(",") + ") VALUES (" + placeholders.join(",") + ")"
+        val stmt = d.compileStatement(sql)
         try {
-            val raw = uni_getStorageSync("_db_tables")
-            if (raw != null && raw !== "") {
-                this.tables = this.parseTableEntries(raw as String)
-            }
-            val idRaw = uni_getStorageSync("_db_auto_inc")
-            if (idRaw != null && idRaw !== "") {
-                this.autoIncrement = this.parseAutoIncEntries(idRaw as String)
-            }
-        }
-         catch (_: Throwable) {}
-    }
-    private fun parseTableEntries(json: String): UTSArray<TableEntry> {
-        val result: UTSArray<TableEntry> = _uA()
-        val items = this.splitJsonArray(json)
-        run {
-            var i: Number = 0
-            while(i < items.length){
-                val name = this.extractJsonStrValue(items[i], "name")
-                if (name == null || name.length === 0) {
+            run {
+                var i: Number = 0
+                while(i < n){
+                    this.bindValue(stmt, i + 1, values[i])
                     i++
-                    continue
                 }
-                val rowsJson = this.extractJsonRawValue(items[i], "rows")
-                val rows = if (rowsJson != null) {
-                    this.parseRowEntries(rowsJson)
-                } else {
-                    _uA()
-                }
-                result.push(TableEntry(name = name, rows = rows))
-                i++
             }
+            val rid: Number = stmt.executeInsert()
+            return rid
         }
-        return result
+         finally {
+            stmt.close()
+        }
     }
-    private fun parseAutoIncEntries(json: String): UTSArray<AutoIncrementEntry> {
-        val result: UTSArray<AutoIncrementEntry> = _uA()
-        val items = this.splitJsonArray(json)
-        run {
-            var i: Number = 0
-            while(i < items.length){
-                val name = this.extractJsonStrValue(items[i], "name")
-                val value = this.extractJsonNumValue(items[i], "value")
-                if (name != null && name.length > 0) {
-                    result.push(AutoIncrementEntry(name = name, value = value))
-                }
-                i++
-            }
-        }
-        return result
-    }
-    private fun parseRowEntries(json: String): UTSArray<RowEntry> {
-        val result: UTSArray<RowEntry> = _uA()
-        val items = this.splitJsonArray(json)
-        run {
-            var i: Number = 0
-            while(i < items.length){
-                val colsJson = this.extractJsonRawValue(items[i], "cols")
-                val valsJson = this.extractJsonRawValue(items[i], "vals")
-                if (colsJson == null || valsJson == null) {
-                    i++
-                    continue
-                }
-                val cols = UTSAndroid.consoleDebugError(JSON.parse(colsJson), " at database/DatabaseManager.uts:579") as UTSArray<String>
-                val vals = UTSAndroid.consoleDebugError(JSON.parse(valsJson), " at database/DatabaseManager.uts:580") as UTSArray<Any>
-                result.push(RowEntry(cols = cols, vals = vals))
-                i++
-            }
-        }
-        return result
-    }
-    private fun splitJsonArray(json: String): UTSArray<String> {
-        val trimmed = json.trim()
-        if (trimmed.length < 2 || trimmed.substring(0, 1) !== "[") {
-            return _uA()
-        }
-        val content = trimmed.substring(1, trimmed.length - 1)
-        val items: UTSArray<String> = _uA()
-        var depth: Number = 0
-        var start: Number = 0
-        var inStr = false
-        run {
-            var i: Number = 0
-            while(i < content.length){
-                val ch = content.substring(i, i + 1)
-                if (ch === "\"" && (i === 0 || content.substring(i - 1, i) !== "\\")) {
-                    inStr = !inStr
-                } else if (!inStr) {
-                    if (ch === "{" || ch === "[") {
-                        depth++
-                    } else if (ch === "}" || ch === "]") {
-                        depth--
-                    } else if (ch === "," && depth === 0) {
-                        items.push(content.substring(start, i))
-                        start = i + 1
-                    }
-                }
-                i++
-            }
-        }
-        if (start < content.length) {
-            val last = content.substring(start).trim()
-            if (last.length > 0) {
-                items.push(last)
-            }
-        }
-        return items
-    }
-    private fun extractJsonStrValue(objJson: String, key: String): String? {
-        val pair = this.findJsonPair(objJson, key)
-        if (pair == null) {
-            return null
-        }
-        val raw = pair.substring(pair.indexOf(":") + 1).trim()
-        if (raw.length >= 2 && raw.substring(0, 1) === "\"" && raw.substring(raw.length - 1) === "\"") {
-            return raw.substring(1, raw.length - 1)
-        }
-        return null
-    }
-    private fun extractJsonNumValue(objJson: String, key: String): Number {
-        val pair = this.findJsonPair(objJson, key)
-        if (pair == null) {
+    open fun update(table: String, row: SqlRow, where: String, whereArgs: UTSArray<Any> = _uA()): Number {
+        val d = this.db
+        if (d == null) {
             return 0
         }
-        val raw = pair.substring(pair.indexOf(":") + 1).trim()
-        val n = parseFloat(raw)
-        return if (!isNaN(n)) {
-            n
-        } else {
-            0
+        val columns: UTSArray<String> = row.columns
+        val values: UTSArray<Any?> = row.values
+        val n: Number = columns.length
+        if (n === 0) {
+            return 0
         }
-    }
-    private fun extractJsonRawValue(objJson: String, key: String): String? {
-        val pair = this.findJsonPair(objJson, key)
-        if (pair == null) {
-            return null
+        if (values.length !== n) {
+            return 0
         }
-        return pair.substring(pair.indexOf(":") + 1).trim()
-    }
-    private fun findJsonPair(objJson: String, key: String): String? {
-        val pairs = this.extractJsonPairs(objJson)
+        val sets: UTSArray<String> = _uA()
         run {
             var i: Number = 0
-            while(i < pairs.length){
-                val splitted = this.splitPair(pairs[i])
-                if (splitted != null && splitted.length > 0 && splitted[0] === key) {
-                    return pairs[i]
+            while(i < n){
+                val col = columns[i] as String
+                sets.push(col + " = ?")
+                i++
+            }
+        }
+        val sql = "UPDATE " + table + " SET " + sets.join(",") + " WHERE " + where
+        val stmt = d.compileStatement(sql)
+        try {
+            var idx: Number = 1
+            run {
+                var i: Number = 0
+                while(i < n){
+                    this.bindValue(stmt, idx, values[i])
+                    idx++
+                    i++
+                }
+            }
+            run {
+                var i: Number = 0
+                while(i < whereArgs.length){
+                    this.bindValue(stmt, idx, whereArgs[i])
+                    idx++
+                    i++
+                }
+            }
+            return stmt.executeUpdateDelete()
+        }
+         finally {
+            stmt.close()
+        }
+    }
+    open fun `delete`(table: String, where: String, whereArgs: UTSArray<Any> = _uA()): Number {
+        val d = this.db
+        if (d == null) {
+            return 0
+        }
+        val sql = "DELETE FROM " + table + " WHERE " + where
+        val stmt = d.compileStatement(sql)
+        try {
+            run {
+                var i: Number = 0
+                while(i < whereArgs.length){
+                    this.bindValue(stmt, i + 1, whereArgs[i])
+                    i++
+                }
+            }
+            return stmt.executeUpdateDelete()
+        }
+         finally {
+            stmt.close()
+        }
+    }
+    open fun close(): Unit {
+        if (this.db != null) {
+            this.db!!!!.close()
+            this.db = null
+        }
+        if (this.helper != null) {
+            this.helper!!!!.close()
+            this.helper = null
+        }
+    }
+    private fun toStringArgs(params: UTSArray<Any>): UTSArray<String> {
+        val out: UTSArray<String> = _uA()
+        run {
+            var i: Number = 0
+            while(i < params.length){
+                val p = params[i]
+                if (p == null) {
+                    out.push("")
+                } else {
+                    out.push("" + p)
                 }
                 i++
             }
         }
-        return null
+        return out
     }
-    private fun saveToStorage(): Unit {
-        try {
-            uni_setStorageSync("_db_tables", JSON.stringify(this.tables))
-            uni_setStorageSync("_db_auto_inc", JSON.stringify(this.autoIncrement))
-        }
-         catch (e: Throwable) {
-            console.error("DB save error: " + e, " at database/DatabaseManager.uts:656")
-        }
-    }
-    companion object {
-        private var instance: MicroHabitDB? = null
-        fun getInstance(): MicroHabitDB {
-            if (MicroHabitDB.instance == null) {
-                MicroHabitDB.instance = MicroHabitDB()
-            }
-            return MicroHabitDB.instance!!
+    private fun bindValue(stmt: SQLiteStatement, index: Number, v: Any?): Unit {
+        val i: Int = index.toInt()
+        if (v == null) {
+            stmt.bindNull(i)
+        } else if (UTSAndroid.`typeof`(v) === "number") {
+            stmt.bindLong(i, (v as Number).toLong())
+        } else {
+            stmt.bindString(i, "" + v)
         }
     }
 }
-val dbManager = MicroHabitDB.getInstance()
+val sqliteStore = SqliteStore()
+open class DbManagerShim : IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("DbManagerShim", "database/DatabaseManager.uts", 3, 7)
+    }
+    open fun init(): Unit {}
+    open fun execSql(sql: String, params: UTSArray<Any> = _uA()): Unit {
+        sqliteStore.execSql(sql, params)
+    }
+    open fun query(sql: String, params: UTSArray<Any> = _uA()): UTSArray<Map<String, Any>> {
+        return sqliteStore.query(sql, params)
+    }
+    open fun queryOne(sql: String, params: UTSArray<Any> = _uA()): Map<String, Any>? {
+        return sqliteStore.queryOne(sql, params)
+    }
+    open fun insert(table: String, row: SqlRow): Number {
+        return sqliteStore.insert(table, row)
+    }
+    open fun update(table: String, row: SqlRow, where: String, whereArgs: UTSArray<Any> = _uA()): Number {
+        return sqliteStore.update(table, row, where, whereArgs)
+    }
+    open fun `delete`(table: String, where: String, whereArgs: UTSArray<Any> = _uA()): Number {
+        return sqliteStore.`delete`(table, where, whereArgs)
+    }
+    open fun close(): Unit {
+        sqliteStore.close()
+    }
+}
+val dbManager = DbManagerShim()
 fun getSetting(key: String, defaultValue: String = ""): String {
     val row = dbManager.queryOne("SELECT value FROM user_settings WHERE key = ?", _uA(
         key
@@ -1251,11 +783,27 @@ fun putSetting(key: String, value: String): Unit {
         key
     ))
     if (existing != null) {
-        dbManager.update("user_settings", _uO("value" to value, "updated_at" to now), "key = ?", _uA(
+        val row = SqlRow(columns = _uA(
+            "value",
+            "updated_at"
+        ), values = _uA(
+            value,
+            now
+        ))
+        dbManager.update("user_settings", row, "key = ?", _uA(
             key
         ))
     } else {
-        dbManager.insert("user_settings", _uO("key" to key, "value" to value, "updated_at" to now))
+        val row = SqlRow(columns = _uA(
+            "key",
+            "value",
+            "updated_at"
+        ), values = _uA(
+            key,
+            value,
+            now
+        ))
+        dbManager.insert("user_settings", row)
     }
 }
 fun putInt(key: String, value: Number): Unit {
@@ -1443,11 +991,30 @@ fun getNewbieTriggerLevel(originalLevel: String): String {
     return "gentle"
 }
 fun insertTriggerLog(log: TriggerLog): Number {
-    return dbManager.insert("trigger_logs", _uO("trigger_type" to log.trigger_type, "trigger_level" to log.trigger_level, "app_package" to log.app_package, "app_category" to log.app_category, "continuous_minutes" to log.continuous_minutes, "action_id" to log.action_id, "user_action" to log.user_action, "created_at" to log.created_at))
+    val row = SqlRow(columns = _uA(
+        "trigger_type",
+        "trigger_level",
+        "app_package",
+        "app_category",
+        "continuous_minutes",
+        "action_id",
+        "user_action",
+        "created_at"
+    ), values = _uA(
+        log.trigger_type,
+        log.trigger_level,
+        log.app_package,
+        log.app_category,
+        log.continuous_minutes,
+        log.action_id,
+        log.user_action,
+        log.created_at
+    ))
+    return dbManager.insert("trigger_logs", row)
 }
 fun countTriggersByDateAndActionIds(date: String, actionIds: UTSArray<String>): Number {
     val start = getTimestampFromDate(date)
-    val end = start + 86400000
+    val end = start + 86400
     val ids = actionIds.map(fun(id: String): String {
         return "'" + id + "'"
     }
@@ -1456,15 +1023,39 @@ fun countTriggersByDateAndActionIds(date: String, actionIds: UTSArray<String>): 
         start,
         end
     ))
-    return if (row != null) {
-        (row.get("cnt") as Number)
+    val rawCnt = if (row != null) {
+        row.get("cnt")
+    } else {
+        null
+    }
+    return if (rawCnt != null) {
+        parseFloat("" + rawCnt)
     } else {
         0
     }
 }
+fun getTodayTriggerLogs(): UTSArray<TriggerLog> {
+    val start = getDayStartTimestamp()
+    val end = start + 86400
+    val rows = dbManager.query("SELECT * FROM trigger_logs WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC", _uA(
+        start,
+        end
+    ))
+    return rows.map(fun(r: Map<String, Any>): TriggerLog {
+        return mapRow(r)
+    }
+    )
+}
+fun mapRow(row: Map<String, Any>): TriggerLog {
+    return TriggerLog(id = row.get("id") as Number, trigger_type = row.get("trigger_type") as String, trigger_level = row.get("trigger_level") as String, app_package = row.get("app_package") as String?, app_category = row.get("app_category") as String?, continuous_minutes = row.get("continuous_minutes") as Number, action_id = row.get("action_id") as String?, user_action = row.get("user_action") as UserAction?, created_at = row.get("created_at") as Number)
+}
+fun getDayStartTimestamp(): Number {
+    val d = Date()
+    return Math.floor(Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000)
+}
 fun getTimestampFromDate(date: String): Number {
     val parts = date.split("-")
-    return Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime()
+    return Math.floor(Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime() / 1000)
 }
 typealias ActionResult = String
 open class ActionLog (
@@ -1491,29 +1082,216 @@ open class ActionLog (
     open var completed_at: Number,
     @JsonNotNull
     open var created_at: Number,
-) : UTSObject(), IUTSSourceMap {
+) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
         return UTSSourceMapPosition("ActionLog", "models/ActionLog.uts", 3, 13)
     }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return ActionLogReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class ActionLogReactiveObject : ActionLog, IUTSReactive<ActionLog> {
+    override var __v_raw: ActionLog
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: ActionLog, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(id = __v_raw.id, action_id = __v_raw.action_id, action_type = __v_raw.action_type, result = __v_raw.result, skip_reason = __v_raw.skip_reason, trigger_type = __v_raw.trigger_type, trigger_level = __v_raw.trigger_level, duration_ms = __v_raw.duration_ms, target_ms = __v_raw.target_ms, triggered_at = __v_raw.triggered_at, completed_at = __v_raw.completed_at, created_at = __v_raw.created_at) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): ActionLogReactiveObject {
+        return ActionLogReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var id: Number
+        get() {
+            return _tRG(__v_raw, "id", __v_raw.id, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("id")) {
+                return
+            }
+            val oldValue = __v_raw.id
+            __v_raw.id = value
+            _tRS(__v_raw, "id", oldValue, value)
+        }
+    override var action_id: String
+        get() {
+            return _tRG(__v_raw, "action_id", __v_raw.action_id, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("action_id")) {
+                return
+            }
+            val oldValue = __v_raw.action_id
+            __v_raw.action_id = value
+            _tRS(__v_raw, "action_id", oldValue, value)
+        }
+    override var action_type: String
+        get() {
+            return _tRG(__v_raw, "action_type", __v_raw.action_type, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("action_type")) {
+                return
+            }
+            val oldValue = __v_raw.action_type
+            __v_raw.action_type = value
+            _tRS(__v_raw, "action_type", oldValue, value)
+        }
+    override var result: ActionResult
+        get() {
+            return _tRG(__v_raw, "result", __v_raw.result, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("result")) {
+                return
+            }
+            val oldValue = __v_raw.result
+            __v_raw.result = value
+            _tRS(__v_raw, "result", oldValue, value)
+        }
+    override var skip_reason: String?
+        get() {
+            return _tRG(__v_raw, "skip_reason", __v_raw.skip_reason, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("skip_reason")) {
+                return
+            }
+            val oldValue = __v_raw.skip_reason
+            __v_raw.skip_reason = value
+            _tRS(__v_raw, "skip_reason", oldValue, value)
+        }
+    override var trigger_type: String
+        get() {
+            return _tRG(__v_raw, "trigger_type", __v_raw.trigger_type, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("trigger_type")) {
+                return
+            }
+            val oldValue = __v_raw.trigger_type
+            __v_raw.trigger_type = value
+            _tRS(__v_raw, "trigger_type", oldValue, value)
+        }
+    override var trigger_level: String
+        get() {
+            return _tRG(__v_raw, "trigger_level", __v_raw.trigger_level, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("trigger_level")) {
+                return
+            }
+            val oldValue = __v_raw.trigger_level
+            __v_raw.trigger_level = value
+            _tRS(__v_raw, "trigger_level", oldValue, value)
+        }
+    override var duration_ms: Number
+        get() {
+            return _tRG(__v_raw, "duration_ms", __v_raw.duration_ms, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("duration_ms")) {
+                return
+            }
+            val oldValue = __v_raw.duration_ms
+            __v_raw.duration_ms = value
+            _tRS(__v_raw, "duration_ms", oldValue, value)
+        }
+    override var target_ms: Number
+        get() {
+            return _tRG(__v_raw, "target_ms", __v_raw.target_ms, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("target_ms")) {
+                return
+            }
+            val oldValue = __v_raw.target_ms
+            __v_raw.target_ms = value
+            _tRS(__v_raw, "target_ms", oldValue, value)
+        }
+    override var triggered_at: Number
+        get() {
+            return _tRG(__v_raw, "triggered_at", __v_raw.triggered_at, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("triggered_at")) {
+                return
+            }
+            val oldValue = __v_raw.triggered_at
+            __v_raw.triggered_at = value
+            _tRS(__v_raw, "triggered_at", oldValue, value)
+        }
+    override var completed_at: Number
+        get() {
+            return _tRG(__v_raw, "completed_at", __v_raw.completed_at, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("completed_at")) {
+                return
+            }
+            val oldValue = __v_raw.completed_at
+            __v_raw.completed_at = value
+            _tRS(__v_raw, "completed_at", oldValue, value)
+        }
+    override var created_at: Number
+        get() {
+            return _tRG(__v_raw, "created_at", __v_raw.created_at, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("created_at")) {
+                return
+            }
+            val oldValue = __v_raw.created_at
+            __v_raw.created_at = value
+            _tRS(__v_raw, "created_at", oldValue, value)
+        }
 }
 fun insertActionLog(log: ActionLog): Number {
-    return dbManager.insert("action_logs", _uO("action_id" to log.action_id, "action_type" to log.action_type, "result" to log.result, "skip_reason" to log.skip_reason, "trigger_type" to log.trigger_type, "trigger_level" to log.trigger_level, "duration_ms" to log.duration_ms, "target_ms" to log.target_ms, "triggered_at" to log.triggered_at, "completed_at" to log.completed_at, "created_at" to log.created_at))
+    val row = SqlRow(columns = _uA(
+        "action_id",
+        "action_type",
+        "result",
+        "skip_reason",
+        "trigger_type",
+        "trigger_level",
+        "duration_ms",
+        "target_ms",
+        "triggered_at",
+        "completed_at",
+        "created_at"
+    ), values = _uA(
+        log.action_id,
+        log.action_type,
+        log.result,
+        log.skip_reason,
+        log.trigger_type,
+        log.trigger_level,
+        log.duration_ms,
+        log.target_ms,
+        log.triggered_at,
+        log.completed_at,
+        log.created_at
+    ))
+    return dbManager.insert("action_logs", row)
 }
 fun getTodayLogs(): UTSArray<ActionLog> {
-    val start = getDayStartTimestamp()
-    val end = start + 86400000
+    val start = getDayStartTimestamp__1()
+    val end = start + 86400
     val rows = dbManager.query("SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC", _uA(
         start,
         end
     ))
     return rows.map(fun(r: Map<String, Any>): ActionLog {
-        return mapRow(r)
+        return mapRow__1(r)
     }
     )
 }
 fun getTodayCompletedLogs(): UTSArray<ActionLog> {
-    val start = getDayStartTimestamp()
-    val end = start + 86400000
+    val start = getDayStartTimestamp__1()
+    val end = start + 86400
     val rows = dbManager.query("SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) ORDER BY created_at DESC", _uA(
         start,
         end,
@@ -1521,13 +1299,13 @@ fun getTodayCompletedLogs(): UTSArray<ActionLog> {
         "self_reported"
     ))
     return rows.map(fun(r: Map<String, Any>): ActionLog {
-        return mapRow(r)
+        return mapRow__1(r)
     }
     )
 }
 fun getCompletedLogsByDateAndActions(date: String, actionIds: UTSArray<String>): UTSArray<ActionLog> {
     val start = getTimestampFromDate__1(date)
-    val end = start + 86400000
+    val end = start + 86400
     val ids = actionIds.map(fun(id: String): String {
         return "'" + id + "'"
     }
@@ -1539,50 +1317,65 @@ fun getCompletedLogsByDateAndActions(date: String, actionIds: UTSArray<String>):
         "self_reported"
     ))
     return rows.map(fun(r: Map<String, Any>): ActionLog {
-        return mapRow(r)
+        return mapRow__1(r)
     }
     )
 }
 fun getTotalCompletedDurationSec(date: String): Number {
     val start = getTimestampFromDate__1(date)
-    val end = start + 86400000
+    val end = start + 86400
     val row = dbManager.queryOne("SELECT COALESCE(SUM(duration_ms), 0) as total FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
         start,
         end,
         "completed",
         "self_reported"
     ))
-    return if (row != null) {
-        Math.floor((row.get("total") as Number) / 1000)
+    val rawTotal = if (row != null) {
+        row.get("total")
+    } else {
+        null
+    }
+    return if (rawTotal != null) {
+        Math.floor(parseFloat("" + rawTotal) / 1000)
     } else {
         0
     }
 }
 fun countCompletedToday(): Number {
-    val start = getDayStartTimestamp()
-    val end = start + 86400000
+    val start = getDayStartTimestamp__1()
+    val end = start + 86400
     val row = dbManager.queryOne("SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
         start,
         end,
         "completed",
         "self_reported"
     ))
-    return if (row != null) {
-        (row.get("cnt") as Number)
+    val rawCnt = if (row != null) {
+        row.get("cnt")
+    } else {
+        null
+    }
+    return if (rawCnt != null) {
+        parseFloat("" + rawCnt)
     } else {
         0
     }
 }
 fun countSkippedToday(): Number {
-    val start = getDayStartTimestamp()
-    val end = start + 86400000
+    val start = getDayStartTimestamp__1()
+    val end = start + 86400
     val row = dbManager.queryOne("SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result = ?", _uA(
         start,
         end,
         "skipped"
     ))
-    return if (row != null) {
-        (row.get("cnt") as Number)
+    val rawCnt = if (row != null) {
+        row.get("cnt")
+    } else {
+        null
+    }
+    return if (rawCnt != null) {
+        parseFloat("" + rawCnt)
     } else {
         0
     }
@@ -1594,7 +1387,7 @@ open class BarItem (
     open var value: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("BarItem", "database/ActionLogDao.uts", 59, 13)
+        return UTSSourceMapPosition("BarItem", "database/ActionLogDao.uts", 62, 13)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return BarItemReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -1656,7 +1449,7 @@ fun getHourlyCompletionData(date: String): UTSArray<BarItem> {
     }
     val rows = dbManager.query("SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
         getTimestampFromDate__1(date),
-        getTimestampFromDate__1(date) + 86400000,
+        getTimestampFromDate__1(date) + 86400,
         "completed",
         "self_reported"
     ))
@@ -1668,16 +1461,16 @@ fun getHourlyCompletionData(date: String): UTSArray<BarItem> {
     }
     return result
 }
-fun mapRow(row: Map<String, Any>): ActionLog {
+fun mapRow__1(row: Map<String, Any>): ActionLog {
     return ActionLog(id = row.get("id") as Number, action_id = row.get("action_id") as String, action_type = row.get("action_type") as String, result = row.get("result") as ActionResult, skip_reason = row.get("skip_reason") as String?, trigger_type = row.get("trigger_type") as String, trigger_level = row.get("trigger_level") as String, duration_ms = row.get("duration_ms") as Number, target_ms = row.get("target_ms") as Number, triggered_at = row.get("triggered_at") as Number, completed_at = row.get("completed_at") as Number, created_at = row.get("created_at") as Number)
 }
-fun getDayStartTimestamp(): Number {
+fun getDayStartTimestamp__1(): Number {
     val d = Date()
-    return Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    return Math.floor(Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000)
 }
 fun getTimestampFromDate__1(date: String): Number {
     val parts = date.split("-")
-    return Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime()
+    return Math.floor(Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime() / 1000)
 }
 enum class TriggerState__1(override val value: Int) : UTSEnumInt {
     IDLE(0),
@@ -1840,9 +1633,9 @@ val DEFAULT_SETTINGS = _uA(
     DefaultSetting(key = "body_limit", value = "none")
 ) as UTSArray<DefaultSetting>
 fun runSql(sql: String, params: UTSArray<Any> = _uA()): Unit {
-    dbManager.execSql(sql, params)
+    sqliteStore.execSql(sql, params)
 }
-fun onCreate(db: Any): Unit {
+fun onCreate(): Unit {
     createTables()
     insertDefaultSettings()
 }
@@ -1992,11 +1785,57 @@ fun insertOrUpdateSummary(summary: DailySummary): Unit {
         summary.date
     ))
     if (existing != null) {
-        dbManager.update("daily_summaries", _uO("total_completed" to summary.total_completed, "total_skipped" to summary.total_skipped, "total_duration_sec" to summary.total_duration_sec, "eye_score" to summary.eye_score, "posture_score" to summary.posture_score, "vitality_score" to summary.vitality_score, "penetration" to summary.penetration, "phone_usage_min" to summary.phone_usage_min, "guard_minutes" to summary.guard_minutes), "date = ?", _uA(
+        val row = SqlRow(columns = _uA(
+            "total_completed",
+            "total_skipped",
+            "total_duration_sec",
+            "eye_score",
+            "posture_score",
+            "vitality_score",
+            "penetration",
+            "phone_usage_min",
+            "guard_minutes"
+        ), values = _uA(
+            summary.total_completed,
+            summary.total_skipped,
+            summary.total_duration_sec,
+            summary.eye_score,
+            summary.posture_score,
+            summary.vitality_score,
+            summary.penetration,
+            summary.phone_usage_min,
+            summary.guard_minutes
+        ))
+        dbManager.update("daily_summaries", row, "date = ?", _uA(
             summary.date
         ))
     } else {
-        dbManager.insert("daily_summaries", _uO("date" to summary.date, "total_completed" to summary.total_completed, "total_skipped" to summary.total_skipped, "total_duration_sec" to summary.total_duration_sec, "eye_score" to summary.eye_score, "posture_score" to summary.posture_score, "vitality_score" to summary.vitality_score, "penetration" to summary.penetration, "phone_usage_min" to summary.phone_usage_min, "guard_minutes" to summary.guard_minutes, "created_at" to Math.floor(Date.now() / 1000)))
+        val row = SqlRow(columns = _uA(
+            "date",
+            "total_completed",
+            "total_skipped",
+            "total_duration_sec",
+            "eye_score",
+            "posture_score",
+            "vitality_score",
+            "penetration",
+            "phone_usage_min",
+            "guard_minutes",
+            "created_at"
+        ), values = _uA(
+            summary.date,
+            summary.total_completed,
+            summary.total_skipped,
+            summary.total_duration_sec,
+            summary.eye_score,
+            summary.posture_score,
+            summary.vitality_score,
+            summary.penetration,
+            summary.phone_usage_min,
+            summary.guard_minutes,
+            Math.floor(Date.now() / 1000)
+        ))
+        dbManager.insert("daily_summaries", row)
     }
 }
 fun getRecent28Days(): UTSArray<DailyCount> {
@@ -2630,7 +2469,7 @@ open class AppMonitorService : AccessibilityService, IUTSSourceMap {
     }
     private fun stopCheck(): Unit {
         if (this.handler != null) {
-            this.handler!!.removeCallbacksAndMessages(null)
+            this.handler!!!!.removeCallbacksAndMessages(null)
             this.handler = null
         }
     }
@@ -2967,7 +2806,7 @@ open class FloatingOverlayManager : IUTSSourceMap {
     }
     private fun stopCountdown(): Unit {
         if (this.handler != null) {
-            this.handler!!.removeCallbacksAndMessages(null)
+            this.handler!!!!.removeCallbacksAndMessages(null)
             this.handler = null
         }
     }
@@ -3005,6 +2844,15 @@ open class FloatingOverlayManager : IUTSSourceMap {
         return value.toInt()
     }
 }
+var pendingActionId: String = ""
+fun setActionIdForNextPage(id: String): Unit {
+    pendingActionId = id
+}
+fun takeActionId(): String {
+    val id = pendingActionId
+    pendingActionId = ""
+    return id
+}
 open class GenApp : BaseApp {
     constructor(__ins: ComponentInternalInstance) : super(__ins) {
         setCurrentInstance(__ins)
@@ -3021,8 +2869,10 @@ open class GenApp : BaseApp {
             var triggeredActionId: String = ""
             onLaunch(fun(_options){
                 try {
-                    dbManager.init()
-                    onCreate(dbManager)
+                    sqliteStore.openDatabase("micro_habit_v2.db", 1, fun(): Unit {
+                        return onCreate()
+                    }
+                    , fun(oldV: Number, newV: Number): Unit {})
                     val callbacks = MonitorCallbacks(onAppDurationTrigger = fun(info: AppForegroundInfo): Unit {
                         val threshold = getInt("app_duration_threshold", 60) * 1000
                         if (info.continuousMs < threshold) {
@@ -3043,6 +2893,7 @@ open class GenApp : BaseApp {
                                     onUserAccepted()
                                     dismissOverlay()
                                     val aid = triggeredActionId
+                                    setActionIdForNextPage(aid)
                                     uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + aid))
                                 }
                                 , onSelfReported = fun(): Unit {
@@ -3081,9 +2932,9 @@ open class GenApp : BaseApp {
                     startMonitorService(callbacks)
                 }
                  catch (e: Throwable) {
-                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:131")
+                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:132")
                 }
-                console.log("App Launch", " at App.uvue:133")
+                console.log("App Launch", " at App.uvue:134")
             }
             )
             onAppShow(fun(_options){
@@ -3091,11 +2942,11 @@ open class GenApp : BaseApp {
                     saveTodaySummary()
                 }
                  catch (_: Throwable) {}
-                console.log("App Show", " at App.uvue:138")
+                console.log("App Show", " at App.uvue:139")
             }
             )
             onAppHide(fun(){
-                console.log("App Hide", " at App.uvue:142")
+                console.log("App Hide", " at App.uvue:143")
             }
             )
             onLastPageBackPress(fun(){
@@ -3112,8 +2963,8 @@ open class GenApp : BaseApp {
             }
             )
             onExit(fun(){
-                dbManager.close()
-                console.log("App Exit", " at App.uvue:160")
+                sqliteStore.close()
+                console.log("App Exit", " at App.uvue:161")
             }
             )
             return fun(): Any? {
@@ -3304,7 +3155,7 @@ fun getByKey(key: String): LlmCache? {
     if (row == null) {
         return null
     }
-    return mapRow__1(row)
+    return mapRow__2(row)
 }
 fun save(key: String, type: String, response: String, expiresAt: Number): Unit {
     dbManager.execSql("INSERT OR REPLACE INTO llm_cache (cache_key, cache_type, response, expires_at, created_at) VALUES (?,?,?,?,?)", _uA(
@@ -3315,7 +3166,7 @@ fun save(key: String, type: String, response: String, expiresAt: Number): Unit {
         Math.floor(Date.now() / 1000)
     ))
 }
-fun mapRow__1(row: Map<String, Any>): LlmCache {
+fun mapRow__2(row: Map<String, Any>): LlmCache {
     return LlmCache(cache_key = row.get("cache_key") as String, cache_type = row.get("cache_type") as String, response = row.get("response") as String, model = row.get("model") as String, created_at = row.get("created_at") as Number, expires_at = row.get("expires_at") as Number)
 }
 fun isNetworkAvailable(): Boolean {
@@ -4075,6 +3926,10 @@ fun useAppStore(): AppStore {
             val date = today()
             val nowMs = Date.now()
             val summaryHour = parseSummaryHour(getSetting("daily_summary_time", "21:00"))
+            try {
+                saveTodaySummary()
+            }
+             catch (_: Throwable) {}
             val data = getHomepageData(date)
             eyeScore.value = Math.round(data.eyeScore)
             eyeStatus.value = data.eyeLevel
@@ -4090,7 +3945,7 @@ fun useAppStore(): AppStore {
             val todayCache = getByKey(todayKey)
             if (todayCache != null) {
                 try {
-                    val parsed = UTSAndroid.consoleDebugError(JSON.parse(todayCache.response), " at stores/appStore.uts:93")
+                    val parsed = UTSAndroid.consoleDebugError(JSON.parse(todayCache.response), " at stores/appStore.uts:97")
                     dailySummary.value = parsed as DailyOutput
                 } catch (_: Throwable) {}
                 dailySummaryLoading.value = false
@@ -4158,7 +4013,7 @@ fun generateDailySummary(date: String, onComplete: (summary: DailyOutput) -> Uni
     callDaily(date, dto, fun(result: Any){
         try {
             val jsonStr = JSON.stringify(result)
-            val obj = UTSAndroid.consoleDebugError(JSON.parse(jsonStr), " at stores/appStore.uts:175") as DailyOutput
+            val obj = UTSAndroid.consoleDebugError(JSON.parse(jsonStr), " at stores/appStore.uts:179") as DailyOutput
             if (obj.one_liner != null) {
                 onComplete(obj)
                 return
@@ -4212,8 +4067,41 @@ val GenComponentsFeedbackDialogClass = CreateVueComponent(GenComponentsFeedbackD
     return GenComponentsFeedbackDialog(instance)
 }
 )
+fun getAllEnabledRules(): UTSArray<TriggerRule> {
+    val rows = dbManager.query("SELECT * FROM trigger_rules WHERE enabled = 1 ORDER BY priority DESC")
+    return rows.map(fun(r: Map<String, Any>): TriggerRule {
+        return mapRow__3(r)
+    }
+    )
+}
 fun insertRule(rule: TriggerRule): Number {
-    return dbManager.insert("trigger_rules", _uO("rule_type" to rule.rule_type, "trigger_type" to rule.trigger_type, "condition_json" to rule.condition_json, "action_weights_json" to rule.action_weights_json, "enabled" to rule.enabled, "priority" to rule.priority, "source" to rule.source, "expires_at" to rule.expires_at, "created_at" to rule.created_at, "updated_at" to rule.updated_at))
+    val row = SqlRow(columns = _uA(
+        "rule_type",
+        "trigger_type",
+        "condition_json",
+        "action_weights_json",
+        "enabled",
+        "priority",
+        "source",
+        "expires_at",
+        "created_at",
+        "updated_at"
+    ), values = _uA(
+        rule.rule_type,
+        rule.trigger_type,
+        rule.condition_json,
+        rule.action_weights_json,
+        rule.enabled,
+        rule.priority,
+        rule.source,
+        rule.expires_at,
+        rule.created_at,
+        rule.updated_at
+    ))
+    return dbManager.insert("trigger_rules", row)
+}
+fun mapRow__3(row: Map<String, Any>): TriggerRule {
+    return TriggerRule(id = row.get("id") as Number, rule_type = row.get("rule_type") as String, trigger_type = row.get("trigger_type") as String, condition_json = row.get("condition_json") as String, action_weights_json = row.get("action_weights_json") as String, enabled = row.get("enabled") as Number, priority = row.get("priority") as Number, source = row.get("source") as String, expires_at = row.get("expires_at") as Number?, created_at = row.get("created_at") as Number, updated_at = row.get("updated_at") as Number)
 }
 val GenPagesActionExecuteClass = CreateVueComponent(GenPagesActionExecute::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesActionExecute.inheritAttrs, inject = GenPagesActionExecute.inject, props = GenPagesActionExecute.props, propsNeedCastKeys = GenPagesActionExecute.propsNeedCastKeys, emits = GenPagesActionExecute.emits, components = GenPagesActionExecute.components, styles = GenPagesActionExecute.styles, setup = fun(props: ComponentPublicInstance): Any? {
@@ -4513,6 +4401,120 @@ val GenPagesSettingsIndexClass = CreateVueComponent(GenPagesSettingsIndex::class
     return GenPagesSettingsIndex(instance, renderer)
 }
 )
+open class DbTableInfo (
+    @JsonNotNull
+    open var name: String,
+    @JsonNotNull
+    open var count: Number,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 168, 6)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return DbTableInfoReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class DbTableInfoReactiveObject : DbTableInfo, IUTSReactive<DbTableInfo> {
+    override var __v_raw: DbTableInfo
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: DbTableInfo, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(name = __v_raw.name, count = __v_raw.count) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): DbTableInfoReactiveObject {
+        return DbTableInfoReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var name: String
+        get() {
+            return _tRG(__v_raw, "name", __v_raw.name, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("name")) {
+                return
+            }
+            val oldValue = __v_raw.name
+            __v_raw.name = value
+            _tRS(__v_raw, "name", oldValue, value)
+        }
+    override var count: Number
+        get() {
+            return _tRG(__v_raw, "count", __v_raw.count, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("count")) {
+                return
+            }
+            val oldValue = __v_raw.count
+            __v_raw.count = value
+            _tRS(__v_raw, "count", oldValue, value)
+        }
+}
+open class ConfigItem (
+    @JsonNotNull
+    open var key: String,
+    @JsonNotNull
+    open var value: String,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 172, 6)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return ConfigItemReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class ConfigItemReactiveObject : ConfigItem, IUTSReactive<ConfigItem> {
+    override var __v_raw: ConfigItem
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: ConfigItem, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(key = __v_raw.key, value = __v_raw.value) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): ConfigItemReactiveObject {
+        return ConfigItemReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var key: String
+        get() {
+            return _tRG(__v_raw, "key", __v_raw.key, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("key")) {
+                return
+            }
+            val oldValue = __v_raw.key
+            __v_raw.key = value
+            _tRS(__v_raw, "key", oldValue, value)
+        }
+    override var value: String
+        get() {
+            return _tRG(__v_raw, "value", __v_raw.value, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("value")) {
+                return
+            }
+            val oldValue = __v_raw.value
+            __v_raw.value = value
+            _tRS(__v_raw, "value", oldValue, value)
+        }
+}
+val GenPagesDebugLogsClass = CreateVueComponent(GenPagesDebugLogs::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesDebugLogs.inheritAttrs, inject = GenPagesDebugLogs.inject, props = GenPagesDebugLogs.props, propsNeedCastKeys = GenPagesDebugLogs.propsNeedCastKeys, emits = GenPagesDebugLogs.emits, components = GenPagesDebugLogs.components, styles = GenPagesDebugLogs.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenPagesDebugLogs.setup(props as GenPagesDebugLogs)
+    }
+    )
+}
+, fun(instance, renderer): GenPagesDebugLogs {
+    return GenPagesDebugLogs(instance, renderer)
+}
+)
 fun createApp(): UTSJSONObject {
     val app = createSSRApp(GenAppClass)
     return _uO("app" to app)
@@ -4537,6 +4539,7 @@ fun definePageRoutes() {
     __uniRoutes.push(UniPageRoute(path = "pages/action/execute", component = GenPagesActionExecuteClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationStyle" to "custom", "navigationBarTitleText" to "")))
     __uniRoutes.push(UniPageRoute(path = "pages/data/dashboard", component = GenPagesDataDashboardClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "数据看板")))
     __uniRoutes.push(UniPageRoute(path = "pages/settings/index", component = GenPagesSettingsIndexClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "设置")))
+    __uniRoutes.push(UniPageRoute(path = "pages/debug/logs", component = GenPagesDebugLogsClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "调试日志")))
 }
 val __uniTabBar: Map<String, Any?>? = _uM("list" to _uA(
     _uM("pagePath" to "pages/home/index", "text" to "首页"),
@@ -4561,7 +4564,7 @@ fun defineAppConfig() {
 }
 open class UniCloudConfig : io.dcloud.unicloud.InternalUniCloudConfig, IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("UniCloudConfig", "main.uts", 47, 14)
+        return UTSSourceMapPosition("UniCloudConfig", "main.uts", 49, 14)
     }
     override var isDev: Boolean = true
     override var spaceList: String = "[{\"provider\":\"aliyun\",\"spaceName\":\"trial-w7onvxzrxrp2h087561\",\"spaceId\":\"mp-76d188c8-df1a-4535-9cee-3bb94b3a694d\",\"clientSecret\":\"b94cO0f6Qv3WwtDVDIwHFw==\",\"endpoint\":\"https://api.next.bspapp.com\"}]"

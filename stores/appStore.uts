@@ -1,4 +1,4 @@
-import { getHomepageData } from '../services/ScoreCalculator'
+import { getHomepageData, saveTodaySummary } from '../services/ScoreCalculator'
 import { getRecommendedActions } from '../services/Recommendation'
 import { MicroAction } from '../models/MicroAction'
 import { today, yesterday, getHour } from '../utils/TimeUtils'
@@ -81,6 +81,7 @@ export function useAppStore(): AppStore {
         const nowMs = Date.now()
         const summaryHour = parseSummaryHour(getSetting('daily_summary_time', '21:00'))
 
+        try { saveTodaySummary() } catch (_) {}
         const data = getHomepageData(date)
 
         eyeScore.value = Math.round(data.eyeScore)

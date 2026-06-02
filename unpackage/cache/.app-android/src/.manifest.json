@@ -6,72 +6,76 @@
   },
   "files": {
     "pages/settings/index.kt": {
-      "md5": "69892ab7dea5a3394cbcef2243392afb5b513bc3",
-      "class": "GenPagesSettingsIndex"
+      "class": "GenPagesSettingsIndex",
+      "md5": "0a6e3d699488b076530b2e2f30f8f2414b59c345"
     },
-    "components/ActionCard.kt": {
-      "md5": "4b5ae07d36536e22cd76c8da127b08c129d87ff0",
-      "class": "GenComponentsActionCard"
+    "components/BarChart.kt": {
+      "class": "GenComponentsBarChart",
+      "md5": "c8187961635816f6767726d51ee6ccca042ebe86"
+    },
+    "components/FeedbackDialog.kt": {
+      "md5": "20c966cdce079d9cf855c094e9f8ae0b985bd1bd",
+      "class": "GenComponentsFeedbackDialog"
+    },
+    "pages/debug/logs.kt": {
+      "class": "GenPagesDebugLogs",
+      "md5": "76afeb297ad0a6bfa07788f71e8f63217b38b00b"
+    },
+    "index.kt": {
+      "class": "",
+      "md5": "205ce08fe230a2dda65b16c036370e58b806b1b3"
     },
     "components/CountdownBar.kt": {
       "md5": "da402fab1a51f8b936d63a8eac71527c27d3659d",
       "class": "GenComponentsCountdownBar"
     },
+    "components/EncourageToast.kt": {
+      "class": "GenComponentsEncourageToast",
+      "md5": "a98481b3a473d9578e42e5732d74fdf4962f1703"
+    },
     "pages/data/dashboard.kt": {
       "md5": "a0bdf7f9c4504bf5008568763ae31b351ef2afea",
       "class": "GenPagesDataDashboard"
     },
-    "index.kt": {
-      "class": "",
-      "md5": "207029892d9cb63a694ef4c1066bcb6344eabccd"
+    "components/HeatmapCalendar.kt": {
+      "md5": "41eeb9154d2b1fe527b40d08976ec929a9d65095",
+      "class": "GenComponentsHeatmapCalendar"
+    },
+    "pages/home/index.kt": {
+      "class": "GenPagesHomeIndex",
+      "md5": "aaea2510c5173d415a00187de401ac482554b4b4"
+    },
+    "pages/action/execute.kt": {
+      "class": "GenPagesActionExecute",
+      "md5": "02c6e15502c45c282f5b5b54c97a65f93198b724"
+    },
+    "components/ActionCard.kt": {
+      "class": "GenComponentsActionCard",
+      "md5": "4b5ae07d36536e22cd76c8da127b08c129d87ff0"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmRuleSuggest.kt": {
+      "class": "GenCloudObjLlmRuleSuggest",
+      "md5": "f069c8e8edba1b5ccf1d6e3f3ddc808d82feee48"
     },
     "pages/guide/index.kt": {
       "class": "GenPagesGuideIndex",
       "md5": "e343a7061feb4f31e4e903b462d073eb5084bc86"
     },
-    "uniCloud/cloudfunctions/GenCloudObjLlmDaily.kt": {
-      "class": "GenCloudObjLlmDaily",
-      "md5": "0c3cd1a85a1135e443a8557d9edbfc4ce3f51e7f"
-    },
-    "pages/home/index.kt": {
-      "md5": "8503b21576558091c5b59a547ce6f34b493c9d91",
-      "class": "GenPagesHomeIndex"
-    },
-    "components/HeatmapCalendar.kt": {
-      "class": "GenComponentsHeatmapCalendar",
-      "md5": "41eeb9154d2b1fe527b40d08976ec929a9d65095"
-    },
-    "uniCloud/cloudfunctions/GenCloudObjLlmRuleSuggest.kt": {
-      "md5": "f069c8e8edba1b5ccf1d6e3f3ddc808d82feee48",
-      "class": "GenCloudObjLlmRuleSuggest"
-    },
     "components/StatusIndicator.kt": {
-      "class": "GenComponentsStatusIndicator",
-      "md5": "c0f0e45d74bf04e49b7147a162547bcc2fbe83b6"
-    },
-    "pages/action/execute.kt": {
-      "md5": "8cdcdc7d6b977927ccca04a35076ae0bd77576e3",
-      "class": "GenPagesActionExecute"
-    },
-    "components/EncourageToast.kt": {
-      "md5": "a98481b3a473d9578e42e5732d74fdf4962f1703",
-      "class": "GenComponentsEncourageToast"
+      "md5": "c0f0e45d74bf04e49b7147a162547bcc2fbe83b6",
+      "class": "GenComponentsStatusIndicator"
     },
     "uniCloud/cloudfunctions/GenCloudObjLlmWeekly.kt": {
-      "class": "GenCloudObjLlmWeekly",
-      "md5": "d8372e5bea68f528e3c9ea0a754b2cc8f209e6ce"
-    },
-    "components/BarChart.kt": {
-      "md5": "c8187961635816f6767726d51ee6ccca042ebe86",
-      "class": "GenComponentsBarChart"
+      "md5": "d8372e5bea68f528e3c9ea0a754b2cc8f209e6ce",
+      "class": "GenCloudObjLlmWeekly"
     },
     "components/LineChart.kt": {
-      "md5": "57544cbdcc8c9ed6cd63f9b62586bee719f9214b",
-      "class": "GenComponentsLineChart"
+      "class": "GenComponentsLineChart",
+      "md5": "57544cbdcc8c9ed6cd63f9b62586bee719f9214b"
     },
-    "components/FeedbackDialog.kt": {
-      "md5": "20c966cdce079d9cf855c094e9f8ae0b985bd1bd",
-      "class": "GenComponentsFeedbackDialog"
+    "uniCloud/cloudfunctions/GenCloudObjLlmDaily.kt": {
+      "md5": "0c3cd1a85a1135e443a8557d9edbfc4ce3f51e7f",
+      "class": "GenCloudObjLlmDaily"
     }
   }
 }

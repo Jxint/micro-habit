@@ -1,0 +1,7 @@
+{
+  "id": "uts-sqlite-store",
+  "name": "SQLite 存储",
+  "version": "1.0.0",
+  "description": "封装 android.database.sqlite，提供 SQL exec/query 接口，替代手写 SQL 解析",
+  "dependencies": []
+}

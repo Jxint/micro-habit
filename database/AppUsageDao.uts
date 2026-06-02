@@ -1,4 +1,4 @@
-import { dbManager } from './DatabaseManager'
+import { dbManager, type SqlRow } from './DatabaseManager'
 import { AppUsageSnapshot } from '../models/AppUsageSnapshot'
 import { today } from '../utils/TimeUtils'
 
@@ -9,18 +9,17 @@ export function insertOrUpdateSnapshot(packageName: string, appLabel: string, fo
     [date, packageName]
   )
   if (existing != null) {
-    dbManager.update('app_usage_snapshots',
-      { total_foreground_sec: foregroundSec, app_label: appLabel },
-      'id = ?', [(existing.get("id") as number)]
-    )
+    const row: SqlRow = {
+      columns: ['total_foreground_sec', 'app_label'],
+      values: [foregroundSec, appLabel]
+    }
+    dbManager.update('app_usage_snapshots', row, 'id = ?', [(existing.get("id") as number)])
   } else {
-    dbManager.insert('app_usage_snapshots', {
-      date: date,
-      package_name: packageName,
-      app_label: appLabel,
-      total_foreground_sec: foregroundSec,
-      created_at: Math.floor(Date.now() / 1000)
-    })
+    const row: SqlRow = {
+      columns: ['date', 'package_name', 'app_label', 'total_foreground_sec', 'created_at'],
+      values: [date, packageName, appLabel, foregroundSec, Math.floor(Date.now() / 1000)]
+    }
+    dbManager.insert('app_usage_snapshots', row)
   }
 }
 

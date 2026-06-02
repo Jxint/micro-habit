@@ -1,25 +1,25 @@
-import { dbManager } from './DatabaseManager'
+import { dbManager, type SqlRow } from './DatabaseManager'
 import { ActionLog, ActionResult } from '../models/ActionLog'
 
 export function insertActionLog(log: ActionLog): number {
-  return dbManager.insert('action_logs', {
-    action_id: log.action_id,
-    action_type: log.action_type,
-    result: log.result,
-    skip_reason: log.skip_reason,
-    trigger_type: log.trigger_type,
-    trigger_level: log.trigger_level,
-    duration_ms: log.duration_ms,
-    target_ms: log.target_ms,
-    triggered_at: log.triggered_at,
-    completed_at: log.completed_at,
-    created_at: log.created_at
-  })
+  const row: SqlRow = {
+    columns: [
+      'action_id', 'action_type', 'result', 'skip_reason',
+      'trigger_type', 'trigger_level', 'duration_ms', 'target_ms',
+      'triggered_at', 'completed_at', 'created_at'
+    ],
+    values: [
+      log.action_id, log.action_type, log.result, log.skip_reason,
+      log.trigger_type, log.trigger_level, log.duration_ms, log.target_ms,
+      log.triggered_at, log.completed_at, log.created_at
+    ]
+  }
+  return dbManager.insert('action_logs', row)
 }
 
 export function getTodayLogs(): ActionLog[] {
   const start = getDayStartTimestamp()
-  const end = start + 86400000
+  const end = start + 86400
   const rows = dbManager.query(
     'SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC',
     [start, end]
@@ -29,7 +29,7 @@ export function getTodayLogs(): ActionLog[] {
 
 export function getTodayCompletedLogs(): ActionLog[] {
   const start = getDayStartTimestamp()
-  const end = start + 86400000
+  const end = start + 86400
   const rows = dbManager.query(
     'SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) ORDER BY created_at DESC',
     [start, end, 'completed', 'self_reported']
@@ -39,7 +39,7 @@ export function getTodayCompletedLogs(): ActionLog[] {
 
 export function getCompletedLogsByDateAndActions(date: string, actionIds: string[]): ActionLog[] {
   const start = getTimestampFromDate(date)
-  const end = start + 86400000
+  const end = start + 86400
   const ids = actionIds.map((id: string): string => "'" + id + "'").join(',')
   const rows = dbManager.query(
     'SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) AND action_id IN (' + ids + ') ORDER BY created_at DESC',
@@ -50,32 +50,35 @@ export function getCompletedLogsByDateAndActions(date: string, actionIds: string
 
 export function getTotalCompletedDurationSec(date: string): number {
   const start = getTimestampFromDate(date)
-  const end = start + 86400000
+  const end = start + 86400
   const row = dbManager.queryOne(
     'SELECT COALESCE(SUM(duration_ms), 0) as total FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)',
     [start, end, 'completed', 'self_reported']
   )
-  return row != null ? Math.floor((row.get("total") as number) / 1000) : 0
+  const rawTotal = row != null ? row.get("total") : null
+  return rawTotal != null ? Math.floor(parseFloat('' + rawTotal) / 1000) : 0
 }
 
 export function countCompletedToday(): number {
   const start = getDayStartTimestamp()
-  const end = start + 86400000
+  const end = start + 86400
   const row = dbManager.queryOne(
     'SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)',
     [start, end, 'completed', 'self_reported']
   )
-  return row != null ? (row.get("cnt") as number) : 0
+  const rawCnt = row != null ? row.get("cnt") : null
+  return rawCnt != null ? parseFloat('' + rawCnt) : 0
 }
 
 export function countSkippedToday(): number {
   const start = getDayStartTimestamp()
-  const end = start + 86400000
+  const end = start + 86400
   const row = dbManager.queryOne(
     'SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result = ?',
     [start, end, 'skipped']
   )
-  return row != null ? (row.get("cnt") as number) : 0
+  const rawCnt = row != null ? row.get("cnt") : null
+  return rawCnt != null ? parseFloat('' + rawCnt) : 0
 }
 
 export function getRecentLogs(count: number): ActionLog[] {
@@ -97,7 +100,7 @@ export function getHourlyCompletionData(date: string): BarItem[] {
 
   const rows = dbManager.query(
     'SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)',
-    [getTimestampFromDate(date), getTimestampFromDate(date) + 86400000, 'completed', 'self_reported']
+    [getTimestampFromDate(date), getTimestampFromDate(date) + 86400, 'completed', 'self_reported']
   )
 
   for (const row of rows) {
@@ -134,10 +137,10 @@ function mapRow(row: Map<string, any>): ActionLog {
 
 function getDayStartTimestamp(): number {
   const d = new Date()
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000)
 }
 
 function getTimestampFromDate(date: string): number {
   const parts = date.split('-')
-  return new Date(parseInt(parts[0] as string), parseInt(parts[1] as string) - 1, parseInt(parts[2] as string)).getTime()
+  return Math.floor(new Date(parseInt(parts[0] as string), parseInt(parts[1] as string) - 1, parseInt(parts[2] as string)).getTime() / 1000)
 }

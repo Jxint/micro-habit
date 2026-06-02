@@ -32,6 +32,12 @@
       "style": {
         "navigationBarTitleText": "设置"
       }
+    },
+    {
+      "path": "pages/debug/logs",
+      "style": {
+        "navigationBarTitleText": "调试日志"
+      }
     }
   ],
   "tabBar": {

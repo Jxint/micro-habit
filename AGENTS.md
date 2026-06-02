@@ -459,11 +459,6 @@ overlay.show({
   Select-String -Path "uni_modules/**/*.uts" -Pattern "^export interface"
   ```
   任何命中都必须改为 `type`
-- **本项目已修复位置**（3 个文件 5 处）：
-  - `uni_modules/uts-accessibility-service/utssdk/app-android/AppMonitorService.uts`：`AppForegroundInfo`、`MonitorCallbacks`
-  - `uni_modules/uts-floating-overlay/utssdk/app-android/FloatingOverlay.uts`：`OverlayConfig`、`OverlayCallbacks`
-  - `uni_modules/uts-audio-player/utssdk/app-android/AudioPlayer.uts`：`AudioPlayerCallbacks`
-- **项目内 `models/`、`services/`、`database/`、`stores/` 等目录已全部使用 `type`**，保持一致
 
 ### 20. Java `Intent` 类必须导入，不能只用全限定名混搭
 ```uts
@@ -509,10 +504,6 @@ const pm = this.getSystemService(Context.POWER_SERVICE) as PowerManager
 - **静态常量不通过继承**：虽然 `Service`、`WindowManager`、`Activity` 都"继承"自 `Context` 或其包装类，但 Java/Kotlin 静态字段**不参与继承**
 - 必须 `import Context from 'android.content.Context'` 然后用 `Context.X_SERVICE`
 - 错误码：**error18 找不到名称**
-- **本项目已修复位置**（3 处）：
-  - `FloatingOverlay.uts:108`：`WindowManager.WINDOW_SERVICE` → `Context.WINDOW_SERVICE`
-  - `MonitorForegroundService.uts:40`：`Service.NOTIFICATION_SERVICE` → `Context.NOTIFICATION_SERVICE`
-  - `MonitorForegroundService.uts:60`：`Service.POWER_SERVICE` → `Context.POWER_SERVICE`
 
 ### 22. Android 视图/服务构造函数参数必须是 `Context`，**禁止 `any`**
 ```uts
@@ -536,9 +527,6 @@ private buildSelectPhase(ctx: Context, config: OverlayConfig, cbs: OverlayCallba
 - 函数/方法签名中传入 `Context` 的参数**必须是 `Context` 类型**，不能用 `any`
 - **`UTSAndroid.getAppContext()` 直接返回 `Context`（非 any）**，可放心赋给 `ctx: Context` 变量
 - **错误码**：类型不匹配 `'Any'` vs `'Context'`
-- **本项目已修复位置**（2 处）：
-  - `FloatingOverlay.uts:140`：`buildSelectPhase(ctx: any, ...)` → `buildSelectPhase(ctx: Context, ...)`
-  - `FloatingOverlay.uts:232`：`switchToExec(ctx: any, ...)` → `switchToExec(ctx: Context, ...)`
 - **注意**：`context: any` 作为跨平台工具函数占位参数（如 `CloudService.uts:75`）是允许的，因为它不传给 Android 构造函数
 
 ### 23. 模块级 `let` 可变变量跨 if 块访问同样需 `!!`
@@ -566,9 +554,6 @@ export function showOverlay(config: OverlayConfig, cbs: OverlayCallbacks): void 
 **规则**：
 - 模块级 `let` 变量即使在同一函数内 `if (x == null) { x = new T() }` 之后访问，仍需 `!!`
 - 编译器不做跨代码块的 smart cast（与 §17 的"类 private 属性 + 跨 if" 行为一致）
-- **本项目已修复位置**：
-  - `FloatingOverlay.uts:45`：`overlayManager.show(...)` → `overlayManager!!.show(...)`
-  - 配合 §17（handler / service / wakeLock 等 `private` 属性同样需 `!!`）
 - **完整修复模板**（跨 `if-else/early-return` 的 mutable 变量）：
   ```uts
   if (x == null) return       // 早退
@@ -624,9 +609,6 @@ title.setTextSize(22.0f)                    // ✅ Kotlin Float 字面量也可
   - `20` → `Int`、`20.0` → `Double`、`20.0f` → `Float`、`20L` → `Long`
   - `dp(20)` 中 `20` 是 Int，可赋给 `number` 形参；`dp(2.5)` 中 `2.5` 是 Double，也可赋给 `number`
   - 算术运算：`Int * Float = Float`、`Int * Double = Double`、`Float + Double = Double`（类型提升遵循 Kotlin 规则）
-- **本项目已修复位置**（12 处）：
-  - `FloatingOverlay.uts:372`：`dp(value: number): number` → `dp(value: number): Int` + `return value.toInt()`
-  - `FloatingOverlay.uts:155,163,175,192,211,244,252,266,274,324,332`（11 个 `setTextSize(x.x)`）→ `setTextSize(x.x.toFloat())`
 - **自查命令**：
   ```powershell
   # 查找 Android Float 形参 API 的 Double 字面量调用
@@ -679,9 +661,6 @@ bar.setProgress(total - self.remainingMs)          // ✅ Int - Int = Int
   - 公共 API（如 `OverlayConfig.durationMs`、`MicroAction.defaultDurationMs`、`AppForegroundInfo.continuousMs`）保持 `number` 灵活
   - 内部 Android 边界处统一加 `.toInt()`，错误局部化
   - 避免大规模改动破坏调用方（`insertActionLog` 的 `target_ms: number` 等）
-- **本项目已修复位置**（2 处）：
-  - `FloatingOverlay.uts:259`：`setMax(config.durationMs)` → `setMax(config.durationMs.toInt())`
-  - `FloatingOverlay.uts:296`：`setProgress(total - self.remainingMs)` → `setProgress((total - self.remainingMs).toInt())`
 - **自查命令**：
   ```powershell
   # 找 "number 类型字段" 直接传给 Android Int 形参的位置
@@ -691,70 +670,6 @@ bar.setProgress(total - self.remainingMs)          // ✅ Int - Int = Int
   ```
 - **关联规则**：§24 工具函数返回类型（`dp(): Int`）是同一类问题的另一面
 ```
-
-### 26. HBuilderX 5.x uts 插件合并机制：`config.json` 字段不全生效，必须用 `AndroidManifest.xml`
-**【最高优先级】Android Service/Receiver/Provider 等需要 manifest 注册的组件，必须放在 `utssdk/app-android/AndroidManifest.xml` 才会被合并。**
-
-**陷阱**：
-- `config.json` 里的 `permissions` 数组 → **完全忽略**（不写入最终 manifest）
-- `config.json` 里的 `services` 数组 → **完全忽略**
-- `config.json` 里的 `receivers` 数组 → **完全忽略**
-- `config.json` 里 `id`/`name`/`version`/`dependencies` → 生效
-- `manifest.json`（应用级）里的 `android.permissions` → 生效
-- `manifest.json`（应用级）里的 `android.minSdkVersion`/`targetSdkVersion` → 生效
-
-**真实案例**（本项目 2026-06-01 教训）：
-- 用户反馈 OPPO 无障碍列表看不到本应用
-- 调研：发现 `config.json` 已正确写 `services[AppMonitorService]`/`receivers[BootReceiver]`/`permissions[BIND_ACCESSIBILITY_SERVICE...]`
-- 云打包后用 `aapt2 dump xmltree` 看真实 APK manifest：
-  - ✓ `minSdkVersion=24`、`targetSdkVersion=34`（来自 `manifest.json`）
-  - ✗ 完全找不到 `AppMonitorService`/`MonitorForegroundService`/`BootReceiver`
-  - ✗ 完全找不到 `BIND_ACCESSIBILITY_SERVICE`/`FOREGROUND_SERVICE` 等权限
-- 对比 `audio-player`/`floating-overlay` 的 `config.json`：它们也是空的 `services`/`receivers`，但能跑是因为**它们用 Java API 直接调（MediaPlayer/WindowManager），不需要 manifest 注册**
-- 真正需要 manifest 注册的 Service（AccessibilityService），config.json 路径**完全失效**
-
-**正确做法**（以本项目 `uts-accessibility-service` 为例）：
-- 在 `uni_modules/uts-accessibility-service/utssdk/app-android/AndroidManifest.xml` 写标准 manifest 片段
-- 文件模板（**不要用 `config.json` 声明 service/receiver/permission**）：
-  ```xml
-  <?xml version="1.0" encoding="utf-8"?>
-  <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-      package="uts.sdk.utsAccessibilityService">
-      <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
-      <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-      <!-- ... 其他权限 ... -->
-      <application>
-          <service
-              android:name="uts.sdk.utsAccessibilityService.AppMonitorService"
-              android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-              android:exported="true">
-              <intent-filter>
-                  <action android:name="android.accessibilityservice.AccessibilityService" />
-              </intent-filter>
-              <meta-data android:name="android.accessibilityservice">
-                  <meta-data android:name="accessibilityEventTypes" android:value="typeWindowStateChanged" />
-                  <meta-data android:name="accessibilityFeedbackType" android:value="feedbackGeneric" />
-                  <meta-data android:name="accessibilityFlags" android:value="flagReportViewIds" />
-                  <meta-data android:name="canRetrieveWindowContent" android:value="true" />
-                  <meta-data android:name="notificationTimeout" android:value="100" />
-              </meta-data>
-          </service>
-          <service
-              android:name="uts.sdk.utsAccessibilityService.MonitorForegroundService"
-              android:exported="false"
-              android:foregroundServiceType="specialUse" />
-          <receiver
-              android:name="uts.sdk.utsAccessibilityService.BootReceiver"
-              android:exported="true">
-              <intent-filter>
-                  <action android:name="android.intent.action.BOOT_COMPLETED" />
-              </intent-filter>
-          </receiver>
-      </application>
-  </manifest>
-  ```
-- AccessibilityService 的 meta-data 用 **inline 嵌套**（不要用 `android:resource="@xml/xxx"` 引用，HBuilderX 5.x 不支持 uts 插件携带自定义 res 资源）
-- `canRetrieveWindowContent=true` **必须写** —— 否则系统不把 service 列在"无障碍"列表中
 
 **验证方法**（打包后必做）：
 1. 找到云端下载的 APK：`unpackage/release/__UNI__*.apk`
@@ -781,4 +696,512 @@ Get-ChildItem -Path "uni_modules" -Recurse -Filter "AndroidManifest.xml" -ErrorA
   - `config.json` 只放 `id`/`name`/`version`/`dependencies`，**不放** permissions/services/receivers
 
 **关联规则**：§24/§25 是 UTS 编译期问题，本条是**打包期 / 平台期问题**（HBuilderX 5.x 合并机制）
+
+### 26. UTS `extends Java/Kotlin 抽象类` 的 override 签名必须精确匹配父类
+
+**【最高优先级】实现 Java/Kotlin 抽象类（如 `SQLiteOpenHelper`）时，子类 `override` 方法的每个参数类型必须与父类签名逐项匹配，UTS 编译器不做"近似"匹配。**
+
+**案例**：本项目 `uts-sqlite-store` 的 `MicroHabitSqliteHelper extends SQLiteOpenHelper`：
+
+```uts
+// ❌ 编译失败（5+1 个错误）：
+class MicroHabitSqliteHelper extends SQLiteOpenHelper {
+  constructor(ctx: Context | null, name: string, version: number, ...) {
+    super(ctx!!, name, null as any, version.toInt())  // 错误 A
+  }
+  override onCreate(db: SQLiteDatabase | null): void { ... }      // 错误 B
+  override onUpgrade(db: SQLiteDatabase | null, oldV: number, newV: number): void { ... }  // 错误 C
+}
+// 调用 new 时还报 "实际 Context? 期望 Context" 错误 D
+// rawQuery 报 "实际 Any 期望 Array<out String!>?" 错误 E
+// Cursor.getColumnNames() 数组 .length 找不到 错误 F
+```
+
+**错误 1**（onUpgrade 找不到候选）：
+```
+Class 'MicroHabitSqliteHelper' is not abstract and does not implement abstract base class member:
+fun onUpgrade(p0: SQLiteDatabase!, p1: Int, p2: Int): Unit
+at SqliteStore.uts:6:0
+```
+父类 Kotlin 签名是 `(SQLiteDatabase!, Int, Int)` 三个参数，子类写了 `(SQLiteDatabase | null, number, number)` → 父类两个 `Int` 参数没实现。
+
+**修复**：子类必须用 **Int**（不是 `number`）+ **SQLiteDatabase**（非空，因为父类是 `SQLiteDatabase!` 平台类型，子类可以声明为非空）：
+```uts
+override onUpgrade(db: SQLiteDatabase, oldV: Int, newV: Int): void { ... }
+```
+
+**错误 2**（'onUpgrade' overrides nothing. Potential signatures for overriding）：
+```
+'onUpgrade' overrides nothing. Potential signatures for overriding:
+fun onUpgrade(p0: SQLiteDatabase!, p1: Int, p2: Int): Unit
+at SqliteStore.uts:27:2
+```
+说明 UTS 编译器**只接受精确匹配**：父类 `Int` ≠ 子类 `number`、`SQLiteDatabase!` ≠ `SQLiteDatabase | null`。
+
+**错误 3**（super 第 4 参数 null 找不到候选）：
+```
+None of the following candidates is applicable:
+constructor(p0: Context?, p1: String?, p2: SQLiteDatabase.CursorFactory?, p3: Int): SQLiteOpenHelper
+constructor(p0: Context?, p1: String?, p2: Int, p3: SQLiteDatabase.OpenParams): SQLiteOpenHelper
+at SqliteStore.uts:17:4
+```
+- `null as any` 推断为 `Any`，与 `SQLiteDatabase.CursorFactory?` 不匹配
+- **修复**：直接用裸 `null` 字面量，UTS 推断为 nullable CursorFactory：
+  ```uts
+  super(ctx, name, null, version.toInt())
+  ```
+
+**错误 4**（new 调用处 "实际 Context? 期望 Context"）：
+```
+参数类型不匹配：实际类型为 'Context?'，预期类型为 'Context'
+at SqliteStore.uts:47:45
+```
+- 调用方传入的 `ctx: Context`（来自 `const ctx: Context = UTSAndroid.getAppContext()`）类型在某些上下文被推断为 Kotlin 平台类型 `Context?`
+- 构造器签名是 `ctx: Context | null`，编译器认为两者不等价
+- **修复**：让构造器签名直接是 `Context`（非空），调用前用 `ctx!!` 断言：
+  ```uts
+  constructor(ctx: Context, name: string, version: number, ...) {  // 不要 | null
+    super(ctx, name, null, version.toInt())  // ctx: Context 精确匹配
+  }
+  
+  // 调用处
+  const ctx: Context = UTSAndroid.getAppContext()  // 显式标注非空
+  this.helper = new MicroHabitSqliteHelper(ctx, name, version, onCreate, onUpgrade)
+  ```
+
+**错误 5**（rawQuery 参数 Any vs Array<out String!>?）：
+```
+参数类型不匹配：实际类型为 'Any'，预期类型为 'Array<(out) String!>?'
+at SqliteStore.uts:71:35
+```
+- `args as any` 把 `Array<String>` 强制转 `Any`，丢失 variance 信息
+- **修复**：用精确的 variance cast：
+  ```uts
+  const args: Array<String> = this.toStringArgs(params)
+  const cursor = d.rawQuery(sql, args as Array<out String!>)
+  ```
+  `out` 是 Kotlin 协变标记，平台类型 `String!` 在 `Array<out String!>` 中兼容
+
+**错误 6**（Cursor.getColumnNames() 数组 .length 找不到）：
+```
+找不到名称 "length"
+at SqliteStore.uts:75:29
+```
+- `Cursor.getColumnNames()` 返回 Java `String[]`，在 UTS 中映射为带平台类型的数组
+- UTS 数组没有 `.length` 属性（Kotlin 数组用 `.size`，但 UTS 也不能直接用）
+- **修复**：完全绕开 `getColumnNames()`，用 `Cursor` 自带 API：
+  ```uts
+  const nCols: Int = cursor.getColumnCount()
+  for (let c: Int = 0; c < nCols; c++) {
+    const name: string = cursor.getColumnName(c) as string
+    // ...
+  }
+  ```
+  `getColumnCount()` 返回 `Int`（明确类型），`getColumnName(c)` 返回 `String?`（平台类型 → UTS `String` + `as string` 断言）
+**规则汇总**（`extends Java/Kotlin 抽象类` 必看）：
+
+| 父类签名 | 子类必须用 | 不能用 |
+|---------|-----------|--------|
+| `Context!`（平台类型） | `Context`（非空）| `Context \| null`（子类反而报"实际 Context? 期望 Context"）|
+| `SQLiteDatabase!` | `SQLiteDatabase` | `SQLiteDatabase \| null` |
+| `Int` | `Int` | `number`（=Number 抽象类，类型提升失败）|
+| `String?` | `string` | `string \| null`（其实可以，但 `as string` 断言更安全）|
+| 构造器第 2/3/4 参数含 nullable Java interface | 裸 `null` 字面量 | `null as any`（丢失 nullable 信息）|
+| 数组形参 `String[]` | 强类型 `as Array<out X!>` cast | `as any`（丢 variance，编译失败）|
+| `Cursor.getColumnNames()` 拿列名 | `cursor.getColumnCount() + cursor.getColumnName(c)` | `colNames.length`（UTS 数组无 length）|
+
+**自查命令**（项目内其他 `extends` 类是否合规）：
+```powershell
+Get-ChildItem "uni_modules" -Recurse -Filter "*.uts" |
+  Select-String -Pattern "^\s*override\s+\w+\s*\(" |
+  ForEach-Object {
+    $line = $_.Line
+    if ($line -match "number\)|null,.*number\)") {
+      Write-Host "$($_.Path):$($_.LineNumber) : $line"
+    }
+  }
+# 必须没有任何 "number)" 或 "... | null, ... number)" 的 override
+```
+### 27. `SQLiteStatement` 比 `ContentValues + execSQL` 更稳：避免 null 字段和 `changesNumber` 坑
+
+**【最高优先级】UTS 操作 Android SQLite 时，优先使用 `SQLiteStatement` + 手动 `bindXxx` 路径，避免 `ContentValues` 隐式 null 字段 + `d.changesNumber`（不存在）问题。**
+
+**坑 A**：`ContentValues.put(key, null)` 编译失败
+```uts
+// ❌ 编译失败：null 不能传给 ContentValues.put 的 V 形参
+val values = ContentValues()
+values.put('col', null)  // "参数类型不匹配：实际 Any? 期望 V"
+```
+
+**坑 B**：`d.changesNumber` / `d.changes()` 在 UTS 中不可用
+```uts
+// ❌ 编译失败："找不到名称 'changesNumber'"
+val rows = d.insert('t', null, values)
+val n = d.changesNumber  // 错误：应为 changes() 方法
+```
+
+**坑 C**：使用 `execSQL` 拼 SQL 时，null/数字/字符串混合传参需要手动 `bindXxx`，很容易出错
+
+**正确模板**（本项目 `uts-sqlite-store` 的 `SqliteStore.execSql`）：
+```uts
+import SQLiteStatement from 'android.database.sqlite.SQLiteStatement'
+
+// execSql with params
+execSql(sql: string, params: any[] = []): void {
+  const d = this.db
+  if (d == null) return
+  if (params.length === 0) {
+    d.execSQL(sql)
+    return
+  }
+  const stmt: SQLiteStatement = d.compileStatement(sql)
+  try {
+    for (let i = 0; i < params.length; i++) {
+      const v = params[i]
+      if (v == null) {
+        stmt.bindNull((i + 1).toInt())
+      } else {
+        stmt.bindString((i + 1).toInt(), '' + v)
+      }
+    }
+    stmt.execute()
+  } finally {
+    stmt.close()
+  }
+}
+
+// insert
+insert(table: string, data: any): number {
+  // ... 构造 sql = 'INSERT INTO t (k1, k2) VALUES (?, ?)'
+  const stmt = d.compileStatement(sql)
+  try {
+    for (let i = 0; i < pairs.length; i++) {
+      this.bindValue(stmt, i + 1, pairs[i].v)  // null→bindNull / else→bindString
+    }
+    return stmt.executeInsert()  // 返回 Long（可赋给 number）
+  } finally {
+    stmt.close()
+  }
+}
+
+// update / delete
+update(...): number {
+  // ...
+  return stmt.executeUpdateDelete()  // 返回 Int（受影响行数）
+}
+```
+
+**关键边界转换**：
+- `(i + 1).toInt()` — 数组索引 + 1 是 Int 运算，但传 `bindNull/bindString` 需要明确 `Int`，显式 `.toInt()` 防止类型提升到 `Number`
+- `stmt.executeInsert()` 返回 Java `long`（Kotlin `Long`），可直接 return 给 `number` 函数
+- `stmt.executeUpdateDelete()` 返回 Java `int`（Kotlin `Int`），可直接 return
+- `stmt.execute()` 无返回值
+
+**Cursor 列名/列数**：
+```uts
+// ❌ Cursor.getColumnNames() 返回 Java String[]，在 UTS 中 .length 失败
+const colNames = cursor.getColumnNames()
+const n = colNames.length  // 错误
+
+// ✅ 用 Cursor 自带 API（更直接）
+const nCols: Int = cursor.getColumnCount()
+for (let c: Int = 0; c < nCols; c++) {
+  const name: string = cursor.getColumnName(c) as string  // 返回 String? → as string
+  const idx: Int = c
+  if (cursor.isNull(idx)) {
+    // 字段为 NULL
+  } else {
+    const s = cursor.getString(idx) as string
+  }
+}
+```
+
+**SQLiteStatement 路径优势**：
+1. **完全支持 null 字段** — `bindNull` 显式处理，编译期不报错
+2. **返回行数/rowId 是 Java 标准 API** — `executeInsert` 返回 `long`，`executeUpdateDelete` 返回 `int`，不依赖 UTS 映射神秘字段
+3. **API 表面小且稳定** — 只需要 `bindNull/bindString/bindLong/bindDouble/blindBlob`，避免 ContentValues.put 的 7 个重载歧义
+4. **预编译 + 绑定分离** — 与 prepared statement 语义一致，性能更好
+
+**适用于**：
+- 所有 INSERT/UPDATE/DELETE 操作（统一用 `compileStatement` + `bindXxx`）
+- 不需要批量事务的场景
+- 对 null 字段有需求的接口（DAO 的 data 对象可能省略字段 → null bind）
+
+**不适用**：
+- 纯 DDL（CREATE TABLE） → 用 `d.execSQL(sql)` 即可
+- 大量批量操作 → 用 `transaction` + 多次 `compileStatement`
+
+**本项目已采用**：`uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore.uts` 全部用 `SQLiteStatement` 路径。
+
+### 28. extends 的子类回调时机：父类 `onXxx` 在 `getXxx()` 调用过程中同步触发，**不能用"先 get 后赋 this"模式**
+
+**【最高优先级】实现 Java/Kotlin "Helper/Manager 模式"抽象类（典型如 `SQLiteOpenHelper`、`TextureView.SurfaceTextureListener`、`ScaleTypeDetector` 等）时，子类的 `override onXxx(...)` 回调会在父类的 `getXxx()` / `acquireXxx()` 方法**调用栈中**同步触发，不是在调用返回后。**
+
+如果子类的"用户回调"需要在 `override onXxx` 中访问 `this.someField`，**而这个 `this.someField` 是在 `getXxx()` 调用返回后才赋值的**——回调执行时 `this.someField` 仍是 `null`，用户代码会拿到错误的 null。
+
+**案例**：本项目 `MicroHabitSqliteHelper extends SQLiteOpenHelper`：
+
+```uts
+// ❌ 运行时 bug（编译通过，逻辑崩）：no such table: user_settings
+class SqliteStore {
+  private db: SQLiteDatabase | null = null
+
+  openDatabase(name, version, onCreate, onUpgrade): void {
+    this.helper = new MicroHabitSqliteHelper(ctx, name, version, onCreate, onUpgrade)
+    //                                                              ↑ 父类只"存储"回调，不触发
+    this.db = this.helper!!.getWritableDatabase()
+    //↑ 这一行返回后，SQLiteOpenHelper 内部检测到"db 不存在"→ 同步调用 onCreate(db) 回调
+    //  → 回调里用户的 onCreate() 执行 CREATE TABLE 语句
+    //  → 但此时 SqliteStore.this.db 仍然 null（要等 getWritableDatabase() 返回后才赋值）
+    //  → execSql 看到 this.db == null → 静默 return → CREATE TABLE 全部丢失
+  }
+}
+```
+
+**根因时序图**：
+```
+getWritableDatabase() 调用栈
+├─ SQLiteOpenHelper.getWritableDatabase()
+│  ├─ 检测 db 文件不存在
+│  ├─ 同步调用子类 override onCreate(db)   ← 用户的 onCreate 在这里执行
+│  │  └─ runSql → sqliteStore.execSql(sql)
+│  │     └─ if (this.db == null) return   ← this.db 还没赋值！
+│  └─ 返回 db 实例
+└─ 回到 openDatabase 第四行
+   this.db = helper.getWritableDatabase()   ← 赋值太晚了
+```
+
+**正确修复**（已采用）：**让回调参数携带状态**，wrapper 内部先 `this.db = db` 再调用户 callback：
+
+```uts
+// ✅ SqliteStore.uts 修复版
+class MicroHabitSqliteHelper extends SQLiteOpenHelper {
+  private onCreateCallback: ((db: SQLiteDatabase) => void) | null = null
+  private onUpgradeCallback: ((db: SQLiteDatabase, oldV: number, newV: number) => void) | null = null
+
+  constructor(
+    ctx: Context,
+    name: string,
+    version: number,
+    onCreate: (db: SQLiteDatabase) => void,
+    onUpgrade: (db: SQLiteDatabase, oldV: number, newV: number) => void
+  ) {
+    super(ctx, name, null, version.toInt())
+    this.onCreateCallback = onCreate
+    this.onUpgradeCallback = onUpgrade
+  }
+
+  override onCreate(db: SQLiteDatabase): void {
+    const cb = this.onCreateCallback
+    if (cb != null) cb(db)   // ← 把 db 作为参数透传给 wrapper
+  }
+
+  override onUpgrade(db: SQLiteDatabase, oldV: Int, newV: Int): void {
+    const cb = this.onUpgradeCallback
+    if (cb != null) cb(db, oldV, newV)   // ← 同样透传
+  }
+}
+
+class SqliteStore {
+  private db: SQLiteDatabase | null = null
+
+  openDatabase(name, version, onCreate, onUpgrade): void {
+    const ctx: Context = UTSAndroid.getAppContext()!!
+    this.helper = new MicroHabitSqliteHelper(ctx, name, version,
+      (db: SQLiteDatabase): void => {
+        this.db = db          // ← wrapper 内部先赋值
+        onCreate()            // ← 然后才调用户 onCreate
+      },
+      (db: SQLiteDatabase, oldV: number, newV: number): void => {
+        this.db = db
+        onUpgrade(oldV, newV)
+      }
+    )
+    this.db = this.helper!!.getWritableDatabase()  // 此时 this.db 已被 wrapper 设过，再赋一次同值（无副作用）
+  }
+}
+```
+
+**时序修复后**：
+```
+getWritableDatabase() 调用栈
+├─ SQLiteOpenHelper.getWritableDatabase()
+│  ├─ 检测 db 不存在
+│  ├─ 同步调用子类 override onCreate(db)
+│  │  └─ cb(db) → wrapper
+│  │     ├─ this.db = db            ← 现在赋值了！
+│  │     └─ onCreate()
+│  │        └─ runSql → execSql(sql)
+│  │           └─ this.db 非空 → execSQL() 成功
+│  └─ 返回 db
+└─ openDatabase 最后一行 this.db = ... 重复赋值同值（no-op）
+```
+
+**通用规则**：
+
+| 场景 | 父类行为 | 修复模式 |
+|------|----------|---------|
+| `SQLiteOpenHelper` 子类 | `onCreate(db)` / `onUpgrade(db, oldV, newV)` 在 `getWritableDatabase()` 内部同步触发 | wrapper 接收 `db` 参数 → `this.db = db` → 调用户 callback |
+| `Handler.Callback` 子类 | `handleMessage(msg)` 在 `handler.sendMessage()` / `post()` 内部排队，**异步**触发 | 通常不需要特殊处理（异步触发，调用栈已返回）|
+| `TextToSpeech.OnInitListener` | `onInit(status)` 在 `TextToSpeech(ctx, listener)` 内部**异步**触发 | 同样不需要（异步），但用户代码仍需判 status |
+| `TextureView.SurfaceTextureListener` | `onSurfaceTextureAvailable(...)` 在 `setSurfaceTextureListener()` 设置后，**异步**触发 | 同样不需要（异步）|
+| `DialogInterface.OnClickListener` | `onClick(dialog, which)` 在用户点击时触发 | 同样不需要（事件驱动）|
+
+**关键判断标准**：
+- 如果父类 `onXxx` 在 `getXxx()` / `acquireXxx()` / `setXxx()` **同一个方法调用栈中同步触发** → 必须用 wrapper + 参数透传模式
+- 如果 `onXxx` 是**异步**触发（Handler/Listener/Event 等） → 通常无问题，正常写即可
+
+**自查命令**（找出可能命中此模式的代码）：
+```powershell
+# 查找"先 helper.getXxx() 再 this.X = ..."模式
+Get-ChildItem "uni_modules" -Recurse -Filter "*.uts" | 
+  Select-String -Pattern "this\.\w+\s*=\s*this\.\w+!!\.get\w+\(" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中后再检查该文件是否有"override onXxx"调用"this.X.method()"
+```
+
+**关联规则**：
+- §26 extends Java 抽象类（精确匹配父类签名）— 此条是该规则在"回调时机"维度的补充
+- §17 类私有可变属性 smart cast 失效 — wrapper 内 `this.db = db` 没有 smart cast 问题，因为是赋值不是读取
+- §24/§25 number vs Int — wrapper 类型用 `number`（UTS 风格），内部 override 用 `Int`（Kotlin 签名精确匹配）
+
+### 29. `SqliteStore.insert/update` 数据 API 必须用 `SqlRow` 自定义类型，禁止 `Map<string, any>` / 对象字面量 / 字符串拼接
+
+**【最高优先级】项目内所有 DAO 调用 `dbManager.insert/update` 时，`row` 参数必须是 `SqlRow` 类型（`{ columns: string[], values: any[] }`）。绝对禁止传 `Map<string, any>`、对象字面量 `{...}`、或 JSON 字符串拼接。**
+
+**历史教训**（3 个阶段 4 个已确认失败方案）：
+
+**阶段 1**：`SqliteStore.insert(table, data: any)` + DAO 传对象字面量 + 内部走 `JSON.stringify` → 60 行自研 JSON 解析器（`dataToKVs` / `splitTopLevelCommas` / `findTopLevelColon`）。该解析器有 **3 个已确认 bug**：
+1. **字符串值带嵌入引号**：`"eye_blink"` → `"\"eye_blink\""`（10 字符含引号）
+2. **`null` 被拆为字面量字符串**：`null` → `"null"`（4 字符）而不是真正的 null
+3. **所有值丢失类型**：`0`/`1.5`/boolean 全部变成 string，SQLite 类型推断失效
+
+实际症状：`insertActionLog returned id=-1`，debug 页 `action_logs count=0`，数据完全丢失。
+
+**阶段 2**：改用 `Map<string, any>` + 链式 `.set()`。`SqliteStore` 内部用 `for (const k of data.keys())` / `for (const v of data.values())` 迭代。**编译失败**：
+- `data.keys` 是 Kotlin `MutableSet<String>` **属性**（不是方法），`data.keys()` 触发 "Expression 'keys' of type 'MutableSet<String>' cannot be invoked as a function"
+- `for...of` 翻译需要 `iterator()`，但 Kotlin 集合上 `iterator()` 有 **6 个歧义候选**（`Enumeration` / `Iterator` / `Map` / `MutableMap` / `CharSequence` / `BufferedInputStream`），编译失败 "Method 'iterator()' is ambiguous"
+- **根因**：UTS `Map<K, V>` 映射到 Kotlin `MutableMap`，`keys`/`values` 是 Kotlin 属性而非方法，迭代模式与 JS 完全不同
+
+**阶段 3（当前采用）**：`SqlRow` 自定义类型 + 平行数组。`columns: string[]` 和 `values: any[]` 一一对应，纯数组下标访问零歧义。
+
+**强制规则**：
+
+1. `SqlRow` 类型定义在 `uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore.uts`：
+   ```ts
+   export type SqlRow = {
+     columns: string[]
+     values: (any | null)[]   // 必须允许 null，因为 DAO 字段如 skip_reason 是 string | null
+   }
+   ```
+   **`values` 必须用 `(any | null)[]` 而不是 `any[]`**：UTS `any[]` = `UTSArray<Any>`（非空元素），DAO 字面量 `[v1, v2, null]` 推断为 `UTSArray<Serializable?>`（Kotlin 最宽父类型 + null），无法赋给 `UTSArray<Any>`（error17）。改用 `(any | null)[]` = `UTSArray<Any | null>` 后推断成功。
+2. `DatabaseManager.uts` re-export：`export { type SqlRow }`（让 DAO 可统一从 `./DatabaseManager` 导入）
+3. DAO 内必须用 `const row: SqlRow = { columns: [...], values: [...] }` 构造 + 一次性传给 `dbManager.insert/update`
+   - **重要**：`values: [...]` 字面量可能推断为 `UTSArray<Serializable?>`，需 SqlRow 的 `values` 字段是 `(any | null)[]` 才能赋值成功（详见第 1 条）
+4. `SqliteStore.bindValue` 签名是 `v: any | null`（不是 `v: any`），函数体已处理 null 走 `stmt.bindNull` 分支
+4. **必须**用 `const row: SqlRow = {...}` 带类型注解的形式，**禁止**直接传对象字面量 `{columns: [...], values: [...]}`（会推断为 `UTSJSONObject` 而非 `SqlRow`，触发 §18 的"Return type mismatch"）
+5. `columns` 和 `values` 数组长度必须严格相等（SqliteStore 内部有 `values.length !== n` 校验，否则返回 -1/0）
+6. **禁止** `Map<string, any>` / `new Map()` / `for...of` on Kotlin collection / 自研 JSON 解析器
+7. `LlmCacheDao.uts` 是唯一例外：走 `dbManager.execSql('INSERT OR REPLACE...')` 路径，不经 `insert()`
+
+**正确示例**（`database/ActionLogDao.uts`）：
+
+```ts
+import { dbManager, type SqlRow } from './DatabaseManager'
+import { ActionLog, ActionResult } from '../models/ActionLog'
+
+export function insertActionLog(log: ActionLog): number {
+  const row: SqlRow = {
+    columns: [
+      'action_id', 'action_type', 'result', 'skip_reason',
+      'trigger_type', 'trigger_level', 'duration_ms', 'target_ms',
+      'triggered_at', 'completed_at', 'created_at'
+    ],
+    values: [
+      log.action_id, log.action_type, log.result, log.skip_reason,
+      log.trigger_type, log.trigger_level, log.duration_ms, log.target_ms,
+      log.triggered_at, log.completed_at, log.created_at
+    ]
+  }
+  return dbManager.insert('action_logs', row)
+}
+```
+
+**正确示例**（update：`database/SettingsDao.uts`）：
+
+```ts
+export function putSetting(key: string, value: string): void {
+  const now = Math.floor(Date.now() / 1000)
+  const existing = dbManager.queryOne('SELECT key FROM user_settings WHERE key = ?', [key])
+  if (existing != null) {
+    const row: SqlRow = {
+      columns: ['value', 'updated_at'],
+      values: [value, now]
+    }
+    dbManager.update('user_settings', row, 'key = ?', [key])
+  } else {
+    const row: SqlRow = {
+      columns: ['key', 'value', 'updated_at'],
+      values: [key, value, now]
+    }
+    dbManager.insert('user_settings', row)
+  }
+}
+```
+
+**错误示例**（全部禁止使用）：
+
+```ts
+// ❌ 错误 1: Map<string, any> → 内部 data.keys()/data.values() 触发 Kotlin iterator 歧义
+const data = new Map<string, any>()
+data.set('action_id', log.action_id)
+dbManager.insert('action_logs', data)
+
+// ❌ 错误 2: 对象字面量直接传参 → 推断为 UTSJSONObject，与 SqlRow 不匹配
+dbManager.insert('action_logs', {
+  columns: ['action_id'],
+  values: [log.action_id]
+})
+
+// ❌ 错误 3: JSON 字符串拼接 → 走废弃的 dataToKVs 解析器
+const data = '{"action_id":"' + log.action_id + '"}'
+dbManager.insert('action_logs', data)
+
+// ❌ 错误 4: SqlRow 字面量无类型注解 → §18 推断失败
+dbManager.insert('action_logs', { columns: ['action_id'], values: [log.action_id] })
+// 正确：const row: SqlRow = { ... }; dbManager.insert('action_logs', row)
+```
+
+**原因**：
+- `Map<K, V>` 在 UTS 中映射到 Kotlin `MutableMap`，`.keys`/`.values` 是 Kotlin 属性不是 JS 方法，迭代触发 `iterator()` 6 候选歧义
+- 对象字面量在 UTS 中推断为 `UTSJSONObject`，与 `SqlRow` 形参类型不匹配
+- `const row: SqlRow = {...}` 显式类型注解让编译器把字面量识别为 `SqlRow`，无任何 UTSJSONObject 推断
+- 平行数组下标访问零歧义，`columns[i]` 和 `values[i]` 严格对应
+
+**适用范围**：
+- 所有 `dbManager.insert(table, row)` 调用点（8 个 DAO）
+- 所有 `dbManager.update(table, row, where, whereArgs)` 调用点（4 个 DAO）
+- **不适用**：`dbManager.execSql(sql, params)` — 该 API 接受 SQL 字符串 + 参数数组
+
+**自查命令**：
+
+```powershell
+# 找出项目中所有"Map<string, any>"反模式（已采用 SqlRow，禁止使用）
+Get-ChildItem "database" -Filter "*.uts" |
+  Select-String -Pattern "new Map<string, any>\(\)" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中必须改为 const row: SqlRow = { columns: [...], values: [...] }
+
+# 找出"对象字面量直接传给 dbManager.insert/update"的反模式
+Get-ChildItem "database" -Filter "*.uts" |
+  Select-String -Pattern "dbManager\.(insert|update)\([^,]+,\s*\{" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中必须用 const row: SqlRow = { ... }; dbManager.insert('table', row)
+```
+
+**关联规则**：
+- §18 函数返回类型 + 对象字面量 → 必须用 `const x: Type = {...}; return x` 模式 — `const row: SqlRow = {...}` 是该规则在 DAO 层的应用
+- §19 对象类型必须用 `type` 禁止 `interface` — `SqlRow` 必须是 `type` 定义
+- §13 子组件对象 prop + computed 字段访问 → 运行时 ClassCastException — 类似的"UTS 对象包装陷阱"
+- §17 模块级 `let` smart cast 失效 — 局部 `const row` 可正常 smart cast，无需 `!!`
 

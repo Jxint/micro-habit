@@ -1,11 +1,12 @@
-import { dbManager } from './DatabaseManager'
+import { dbManager, type SqlRow } from './DatabaseManager'
 import { HeartbeatLog } from '../models/HeartbeatLog'
 
 export function insertHeartbeat(status: string): void {
-  dbManager.insert('heartbeat_logs', {
-    service_status: status,
-    timestamp: Date.now()
-  })
+  const row: SqlRow = {
+    columns: ['service_status', 'timestamp'],
+    values: [status, Date.now()]
+  }
+  dbManager.insert('heartbeat_logs', row)
 }
 
 export function getRecentHeartbeats(limit: number): HeartbeatLog[] {

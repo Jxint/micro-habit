@@ -69,7 +69,7 @@ class MonitorForegroundService extends Service {
       if (pm != null) {
         this.wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, 'MicroHabit:KeepAlive')
         if (this.wakeLock != null) {
-          this.wakeLock.acquire(30 * 60 * 1000)
+          this.wakeLock!!.acquire(30 * 60 * 1000)
         }
       }
     } catch (_) {}
@@ -78,7 +78,7 @@ class MonitorForegroundService extends Service {
   private releaseWakeLock(): void {
     if (this.wakeLock != null) {
       try {
-        this.wakeLock.release()
+        this.wakeLock!!.release()
       } catch (_) {}
       this.wakeLock = null
     }
