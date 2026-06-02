@@ -1,0 +1,363 @@
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <view class="dialog-header">
+        <text class="dialog-title">今日手机使用</text>
+        <view class="dialog-close" @tap="close">
+          <text class="dialog-close-text">×</text>
+        </view>
+      </view>
+
+      <view class="summary-row">
+        <view class="summary-num-block">
+          <text class="summary-num">{{ summary.hourText }}</text>
+          <text class="summary-num-sub">{{ summary.minuteText }}</text>
+        </view>
+        <view class="summary-stat">
+          <text class="summary-stat-num">{{ summary.appCount }}</text>
+          <text class="summary-stat-label">个应用</text>
+        </view>
+      </view>
+
+      <view v-if="segments.length > 0" class="chart-block">
+        <view class="pie-svg-wrap">
+          <svg viewBox="0 0 100 100" class="pie-svg">
+            <circle cx="50" cy="50" r="40" fill="#F0F3F4" />
+            <path
+              v-for="(seg, si) in svgSegments"
+              :key="'sg-' + si"
+              :d="seg.d"
+              :fill="seg.color"
+              stroke="#FFFFFF"
+              stroke-width="0.5"
+            />
+            <circle cx="50" cy="50" r="22" fill="#FFFFFF" />
+            <text x="50" y="48" text-anchor="middle" font-size="6" fill="#7F8C8D">总占比</text>
+            <text x="50" y="56" text-anchor="middle" font-size="7" fill="#2C3E50" font-weight="bold">{{ summary.appCount }}个</text>
+          </svg>
+        </view>
+        <view class="pie-legend">
+          <view
+            v-for="(seg, si) in segments"
+            :key="'lg-' + si"
+            class="legend-row"
+          >
+            <view class="legend-dot" :style="{ backgroundColor: seg.color }"></view>
+            <text class="legend-label">{{ seg.label }}</text>
+            <text class="legend-percent">{{ seg.percent }}%</text>
+            <text class="legend-minutes">{{ seg.minutes }}分</text>
+          </view>
+        </view>
+      </view>
+
+      <view v-else class="empty-block">
+        <text class="empty-text">今日暂无手机使用数据</text>
+        <text class="empty-hint">开启无障碍服务后会自动记录</text>
+      </view>
+
+      <view class="ai-block">
+        <view class="ai-block-header">
+          <text class="ai-block-title">🤖 AI 评价</text>
+        </view>
+        <view v-if="aiText.length > 0" class="ai-content">
+          <text class="ai-text">{{ aiText }}</text>
+        </view>
+        <view v-else class="ai-placeholder">
+          <text class="ai-placeholder-text">点击下方按钮，AI 将根据今日使用情况生成评价</text>
+        </view>
+        <view class="ai-btn" :class="aiLoading ? 'ai-btn-loading' : ''" @tap="onAiTap">
+          <text class="ai-btn-text">{{ aiLoading ? '生成中…' : '立即生成 AI 评价' }}</text>
+        </view>
+      </view>
+
+      <view class="bottom-spacer" />
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { getTodayPhoneUsageSummary, getTodayPieSegments, aiEvaluateTodayUsage, type PhoneUsageSummary, type PieSegment } from '../services/PhoneUsageService'
+
+const props = withDefaults(defineProps<{
+  visible: boolean
+}>(), {
+  visible: false
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
+
+const summary = ref<PhoneUsageSummary>({
+  totalMinutes: 0,
+  totalSeconds: 0,
+  hourText: '0 小时',
+  minuteText: '0 分钟',
+  appCount: 0
+})
+
+const segments = ref<PieSegment[]>([])
+const aiText = ref<string>('')
+const aiLoading = ref<boolean>(false)
+
+type SvgSegment = { d: string, color: string }
+
+function arcPath(startPct: number, endPct: number): string {
+  if (endPct <= startPct) return ''
+  if (endPct - startPct >= 100) {
+    return 'M 50 10 A 40 40 0 1 1 49.99 10 Z'
+  }
+  const startRad = (startPct / 100) * 2 * Math.PI - Math.PI / 2
+  const endRad = (endPct / 100) * 2 * Math.PI - Math.PI / 2
+  const cx = 50
+  const cy = 50
+  const r = 40
+  const x1 = cx + r * Math.cos(startRad)
+  const y1 = cy + r * Math.sin(startRad)
+  const x2 = cx + r * Math.cos(endRad)
+  const y2 = cy + r * Math.sin(endRad)
+  const largeArc = (endPct - startPct) > 50 ? 1 : 0
+  return 'M ' + cx + ' ' + cy + ' L ' + x1.toFixed(2) + ' ' + y1.toFixed(2) + ' A ' + r + ' ' + r + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z'
+}
+
+function getSvgSegments(): SvgSegment[] {
+  const r: SvgSegment[] = []
+  for (let i = 0; i < segments.value.length; i++) {
+    const s = segments.value[i]
+    const d = arcPath(s.startAngle, s.endAngle)
+    r.push({ d: d, color: s.color })
+  }
+  return r
+}
+
+const svgSegments = computed<SvgSegment[]>(getSvgSegments)
+
+function refresh(): void {
+  summary.value = getTodayPhoneUsageSummary()
+  segments.value = getTodayPieSegments()
+}
+
+function close(): void {
+  emit('close')
+}
+
+function onMaskTap(): void {
+  close()
+}
+
+function onAiTap(): void {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  aiText.value = ''
+  aiEvaluateTodayUsage((text: string) => {
+    aiText.value = text
+    aiLoading.value = false
+  })
+}
+
+watch(() : boolean => props.visible, (v: boolean) : void => {
+  if (v) {
+    refresh()
+    aiText.value = ''
+  }
+})
+</script>
+
+<style scoped>
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.dialog-card {
+  width: 90%;
+  max-width: 420px;
+  max-height: 560px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  flex-direction: column;
+}
+.dialog-header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px 12px 4px;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: #F0F3F4;
+  align-items: center;
+  justify-content: center;
+}
+.dialog-close-text {
+  font-size: 18px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.summary-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: #F8F9FA;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.summary-num-block {
+  flex-direction: row;
+  align-items: flex-end;
+}
+.summary-num {
+  font-size: 24px;
+  font-weight: bold;
+  color: #2ECC71;
+}
+.summary-num-sub {
+  font-size: 16px;
+  font-weight: bold;
+  color: #2ECC71;
+  margin-left: 4px;
+}
+.summary-stat {
+  flex-direction: row;
+  align-items: flex-end;
+}
+.summary-stat-num {
+  font-size: 18px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.summary-stat-label {
+  font-size: 12px;
+  color: #95A5A6;
+  margin-left: 4px;
+}
+.chart-block {
+  flex-direction: row;
+  padding: 8px 4px;
+  margin-bottom: 12px;
+}
+.pie-svg-wrap {
+  width: 130px;
+  height: 130px;
+  align-items: center;
+  justify-content: center;
+}
+.pie-svg {
+  width: 130px;
+  height: 130px;
+}
+.pie-legend {
+  flex: 1;
+  margin-left: 12px;
+  flex-direction: column;
+  justify-content: center;
+}
+.legend-row {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  margin-right: 6px;
+}
+.legend-label {
+  flex: 1;
+  font-size: 12px;
+  color: #2C3E50;
+}
+.legend-percent {
+  font-size: 12px;
+  font-weight: bold;
+  color: #7F8C8D;
+  margin-right: 4px;
+}
+.legend-minutes {
+  font-size: 11px;
+  color: #95A5A6;
+  width: 32px;
+  text-align: right;
+}
+.empty-block {
+  padding: 30px 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.empty-text {
+  font-size: 14px;
+  color: #95A5A6;
+}
+.empty-hint {
+  font-size: 12px;
+  color: #BDC3C7;
+  margin-top: 4px;
+}
+.ai-block {
+  background-color: #F8F9FA;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 4px;
+}
+.ai-block-header {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.ai-block-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.ai-content {
+  padding: 8px 4px;
+}
+.ai-text {
+  font-size: 13px;
+  color: #34495E;
+  line-height: 1.6;
+}
+.ai-placeholder {
+  padding: 8px 4px;
+}
+.ai-placeholder-text {
+  font-size: 12px;
+  color: #95A5A6;
+  line-height: 1.5;
+}
+.ai-btn {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background-color: #3498DB;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.ai-btn-loading {
+  background-color: #95A5A6;
+}
+.ai-btn-text {
+  font-size: 13px;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.bottom-spacer {
+  height: 8px;
+}
+</style>

@@ -2,16 +2,25 @@ import { dbManager, type SqlRow } from './DatabaseManager'
 import { AppUsageSnapshot } from '../models/AppUsageSnapshot'
 import { today } from '../utils/TimeUtils'
 
+export type AppUsageItem = {
+  packageName: string
+  appLabel: string
+  foregroundSec: number
+  minutes: number
+}
+
 export function insertOrUpdateSnapshot(packageName: string, appLabel: string, foregroundSec: number): void {
   const date = today()
   const existing = dbManager.queryOne(
-    'SELECT id FROM app_usage_snapshots WHERE date = ? AND package_name = ?',
+    'SELECT id, total_foreground_sec FROM app_usage_snapshots WHERE date = ? AND package_name = ?',
     [date, packageName]
   )
   if (existing != null) {
+    const prevSec = existing.get("total_foreground_sec") as number
+    const nextSec = prevSec + foregroundSec
     const row: SqlRow = {
       columns: ['total_foreground_sec', 'app_label'],
-      values: [foregroundSec, appLabel]
+      values: [nextSec, appLabel]
     }
     dbManager.update('app_usage_snapshots', row, 'id = ?', [(existing.get("id") as number)])
   } else {
@@ -30,4 +39,52 @@ export function getTodayTotalUsageMinutes(): number {
     [date]
   )
   return row != null ? Math.floor((row.get("total") as number) / 60) : 0
+}
+
+export function getTodayTotalUsageSeconds(): number {
+  const date = today()
+  const row = dbManager.queryOne(
+    'SELECT COALESCE(SUM(total_foreground_sec), 0) as total FROM app_usage_snapshots WHERE date = ?',
+    [date]
+  )
+  return row != null ? (row.get("total") as number) : 0
+}
+
+export function getTodayAppBreakdown(): AppUsageItem[] {
+  const date = today()
+  const rows = dbManager.query(
+    'SELECT package_name, app_label, total_foreground_sec FROM app_usage_snapshots WHERE date = ? ORDER BY total_foreground_sec DESC',
+    [date]
+  )
+  const result: AppUsageItem[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    const sec = r.get("total_foreground_sec") as number
+    result.push({
+      packageName: r.get("package_name") as string,
+      appLabel: r.get("app_label") as string,
+      foregroundSec: sec,
+      minutes: Math.floor(sec / 60)
+    })
+  }
+  return result
+}
+
+export function getTop5Apps(): AppUsageItem[] {
+  const all = getTodayAppBreakdown()
+  const r: AppUsageItem[] = []
+  for (let i = 0; i < all.length && i < 5; i++) {
+    r.push(all[i])
+  }
+  return r
+}
+
+export function cleanOldSnapshots(): void {
+  const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 86400
+  const thirtyDaysDate = new Date(thirtyDaysAgo * 1000)
+  const y = thirtyDaysDate.getFullYear()
+  const m = ('' + (thirtyDaysDate.getMonth() + 1)).padStart(2, '0')
+  const d = ('' + thirtyDaysDate.getDate()).padStart(2, '0')
+  const cutoff = y + '-' + m + '-' + d
+  dbManager.delete('app_usage_snapshots', 'date < ?', [cutoff])
 }

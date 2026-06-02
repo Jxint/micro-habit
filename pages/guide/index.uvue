@@ -1,32 +1,75 @@
 <template>
   <view class="page">
-    <view class="guide-content">
-      <text class="guide-title">欢迎使用</text>
-      <text class="guide-subtitle">微习惯健康伴侣</text>
-      <view class="guide-desc">一个在你不经意间，悄悄改善健康的 AI 微习惯伙伴</view>
+    <scroll-view class="scroll-area" scroll-y="true">
+      <view class="hero-block">
+        <view class="hero-icon-wrap">
+          <text class="hero-icon">🌿</text>
+        </view>
+        <text class="hero-title">微习惯健康伴侣</text>
+        <text class="hero-subtitle">一个在你不经意间，悄悄改善健康的 AI 微习惯伙伴</text>
+      </view>
 
-      <view class="permission-section">
-        <view class="permission-item">
-          <text class="perm-status">{{ accEnabled ? '✅' : '❌' }}</text>
-          <view class="perm-info">
-            <text class="perm-title">无障碍服务</text>
-            <text class="perm-desc">检测你正在使用的应用，在恰当时提醒休息</text>
+      <view class="steps-block">
+        <view class="step-card">
+          <view class="step-num-wrap step-num-1">
+            <text class="step-num">1</text>
           </view>
-          <button class="perm-btn" @tap="openAccessibility">开启</button>
+          <view class="step-content">
+            <text class="step-title">开启无障碍服务</text>
+            <text class="step-desc">检测你正在使用的应用，在恰当时提醒休息</text>
+            <view class="step-status-row">
+              <text class="step-status" :class="accEnabled ? 'step-status-on' : 'step-status-off'">
+                {{ accEnabled ? '✅ 已开启' : '⚪ 未开启' }}
+              </text>
+              <view v-if="!accEnabled" class="step-action-btn" @tap="openAccessibility">
+                <text class="step-action-btn-text">立即开启</text>
+              </view>
+            </view>
+          </view>
         </view>
 
-        <view class="permission-item">
-          <text class="perm-status">{{ overlayEnabled ? '✅' : '❌' }}</text>
-          <view class="perm-info">
-            <text class="perm-title">悬浮窗权限</text>
-            <text class="perm-desc">在其他应用上方显示微动作提醒</text>
+        <view class="step-card">
+          <view class="step-num-wrap step-num-2">
+            <text class="step-num">2</text>
           </view>
-          <button class="perm-btn" @tap="openOverlay">开启</button>
+          <view class="step-content">
+            <text class="step-title">开启悬浮窗权限</text>
+            <text class="step-desc">在其他应用上方显示微动作提醒</text>
+            <view class="step-status-row">
+              <text class="step-status" :class="overlayEnabled ? 'step-status-on' : 'step-status-off'">
+                {{ overlayEnabled ? '✅ 已开启' : '⚪ 未开启' }}
+              </text>
+              <view v-if="!overlayEnabled" class="step-action-btn" @tap="openOverlay">
+                <text class="step-action-btn-text">立即开启</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="step-card step-card-info">
+          <view class="step-num-wrap step-num-3">
+            <text class="step-num">3</text>
+          </view>
+          <view class="step-content">
+            <text class="step-title">完成自动守护</text>
+            <text class="step-desc">检测到长时间使用 App，会自动弹出微动作提醒（眨眼、转颈、远眺）</text>
+          </view>
         </view>
       </view>
 
-      <button class="start-btn" @tap="goHome">开始使用</button>
-    </view>
+      <view class="cta-block">
+        <view class="cta-btn-primary" @tap="goHome">
+          <text class="cta-btn-primary-text">开始使用</text>
+        </view>
+        <view class="cta-btn-secondary" @tap="goHome">
+          <text class="cta-btn-secondary-text">先逛逛</text>
+        </view>
+      </view>
+
+      <view class="footer-block">
+        <text class="footer-text">v1.0.0 · 守护你的每一次专注</text>
+      </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -35,21 +78,21 @@ import { putInt } from '../../database/SettingsDao'
 import { isAccessibilityServiceEnabled, openAccessibilitySettings } from '../../uni_modules/uts-accessibility-service/utssdk/app-android/AppMonitorService'
 import { hasOverlayPermission, requestOverlayPermission } from '../../uni_modules/uts-floating-overlay/utssdk/app-android/FloatingOverlay'
 
-const accEnabled = ref(isAccessibilityServiceEnabled())
-const overlayEnabled = ref(hasOverlayPermission())
+const accEnabled = ref<boolean>(isAccessibilityServiceEnabled())
+const overlayEnabled = ref<boolean>(hasOverlayPermission())
 
 function openAccessibility(): void {
   openAccessibilitySettings()
   setTimeout(() : void => {
     accEnabled.value = isAccessibilityServiceEnabled()
-  }, 500)
+  }, 800)
 }
 
 function openOverlay(): void {
   requestOverlayPermission()
   setTimeout(() : void => {
     overlayEnabled.value = hasOverlayPermission()
-  }, 500)
+  }, 800)
 }
 
 function goHome(): void {
@@ -65,77 +108,156 @@ function goHome(): void {
 <style scoped>
 .page {
   flex: 1;
-  background-color: #2C3E50;
+  background-color: #1E2A38;
+}
+.scroll-area {
+  flex: 1;
+}
+.hero-block {
+  align-items: center;
+  padding: 60px 24px 32px 24px;
+  background-color: #1E2A38;
+}
+.hero-icon-wrap {
+  width: 96px;
+  height: 96px;
+  border-radius: 48px;
+  background-color: rgba(46, 204, 113, 0.15);
+  align-items: center;
   justify-content: center;
-  align-items: center;
+  margin-bottom: 20px;
 }
-.guide-content {
-  align-items: center;
-  padding: 40px;
+.hero-icon {
+  font-size: 56px;
 }
-.guide-title {
-  font-size: 28px;
+.hero-title {
+  font-size: 24px;
   font-weight: bold;
   color: #FFFFFF;
   margin-bottom: 8px;
 }
-.guide-subtitle {
-  font-size: 18px;
-  color: #3498DB;
-  margin-bottom: 16px;
-}
-.guide-desc {
-  font-size: 14px;
-  color: #BDC3C7;
+.hero-subtitle {
+  font-size: 13px;
+  color: #95A5A6;
   text-align: center;
-  line-height: 22px;
-  margin-bottom: 24px;
+  line-height: 1.6;
+  padding: 0 16px;
 }
-.permission-section {
-  width: 100%;
-  margin-bottom: 24px;
+.steps-block {
+  padding: 0 16px;
 }
-.permission-item {
+.step-card {
+  flex-direction: row;
+  background-color: #2C3E50;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  align-items: flex-start;
+}
+.step-card-info {
+  background-color: rgba(46, 204, 113, 0.12);
+}
+.step-num-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.step-num-1 {
+  background-color: #3498DB;
+}
+.step-num-2 {
+  background-color: #9B59B6;
+}
+.step-num-3 {
+  background-color: #2ECC71;
+}
+.step-num {
+  font-size: 14px;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.step-content {
+  flex: 1;
+  flex-direction: column;
+}
+.step-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-bottom: 4px;
+}
+.step-desc {
+  font-size: 12px;
+  color: #BDC3C7;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.step-status-row {
   flex-direction: row;
   align-items: center;
-  background-color: #34495E;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 8px;
 }
-.perm-status {
-  font-size: 20px;
-  width: 36px;
-  text-align: center;
-}
-.perm-info {
-  flex: 1;
-  margin: 0 8px;
-}
-.perm-title {
-  font-size: 14px;
-  font-weight: bold;
-  color: #FFFFFF;
-}
-.perm-desc {
-  font-size: 11px;
-  color: #95A5A6;
-  margin-top: 2px;
-}
-.perm-btn {
-  padding: 8px 16px;
-  background-color: #3498DB;
-  color: #FFFFFF;
-  border-radius: 6px;
+.step-status {
   font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 10px;
 }
-.start-btn {
-  width: 200px;
-  padding: 14px;
-  background-color: #27AE60;
+.step-status-on {
+  color: #2ECC71;
+  background-color: rgba(46, 204, 113, 0.15);
+}
+.step-status-off {
+  color: #BDC3C7;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+.step-action-btn {
+  margin-left: 10px;
+  padding: 5px 12px;
+  background-color: #3498DB;
+  border-radius: 12px;
+}
+.step-action-btn-text {
+  font-size: 12px;
   color: #FFFFFF;
-  border-radius: 25px;
+  font-weight: 500;
+}
+.cta-block {
+  padding: 20px 24px 0 24px;
+  align-items: center;
+}
+.cta-btn-primary {
+  width: 100%;
+  padding: 14px;
+  background-color: #2ECC71;
+  border-radius: 26px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+  margin-bottom: 10px;
+}
+.cta-btn-primary-text {
   font-size: 16px;
-  text-align: center;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.cta-btn-secondary {
+  padding: 8px 16px;
+}
+.cta-btn-secondary-text {
+  font-size: 13px;
+  color: #7F8C8D;
+}
+.footer-block {
+  align-items: center;
+  padding: 24px 0 32px 0;
+}
+.footer-text {
+  font-size: 11px;
+  color: #4A5A6A;
 }
 </style>

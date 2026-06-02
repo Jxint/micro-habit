@@ -1,9 +1,31 @@
 <template>
   <view class="page">
     <scroll-view class="scroll-area" scroll-y="true">
-      <view class="greeting-bar">
-        <text class="greeting-text">{{ greeting }}</text>
-        <text class="settings-icon" @tap="goSettings">⚙</text>
+      <view class="greeting-bar" :class="greetingClass">
+        <view class="greeting-left">
+          <text class="greeting-text">{{ greeting }}</text>
+          <text class="greeting-date">{{ dateStr }}</text>
+        </view>
+        <view class="greeting-right">
+          <view class="emoji-button" @tap="openPhoneDialog">
+            <text class="emoji-button-text">{{ greetingEmoji }}</text>
+          </view>
+          <view class="settings-icon" @tap="goSettings">
+            <text class="settings-icon-text">⚙</text>
+          </view>
+        </view>
+      </view>
+      <view class="phone-usage-hint" @tap="openPhoneDialog">
+        <text class="phone-usage-hint-text">{{ phoneUsageHint }}</text>
+      </view>
+
+      <view class="guard-card">
+        <text class="guard-eyebrow">今日已完成</text>
+        <view class="guard-row">
+          <text class="guard-number">{{ guardCount }}</text>
+          <text class="guard-unit">次</text>
+        </view>
+        <text class="guard-sub">微动作累计 {{ guardCount }} 次 · 每一次都是对健康的投资</text>
       </view>
 
       <StatusIndicator
@@ -21,10 +43,6 @@
         :percent="vitalityScore"
         :status="vitalityStatus"
       />
-
-      <view class="guard-section">
-        <text class="guard-text">今日已为你守护 {{ guardMinutes }} 分钟</text>
-      </view>
 
       <view class="penetration-section">
         <text class="section-label">习惯渗透度</text>
@@ -50,7 +68,9 @@
       </view>
 
       <view class="recommend-section">
-        <text class="section-title">🎯 今日推荐</text>
+        <view class="section-header-row">
+          <text class="section-title">🎯 今日推荐</text>
+        </view>
         <view v-if="recommendedActions.length === 0" class="empty-recommend">
           <text class="empty-text">暂无推荐</text>
         </view>
@@ -59,6 +79,7 @@
             :action-id="action.id"
             :action-name="action.name"
             :action-duration="Math.ceil(action.defaultDurationMs / 1000)"
+            variant="recommend"
             @actionTap="startAction"
           />
         </view>
@@ -74,17 +95,21 @@
             :action-id="action.id"
             :action-name="action.name"
             :action-duration="Math.ceil(action.defaultDurationMs / 1000)"
+            variant="library"
             @actionTap="startAction"
           />
         </view>
       </view>
+      <view class="bottom-spacer" />
     </scroll-view>
+    <PhoneUsageDialog :visible="showPhoneDialog" @close="closePhoneDialog" />
   </view>
 </template>
 
 <script setup lang="uts">
 import StatusIndicator from '../../components/StatusIndicator.uvue'
 import ActionCard from '../../components/ActionCard.uvue'
+import PhoneUsageDialog from '../../components/PhoneUsageDialog.uvue'
 import { useAppStore, DailyOutput } from '../../stores/appStore'
 import { MicroAction } from '../../models/MicroAction'
 import { currentHour } from '../../utils/TimeUtils'
@@ -100,54 +125,113 @@ const postureScore = computed<number>(() : number => store.postureScore.value)
 const postureStatus = computed<string>(() : string => store.postureStatus.value)
 const vitalityScore = computed<number>(() : number => store.vitalityScore.value)
 const vitalityStatus = computed<string>(() : string => store.vitalityStatus.value)
-const guardMinutes = computed<number>(() : number => store.guardMinutes.value)
+const guardCount = computed<number>(() : number => store.guardCount.value)
 const penetration = computed<number>(() : number => store.penetration.value)
 const penetrationStr = computed<string>(() : string => penetration.value.toFixed(1))
-const recommendedActions = computed<MicroAction[]>(() : MicroAction[] => store.recommendedActions.value)
-const allActions = computed<MicroAction[]>(() : MicroAction[] => getEnabledActions())
+const recommendedActions = computed<MicroAction[]>(() => store.recommendedActions.value)
+const allActions = computed<MicroAction[]>(() => getEnabledActions())
 
 const dailySummary = computed<DailyOutput | null>(() : DailyOutput | null => store.dailySummary.value)
 const dailySummaryLoading = computed<boolean>(() : boolean => store.dailySummaryLoading.value)
-const summaryOneLiner = computed<string>(() : string => {
+function getSummaryOneLiner(): string {
   const s = dailySummary.value
   return s != null && s.one_liner.length > 0 ? s.one_liner : '今日小结待生成'
-})
-const summaryBody = computed<string>(() : string => {
+}
+function getSummaryBody(): string {
   const s = dailySummary.value
   return s != null ? s.summary : ''
-})
-const summaryGoal = computed<string>(() : string => {
+}
+function getSummaryGoal(): string {
   const s = dailySummary.value
   return s != null ? s.tomorrow_goal : ''
-})
-const summaryEncourage = computed<string>(() : string => {
+}
+function getSummaryEncourage(): string {
   const s = dailySummary.value
   return s != null ? s.encourage : ''
-})
-const summaryHour = computed<number>(() : number => {
+}
+function getSummaryHour(): number {
   const raw = getSetting('daily_summary_time', '21:00')
   const sep = raw.indexOf(':')
   const h = parseInt(sep > 0 ? raw.substring(0, sep) : raw)
   if (h < 0 || h > 23) return 21
   return h
-})
-const summaryPlaceholder = computed<string>(() : string => {
+}
+function getSummaryPlaceholder(): string {
   if (dailySummaryLoading.value) return '正在生成今日小结…'
   const cnt = store.todayCompletedCount.value
-  if (cnt === 0) return '完成一个微动作，开启今日小结'
-  return '已完成' + cnt + '次，' + summaryHour.value + ':00 后自动小结'
-})
+  if (cnt < 1) return '完成一个微动作，开启今日小结'
+  return '已完成' + cnt + '次，' + getSummaryHour() + ':00 后自动小结'
+}
 
-const greeting = computed<string>(() : string => {
+const summaryOneLiner = computed<string>(getSummaryOneLiner)
+const summaryBody = computed<string>(getSummaryBody)
+const summaryGoal = computed<string>(getSummaryGoal)
+const summaryEncourage = computed<string>(getSummaryEncourage)
+const summaryHour = computed<number>(getSummaryHour)
+const summaryPlaceholder = computed<string>(getSummaryPlaceholder)
+
+function getGreeting(): string {
   const h = currentHour()
-  if (h < 6) return '夜深了 🌙'
-  if (h < 9) return '早上好 ☀️'
-  if (h < 12) return '上午好 ☀️'
-  if (h < 14) return '中午好 🌤'
-  if (h < 18) return '下午好 ⛅'
-  if (h < 22) return '晚上好 🌆'
-  return '夜深了 🌙'
-})
+  if (h < 6) return '夜深了'
+  if (h < 9) return '早上好'
+  if (h < 12) return '上午好'
+  if (h < 14) return '中午好'
+  if (h < 18) return '下午好'
+  if (h < 22) return '晚上好'
+  return '夜深了'
+}
+
+function getGreetingEmoji(): string {
+  const h = currentHour()
+  if (h < 6) return '🌙'
+  if (h < 9) return '☀️'
+  if (h < 12) return '☀️'
+  if (h < 14) return '🌤'
+  if (h < 18) return '⛅'
+  if (h < 22) return '🌆'
+  return '🌙'
+}
+
+const greeting = computed<string>(getGreeting)
+const greetingEmoji = computed<string>(getGreetingEmoji)
+
+const phoneMinutes = computed<number>(() : number => store.phoneMinutes.value)
+function getPhoneUsageHint(): string {
+  if (phoneMinutes.value < 1) return '👆 点击查看手机使用详情'
+  return '今日已使用 ' + phoneMinutes.value + ' 分钟，点击查看详情 →'
+}
+const phoneUsageHint = computed<string>(getPhoneUsageHint)
+
+const showPhoneDialog = ref<boolean>(false)
+
+function openPhoneDialog(): void {
+  showPhoneDialog.value = true
+}
+
+function closePhoneDialog(): void {
+  showPhoneDialog.value = false
+}
+
+function getGreetingClass(): string {
+  const h = currentHour()
+  if (h < 6) return 'bg-night'
+  if (h < 9) return 'bg-morning'
+  if (h < 14) return 'bg-noon'
+  if (h < 18) return 'bg-afternoon'
+  if (h < 22) return 'bg-evening'
+  return 'bg-night'
+}
+
+function getDateStr(): string {
+  const d = new Date()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  const weekDays: string[] = ['日', '一', '二', '三', '四', '五', '六']
+  return m + '月' + day + '日 · 星期' + weekDays[d.getDay()]
+}
+
+const greetingClass = computed<string>(getGreetingClass)
+const dateStr = computed<string>(getDateStr)
 
 onPageShow(() => {
   store.refreshHomeData()
@@ -179,34 +263,124 @@ function goSettings(): void {
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  padding-top: 50px;
+  padding: 24px 20px 24px 20px;
+  padding-top: 56px;
+  background-color: #2C3E50;
+}
+.bg-morning {
+  background-color: #ED8F03;
+  background: linear-gradient(135deg, #FFB75E 0%, #ED8F03 100%);
+}
+.bg-noon {
+  background-color: #2F80ED;
+  background: linear-gradient(135deg, #56CCF2 0%, #2F80ED 100%);
+}
+.bg-afternoon {
+  background-color: #FDA085;
+  background: linear-gradient(135deg, #F6D365 0%, #FDA085 100%);
+}
+.bg-evening {
+  background-color: #2575FC;
+  background: linear-gradient(135deg, #6A11CB 0%, #2575FC 100%);
+}
+.bg-night {
+  background-color: #232526;
+  background: linear-gradient(135deg, #232526 0%, #414345 100%);
+}
+.greeting-left {
+  flex-direction: column;
 }
 .greeting-text {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: bold;
-  color: #2C3E50;
+  color: #FFFFFF;
+}
+.greeting-date {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 4px;
+}
+.greeting-right {
+  flex-direction: row;
+  align-items: center;
+}
+.emoji-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.25);
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+.emoji-button-text {
+  font-size: 24px;
 }
 .settings-icon {
-  font-size: 22px;
-  color: #7F8C8D;
-}
-.guard-section {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background-color: rgba(255, 255, 255, 0.25);
   align-items: center;
-  padding: 12px 16px;
+  justify-content: center;
 }
-.guard-text {
+.settings-icon-text {
   font-size: 18px;
+  color: #FFFFFF;
+}
+.phone-usage-hint {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background-color: rgba(0, 0, 0, 0.15);
+}
+.phone-usage-hint-text {
+  font-size: 12px;
+  color: #FFFFFF;
+  font-weight: 500;
+}
+.guard-card {
+  background-color: #FFFFFF;
+  margin: -16px 16px 8px 16px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+.guard-eyebrow {
+  font-size: 12px;
+  color: #7F8C8D;
+  margin-bottom: 4px;
+}
+.guard-row {
+  flex-direction: row;
+  align-items: flex-end;
+  margin-bottom: 6px;
+}
+.guard-number {
+  font-size: 36px;
   font-weight: bold;
   color: #2ECC71;
+}
+.guard-unit {
+  font-size: 16px;
+  color: #2ECC71;
+  font-weight: bold;
+  margin-left: 4px;
+}
+.guard-sub {
+  font-size: 12px;
+  color: #95A5A6;
 }
 .penetration-section {
   flex-direction: row;
   align-items: center;
-  padding: 8px 16px;
-  margin: 4px 16px;
+  padding: 12px 16px;
+  margin: 8px 16px;
   background-color: #FFFFFF;
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 .section-label {
   font-size: 13px;
@@ -216,18 +390,19 @@ function goSettings(): void {
 .penetration-track {
   flex: 1;
   height: 6px;
-  background-color: #ECF0F1;
+  background-color: #F0E6F6;
   border-radius: 3px;
   overflow: hidden;
 }
 .penetration-fill {
   height: 6px;
-  background-color: #9B59B6;
+  background: linear-gradient(90deg, #9B59B6 0%, #E91E63 100%);
   border-radius: 3px;
 }
 .penetration-value {
   font-size: 13px;
   color: #9B59B6;
+  font-weight: bold;
   width: 40px;
   text-align: right;
 }
@@ -235,11 +410,12 @@ function goSettings(): void {
   background-color: #FFFFFF;
   margin: 12px 16px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 14px;
   border-left-width: 4px;
   border-left-color: #3498DB;
   border-left-style: solid;
   flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 .summary-empty {
   border-left-color: #BDC3C7;
@@ -297,12 +473,17 @@ function goSettings(): void {
   color: #95A5A6;
 }
 .recommend-section {
-  margin-top: 8px;
+  margin-top: 12px;
   padding-bottom: 12px;
 }
+.section-header-row {
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 16px 4px 16px;
+}
 .library-section {
-  margin-top: 8px;
-  padding-bottom: 24px;
+  margin-top: 12px;
+  padding-bottom: 12px;
 }
 .library-header {
   flex-direction: column;
@@ -320,7 +501,6 @@ function goSettings(): void {
   font-size: 16px;
   font-weight: bold;
   color: #2C3E50;
-  padding: 8px 16px;
 }
 .empty-recommend {
   padding: 20px;
@@ -329,5 +509,8 @@ function goSettings(): void {
 .empty-text {
   font-size: 14px;
   color: #BDC3C7;
+}
+.bottom-spacer {
+  height: 40px;
 }
 </style>

@@ -238,7 +238,7 @@ function formatResult(r: ActionResult): string {
 
 function loadDbOverview(): void {
   const infos: DbTableInfo[] = []
-    for (let i = 0; i < KNOWN_TABLES.length; i++) {
+  for (let i = 0; i < KNOWN_TABLES.length; i++) {
     const t = KNOWN_TABLES[i]
     try {
       const row = dbManager.queryOne('SELECT COUNT(*) AS cnt FROM ' + t, [])

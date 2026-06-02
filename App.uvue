@@ -4,6 +4,7 @@ import { onCreate } from './database/DatabaseHelper'
 import { saveTodaySummary } from './services/ScoreCalculator'
 import { shouldTrigger, onActionResolved, onUserAccepted, getCurrentState } from './services/TriggerEngine'
 import { insertActionLog } from './database/ActionLogDao'
+import { insertOrUpdateSnapshot } from './database/AppUsageDao'
 import { getInt } from './database/SettingsDao'
 import { getActionById } from './constants/Actions'
 import { getRandomEncourage } from './constants/EncourageTexts'
@@ -21,6 +22,7 @@ onLaunch(() => {
     sqliteStore.openDatabase('micro_habit_v2.db', 1, (): void => onCreate(), (oldV: number, newV: number): void => {})
     const callbacks: MonitorCallbacks = {
       onAppDurationTrigger: (info: AppForegroundInfo): void => {
+        try { insertOrUpdateSnapshot(info.packageName, info.packageName, 1) } catch (_) {}
         const threshold = getInt('app_duration_threshold', 60) * 1000
         if (info.continuousMs < threshold) return
         try {

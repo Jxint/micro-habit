@@ -9,6 +9,7 @@ import { DailyCount } from '../models/DailyCount'
 import { callDaily, DailyData } from '../services/CloudService'
 import { WeeklyReport } from '../models/WeeklyReport'
 import { generateWeeklyReport } from '../services/WeeklyReportService'
+import { getTodayTotalUsageMinutes } from '../database/AppUsageDao'
 
 export type DailyOutput = {
   one_liner: string
@@ -24,8 +25,9 @@ export type AppStore = {
   postureStatus: Ref<string>
   vitalityScore: Ref<number>
   vitalityStatus: Ref<string>
-  guardMinutes: Ref<number>
+  guardCount: Ref<number>
   penetration: Ref<number>
+  phoneMinutes: Ref<number>
   todayCompletedCount: Ref<number>
   recommendedActions: Ref<MicroAction[]>
   heatmapData: Ref<DailyCount[]>
@@ -44,8 +46,9 @@ const postureScore = ref<number>(0)
 const postureStatus = ref<string>('no_data')
 const vitalityScore = ref<number>(0)
 const vitalityStatus = ref<string>('no_data')
-const guardMinutes = ref<number>(0)
+const guardCount = ref<number>(0)
 const penetration = ref<number>(0)
+const phoneMinutes = ref<number>(0)
 const todayCompletedCount = ref<number>(0)
 const recommendedActions = ref<MicroAction[]>([])
 const heatmapData = ref<DailyCount[]>([])
@@ -63,8 +66,9 @@ export function useAppStore(): AppStore {
     postureStatus,
     vitalityScore,
     vitalityStatus,
-    guardMinutes,
+    guardCount,
     penetration,
+    phoneMinutes,
     todayCompletedCount,
     recommendedActions,
     heatmapData,
@@ -83,6 +87,7 @@ export function useAppStore(): AppStore {
 
         try { saveTodaySummary() } catch (_) {}
         const data = getHomepageData(date)
+        try { phoneMinutes.value = getTodayTotalUsageMinutes() } catch (_) {}
 
         eyeScore.value = Math.round(data.eyeScore)
         eyeStatus.value = data.eyeLevel
@@ -90,7 +95,7 @@ export function useAppStore(): AppStore {
         postureStatus.value = data.postureLevel
         vitalityScore.value = Math.round(data.vitalityScore)
         vitalityStatus.value = data.vitalityLevel
-        guardMinutes.value = data.guardMinutes
+        guardCount.value = data.guardCount
         penetration.value = Math.round(data.penetration * 100) / 100
         todayCompletedCount.value = data.todayCompletedCount
         heatmapData.value = data.heatmapData
@@ -118,7 +123,7 @@ export function useAppStore(): AppStore {
           const ydata = getHomepageData(yDate)
           const fallback: DailyOutput = {
             one_liner: '昨天完成' + ydata.todayCompletedCount + '次微动作',
-            summary: '累计' + ydata.guardMinutes + '分钟',
+            summary: '累计' + ydata.guardCount + '次',
             tomorrow_goal: '',
             encourage: ''
           }
@@ -151,10 +156,10 @@ function parseSummaryHour(setting: string): number {
   return h
 }
 
-function buildLocalSummary(completedCount: number, minutes: number): DailyOutput {
+function buildLocalSummary(completedCount: number, count: number): DailyOutput {
   return {
     one_liner: '今日完成' + completedCount + '次微动作',
-    summary: '守护' + minutes + '分钟，继续加油',
+    summary: '累计' + count + '次，继续加油',
     tomorrow_goal: '继续保持！',
     encourage: '你做得很好'
   }
@@ -164,15 +169,16 @@ function generateDailySummary(date: string, onComplete: (summary: DailyOutput) =
   const data = getHomepageData(date)
 
   if (!isNetworkAvailable()) {
-    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardCount))
     return
   }
 
   const dto: DailyData = {
     totalCompleted: data.todayCompletedCount,
     totalSkipped: 0,
-    totalDurationSec: data.guardMinutes * 60,
-    guardMinutes: data.guardMinutes,
+    totalDurationSec: 0,
+    guardMinutes: 0,
+    guardCount: data.guardCount,
     penetration: data.penetration,
     eyeScore: Math.max(0, Math.round(data.eyeScore)),
     postureScore: Math.max(0, Math.round(data.postureScore)),
@@ -189,8 +195,8 @@ function generateDailySummary(date: string, onComplete: (summary: DailyOutput) =
         return
       }
     } catch (_) {}
-    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardCount))
   }, () => {
-    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardCount))
   })
 }

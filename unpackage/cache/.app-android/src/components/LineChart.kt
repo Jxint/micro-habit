@@ -12,11 +12,12 @@ import io.dcloud.uts.Map
 import io.dcloud.uts.Set
 import io.dcloud.uts.UTSAndroid
 import kotlin.properties.Delegates
-import io.dcloud.uniapp.extapi.createCanvasContextAsync as uni_createCanvasContextAsync
-import io.dcloud.uniapp.extapi.getDeviceInfo as uni_getDeviceInfo
 open class GenComponentsLineChart : VueComponent {
     constructor(__ins: ComponentInternalInstance) : super(__ins) {}
-    open var series: UTSArray<LineSeries__1> by `$props`
+    open var seriesValues: UTSArray<UTSArray<Number>> by `$props`
+    open var seriesNames: UTSArray<String> by `$props`
+    open var seriesColors: UTSArray<String> by `$props`
+    open var pointLabels: UTSArray<String> by `$props`
     open var title: String by `$props`
     open var height: Number by `$props`
     companion object {
@@ -26,156 +27,91 @@ open class GenComponentsLineChart : VueComponent {
             val _ctx = __ins.proxy as GenComponentsLineChart
             val _cache = __ins.renderCache
             val props = __props
-            val canvasId = "line_" + Math.floor(Math.random() * 100000)
-            val canvasH = props.height
-            var ctx: CanvasRenderingContext2D? = null
-            var canvasW: Number = 0
-            var canvasHPhys: Number = 0
-            fun gen_draw_fn(): Unit {
-                if (ctx == null) {
-                    return
+            val titleAreaH: Number = 24
+            val legendAreaH: Number = 24
+            val xAxisAreaH: Number = 22
+            val wrapperH = props.height
+            val chartAreaH = wrapperH - titleAreaH - legendAreaH - xAxisAreaH
+            fun gen_pointLeft_fn(pi: Number, total: Number): Number {
+                if (total <= 1) {
+                    return 0
                 }
-                val c = ctx as CanvasRenderingContext2D
-                val w = canvasW
-                val h = canvasHPhys
-                val padLeft: Number = 36
-                val padTop: Number = 30
-                val padRight: Number = 16
-                val padBottom: Number = 24
-                val chartW = w - padLeft - padRight
-                val chartH = h - padTop - padBottom
-                c.clearRect(0, 0, w, h)
-                if (props.title !== "") {
-                    c.fillStyle = "#2C3E50"
-                    c.font = "12px sans-serif"
-                    c.textAlign = "center"
-                    c.fillText(props.title, w / 2, 14)
-                    c.textAlign = "start"
-                }
-                val seriesArr = props.series
-                if (seriesArr.length === 0 || seriesArr[0].points.length === 0) {
-                    return
-                }
-                val maxPoints = seriesArr[0].points.length
-                val gridLines: Number = 4
-                c.strokeStyle = "#E8E8E8"
-                c.lineWidth = 0.5
-                run {
-                    var i: Number = 0
-                    while(i <= gridLines){
-                        val y = padTop + (chartH * i) / gridLines
-                        c.beginPath()
-                        c.moveTo(padLeft, y)
-                        c.lineTo(w - padRight, y)
-                        c.stroke()
-                        val label = Math.round(100 * (1 - i / gridLines))
-                        c.fillStyle = "#95A5A6"
-                        c.font = "9px sans-serif"
-                        c.textAlign = "right"
-                        c.fillText("" + label, padLeft - 4, y + 3)
-                        c.textAlign = "start"
-                        i++
-                    }
-                }
-                run {
-                    var si: Number = 0
-                    while(si < seriesArr.length){
-                        val s = seriesArr[si]
-                        if (s.points.length === 0) {
-                            si++
-                            continue
-                        }
-                        c.strokeStyle = s.color
-                        c.lineWidth = 2
-                        c.beginPath()
-                        run {
-                            var i: Number = 0
-                            while(i < s.points.length){
-                                val x = padLeft + (chartW * i) / (s.points.length - 1)
-                                val kVal = Math.max(0, Math.min(100, s.points[i].value))
-                                val y = padTop + chartH * (1 - kVal / 100)
-                                if (i === 0) {
-                                    c.moveTo(x, y)
-                                } else {
-                                    c.lineTo(x, y)
-                                }
-                                i++
-                            }
-                        }
-                        c.stroke()
-                        c.fillStyle = s.color
-                        run {
-                            var i: Number = 0
-                            while(i < s.points.length){
-                                val x = padLeft + (chartW * i) / (s.points.length - 1)
-                                val kVal = Math.max(0, Math.min(100, s.points[i].value))
-                                val y = padTop + chartH * (1 - kVal / 100)
-                                c.beginPath()
-                                c.arc(x, y, 3, 0, Math.PI * 2, false)
-                                c.fill()
-                                i++
-                            }
-                        }
-                        si++
-                    }
-                }
-                var legendX: Number = padLeft
-                run {
-                    var si: Number = 0
-                    while(si < seriesArr.length){
-                        val s = seriesArr[si]
-                        c.fillStyle = s.color
-                        c.fillRect(legendX, padTop - 14, 10, 10)
-                        c.fillStyle = "#2C3E50"
-                        c.font = "10px sans-serif"
-                        c.textAlign = "start"
-                        c.fillText(s.name, legendX + 14, padTop - 6)
-                        legendX += 70
-                        si++
-                    }
-                }
-                c.textAlign = "start"
-                val firstSeries = seriesArr[0]
-                c.fillStyle = "#95A5A6"
-                c.font = "9px sans-serif"
-                c.textAlign = "center"
-                run {
-                    var i: Number = 0
-                    while(i < maxPoints){
-                        val x = padLeft + (chartW * i) / (maxPoints - 1)
-                        c.fillText(firstSeries.points[i].label, x, padTop + chartH + 14)
-                        i++
-                    }
-                }
-                c.textAlign = "start"
+                return (pi / (total - 1)) * 100
             }
-            val draw = ::gen_draw_fn
-            onReady(fun(){
-                val instance = getCurrentInstance()?.proxy
-                if (instance == null) {
-                    return
-                }
-                uni_createCanvasContextAsync(CreateCanvasContextAsyncOptions(id = canvasId, component = instance, success = fun(context: CanvasContext){
-                    ctx = context.getContext("2d")!!
-                    if (ctx == null) {
-                        return
+            val pointLeft = ::gen_pointLeft_fn
+            fun gen_pointBottom_fn(value: Number): Number {
+                val v = if (value < 0) {
+                    0
+                } else {
+                    if (value > 100) {
+                        100
+                    } else {
+                        value
                     }
-                    val canvas = ctx.canvas
-                    val dpr = uni_getDeviceInfo(null).devicePixelRatio ?: 1
-                    canvasW = canvas.offsetWidth
-                    canvas.width = canvasW * dpr
-                    canvas.height = canvasH * dpr
-                    ctx.scale(dpr, dpr)
-                    canvasHPhys = canvasH
-                    draw()
                 }
-                ))
+                return v
             }
-            )
+            val pointBottom = ::gen_pointBottom_fn
+            fun gen_xLabelLeft_fn(pi: Number): Number {
+                val total = props.pointLabels.length
+                if (total <= 1) {
+                    return 0
+                }
+                return (pi / (total - 1)) * 100
+            }
+            val xLabelLeft = ::gen_xLabelLeft_fn
             return fun(): Any? {
-                return _cE("view", _uM("class" to "chart-wrapper"), _uA(
-                    _cE("canvas", _uM("id" to canvasId, "class" to "chart-canvas", "style" to _nS(_uM("height" to (unref(canvasH) + "px")))), null, 4)
-                ))
+                return _cE("view", _uM("class" to "chart-wrapper", "style" to _nS(_uM("height" to (unref(wrapperH) + "px")))), _uA(
+                    if (_ctx.title.length > 0) {
+                        _cE("view", _uM("key" to 0, "class" to "chart-title"), _uA(
+                            _cE("text", _uM("class" to "chart-title-text"), _tD(_ctx.title), 1)
+                        ))
+                    } else {
+                        _cC("v-if", true)
+                    }
+                    ,
+                    _cE("view", _uM("class" to "chart-legend"), _uA(
+                        _cE(Fragment, null, RenderHelpers.renderList(_ctx.seriesNames, fun(name, si, __index, _cached): Any {
+                            return _cE("view", _uM("key" to ("leg-" + si), "class" to "legend-item"), _uA(
+                                _cE("view", _uM("class" to "legend-dot", "style" to _nS(_uM("backgroundColor" to _ctx.seriesColors[si]))), null, 4),
+                                _cE("text", _uM("class" to "legend-text"), _tD(name), 1)
+                            ))
+                        }
+                        ), 128)
+                    )),
+                    _cE("view", _uM("class" to "chart-area", "style" to _nS(_uM("height" to (chartAreaH + "px")))), _uA(
+                        _cE("view", _uM("class" to "y-axis"), _uA(
+                            _cE("text", _uM("class" to "y-tick"), "100"),
+                            _cE("text", _uM("class" to "y-tick"), "75"),
+                            _cE("text", _uM("class" to "y-tick"), "50"),
+                            _cE("text", _uM("class" to "y-tick"), "25"),
+                            _cE("text", _uM("class" to "y-tick"), "0")
+                        )),
+                        _cE("view", _uM("class" to "plot-area"), _uA(
+                            _cE("view", _uM("class" to "grid-area"), _uA(
+                                _cE(Fragment, null, RenderHelpers.renderList(4, fun(g, __key, __index, _cached): Any {
+                                    return _cE("view", _uM("key" to ("g-" + g), "class" to "grid-line"))
+                                }
+                                ), 64)
+                            )),
+                            _cE(Fragment, null, RenderHelpers.renderList(_ctx.seriesValues, fun(values, si, __index, _cached): Any {
+                                return _cE("view", _uM("key" to ("series-" + si), "class" to "series-layer"), _uA(
+                                    _cE(Fragment, null, RenderHelpers.renderList(values, fun(v, pi, __index, _cached): Any {
+                                        return _cE("view", _uM("key" to ("pt-" + si + "-" + pi), "class" to "point", "style" to _nS(_uM("left" to (pointLeft(pi, values.length) + "%"), "bottom" to (pointBottom(v) + "%"), "backgroundColor" to _ctx.seriesColors[si]))), null, 4)
+                                    }
+                                    ), 128)
+                                ))
+                            }
+                            ), 128)
+                        ))
+                    ), 4),
+                    _cE("view", _uM("class" to "x-axis"), _uA(
+                        _cE(Fragment, null, RenderHelpers.renderList(_ctx.pointLabels, fun(p, pi, __index, _cached): Any {
+                            return _cE("text", _uM("key" to ("xl-" + pi), "class" to "x-tick", "style" to _nS(_uM("left" to (xLabelLeft(pi) + "%")))), _tD(p), 5)
+                        }
+                        ), 128)
+                    ))
+                ), 4)
             }
         }
         val styles: Map<String, Map<String, Map<String, Any>>> by lazy {
@@ -185,17 +121,29 @@ open class GenComponentsLineChart : VueComponent {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("chart-wrapper" to _pS(_uM("flexDirection" to "column", "width" to "100%", "paddingTop" to 4, "paddingRight" to 0, "paddingBottom" to 4, "paddingLeft" to 0)), "chart-canvas" to _pS(_uM("width" to "100%")))
+                return _uM("chart-wrapper" to _pS(_uM("flexDirection" to "column", "width" to "100%", "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 10, "borderTopRightRadius" to 10, "borderBottomRightRadius" to 10, "borderBottomLeftRadius" to 10, "paddingTop" to 8, "paddingRight" to 8, "paddingBottom" to 4, "paddingLeft" to 8)), "chart-title" to _pS(_uM("paddingTop" to 0, "paddingRight" to 4, "paddingBottom" to 4, "paddingLeft" to 4)), "chart-title-text" to _pS(_uM("fontSize" to 13, "fontWeight" to "bold", "color" to "#2C3E50")), "chart-legend" to _pS(_uM("flexDirection" to "row", "paddingTop" to 0, "paddingRight" to 4, "paddingBottom" to 6, "paddingLeft" to 4)), "legend-item" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginRight" to 16)), "legend-dot" to _pS(_uM("width" to 10, "height" to 10, "borderTopLeftRadius" to 5, "borderTopRightRadius" to 5, "borderBottomRightRadius" to 5, "borderBottomLeftRadius" to 5, "marginRight" to 4)), "legend-text" to _pS(_uM("fontSize" to 11, "color" to "#7F8C8D")), "chart-area" to _pS(_uM("flexDirection" to "row", "width" to "100%")), "y-axis" to _pS(_uM("width" to 30, "flexDirection" to "column", "justifyContent" to "space-between", "alignItems" to "flex-end", "paddingRight" to 4)), "y-tick" to _pS(_uM("fontSize" to 9, "color" to "#95A5A6")), "plot-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "flexDirection" to "column", "position" to "relative")), "grid-area" to _pS(_uM("position" to "absolute", "top" to 0, "left" to 0, "right" to 0, "bottom" to 0, "flexDirection" to "column", "justifyContent" to "space-between")), "grid-line" to _pS(_uM("width" to "100%", "height" to 1, "backgroundColor" to "#ECF0F1")), "series-layer" to _pS(_uM("position" to "absolute", "top" to 0, "left" to 0, "right" to 0, "bottom" to 0)), "point" to _pS(_uM("position" to "absolute", "width" to 8, "height" to 8, "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "marginLeft" to -4, "marginBottom" to -4)), "x-axis" to _pS(_uM("height" to 22, "width" to "100%", "flexDirection" to "row", "position" to "relative", "marginLeft" to 30)), "x-tick" to _pS(_uM("position" to "absolute", "fontSize" to 9, "color" to "#95A5A6", "width" to 30, "textAlign" to "center", "marginLeft" to -15)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()
         var emits: Map<String, Any?> = _uM()
-        var props = _nP(_uM("series" to _uM("type" to "Array", "required" to true, "default" to fun(): UTSArray<Any?> {
+        var props = _nP(_uM("seriesValues" to _uM("type" to "Array", "required" to true, "default" to fun(): UTSArray<Any?> {
+            return _uA()
+        }
+        ), "seriesNames" to _uM("type" to "Array", "required" to true, "default" to fun(): UTSArray<Any?> {
+            return _uA()
+        }
+        ), "seriesColors" to _uM("type" to "Array", "required" to true, "default" to fun(): UTSArray<Any?> {
+            return _uA()
+        }
+        ), "pointLabels" to _uM("type" to "Array", "required" to true, "default" to fun(): UTSArray<Any?> {
             return _uA()
         }
         ), "title" to _uM("type" to "String", "required" to true, "default" to ""), "height" to _uM("type" to "Number", "required" to true, "default" to 260)))
         var propsNeedCastKeys = _uA(
-            "series",
+            "seriesValues",
+            "seriesNames",
+            "seriesColors",
+            "pointLabels",
             "title",
             "height"
         )

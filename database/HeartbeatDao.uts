@@ -11,11 +11,17 @@ export function insertHeartbeat(status: string): void {
 
 export function getRecentHeartbeats(limit: number): HeartbeatLog[] {
   const rows = dbManager.query('SELECT * FROM heartbeat_logs ORDER BY timestamp DESC LIMIT ?', [limit])
-  return rows.map((row: Map<string, any>): HeartbeatLog => ({
-    id: row.get("id") as number,
-    service_status: row.get("service_status") as string,
-    timestamp: row.get("timestamp") as number
-  }))
+  const result: HeartbeatLog[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    const item: HeartbeatLog = {
+      id: row.get("id") as number,
+      service_status: row.get("service_status") as string,
+      timestamp: row.get("timestamp") as number
+    }
+    result.push(item)
+  }
+  return result
 }
 
 export function cleanOldHeartbeats(): void {

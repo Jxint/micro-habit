@@ -45,19 +45,28 @@ open class GenPagesDataDashboard : BasePage {
                 return store.vitalityStatus.value
             }
             )
-            val guardMinutes = computed<Number>(fun(): Number {
-                return store.guardMinutes.value
+            val guardCount = computed<Number>(fun(): Number {
+                return store.guardCount.value
             }
             )
-            val penetrationText = computed<String>(fun(): String {
+            fun gen_getPenetrationText_fn(): String {
                 val p = store.penetration.value
                 return "" + Math.round(p * 10) / 10
             }
-            )
+            val getPenetrationText = ::gen_getPenetrationText_fn
+            val penetrationText = computed<String>(getPenetrationText)
             val heatmapData = computed<UTSArray<DailyCount>>(fun(): UTSArray<DailyCount> {
                 return store.heatmapData.value
             }
             )
+            val hourlyLabels = ref(_uA<String>())
+            val hourlyValues = ref(_uA<Number>())
+            val weekTrendValues = ref(_uA<UTSArray<Number>>())
+            val weekTrendNames = ref(_uA<String>())
+            val weekTrendColors = ref(_uA<String>())
+            val weekTrendLabels = ref(_uA<String>())
+            val heatmapDates = ref(_uA<String>())
+            val heatmapCounts = ref(_uA<Number>())
             val weeklyShow = ref<Boolean>(false)
             val weeklyToggleText = computed<String>(fun(): String {
                 return if (weeklyShow.value) {
@@ -75,7 +84,7 @@ open class GenPagesDataDashboard : BasePage {
                 return store.weeklyReportLoading.value
             }
             )
-            val wkTitle = computed<String>(fun(): String {
+            fun gen_getWkTitle_fn(): String {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.title
@@ -83,8 +92,8 @@ open class GenPagesDataDashboard : BasePage {
                     ""
                 }
             }
-            )
-            val wkHighlight = computed<String>(fun(): String {
+            val getWkTitle = ::gen_getWkTitle_fn
+            fun gen_getWkHighlight_fn(): String {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.highlight
@@ -92,8 +101,8 @@ open class GenPagesDataDashboard : BasePage {
                     ""
                 }
             }
-            )
-            val wkTotalCompleted = computed<Number>(fun(): Number {
+            val getWkHighlight = ::gen_getWkHighlight_fn
+            fun gen_getWkTotalCompleted_fn(): Number {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.stats.totalCompleted
@@ -101,8 +110,8 @@ open class GenPagesDataDashboard : BasePage {
                     0
                 }
             }
-            )
-            val wkAvgGuard = computed<Number>(fun(): Number {
+            val getWkTotalCompleted = ::gen_getWkTotalCompleted_fn
+            fun gen_getWkAvgGuard_fn(): Number {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.stats.avgGuardMinutes
@@ -110,8 +119,8 @@ open class GenPagesDataDashboard : BasePage {
                     0
                 }
             }
-            )
-            val wkBestDay = computed<Number>(fun(): Number {
+            val getWkAvgGuard = ::gen_getWkAvgGuard_fn
+            fun gen_getWkBestDay_fn(): Number {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.stats.bestDayCount
@@ -119,8 +128,8 @@ open class GenPagesDataDashboard : BasePage {
                     0
                 }
             }
-            )
-            val wkImprovement = computed<String>(fun(): String {
+            val getWkBestDay = ::gen_getWkBestDay_fn
+            fun gen_getWkImprovement_fn(): String {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.improvement
@@ -128,8 +137,8 @@ open class GenPagesDataDashboard : BasePage {
                     ""
                 }
             }
-            )
-            val wkSuggestions = computed<UTSArray<String>>(fun(): UTSArray<String> {
+            val getWkImprovement = ::gen_getWkImprovement_fn
+            fun gen_getWkSuggestions_fn(): UTSArray<String> {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.suggestions
@@ -137,12 +146,19 @@ open class GenPagesDataDashboard : BasePage {
                     _uA()
                 }
             }
-            )
+            val getWkSuggestions = ::gen_getWkSuggestions_fn
+            val wkTitle = computed<String>(getWkTitle)
+            val wkHighlight = computed<String>(getWkHighlight)
+            val wkTotalCompleted = computed<Number>(getWkTotalCompleted)
+            val wkAvgGuard = computed<Number>(getWkAvgGuard)
+            val wkBestDay = computed<Number>(getWkBestDay)
+            val wkImprovement = computed<String>(getWkImprovement)
+            val wkSuggestions = computed<UTSArray<String>>(getWkSuggestions)
             val wkSuggestCount = computed<Number>(fun(): Number {
                 return wkSuggestions.value.length
             }
             )
-            val wkGoal = computed<String>(fun(): String {
+            fun gen_getWkGoal_fn(): String {
                 val r = store.weeklyReport.value
                 return if (r != null) {
                     r.nextWeekGoal
@@ -150,9 +166,8 @@ open class GenPagesDataDashboard : BasePage {
                     ""
                 }
             }
-            )
-            val hourlyData = ref(_uA<BarItem>())
-            val weekTrend = ref(_uA<LineSeries>())
+            val getWkGoal = ::gen_getWkGoal_fn
+            val wkGoal = computed<String>(getWkGoal)
             val todayDetails = ref(_uA<ActionDetail>())
             val detailCount = computed<Number>(fun(): Number {
                 return todayDetails.value.length
@@ -160,8 +175,68 @@ open class GenPagesDataDashboard : BasePage {
             )
             fun gen_loadData_fn(): Unit {
                 val date = today()
-                hourlyData.value = getHourlyData(date)
-                weekTrend.value = getWeeklyTrend()
+                val hourly = getHourlyData(date)
+                val hLabels: UTSArray<String> = _uA()
+                val hValues: UTSArray<Number> = _uA()
+                run {
+                    var i: Number = 0
+                    while(i < hourly.length){
+                        hLabels.push(hourly[i].label)
+                        hValues.push(hourly[i].value)
+                        i++
+                    }
+                }
+                hourlyLabels.value = hLabels
+                hourlyValues.value = hValues
+                val trend = getWeeklyTrend()
+                if (trend.length > 0) {
+                    val first = trend[0]
+                    if (first != null) {
+                        weekTrendNames.value = _uA(
+                            first.name
+                        )
+                        weekTrendColors.value = _uA(
+                            first.color
+                        )
+                        val v: UTSArray<Number> = _uA()
+                        val labels: UTSArray<String> = _uA()
+                        run {
+                            var i: Number = 0
+                            while(i < first.points.length){
+                                labels.push(first.points[i].label)
+                                v.push(first.points[i].value)
+                                i++
+                            }
+                        }
+                        weekTrendLabels.value = labels
+                        weekTrendValues.value = _uA(
+                            v
+                        )
+                    } else {
+                        weekTrendNames.value = _uA()
+                        weekTrendColors.value = _uA()
+                        weekTrendLabels.value = _uA()
+                        weekTrendValues.value = _uA()
+                    }
+                } else {
+                    weekTrendNames.value = _uA()
+                    weekTrendColors.value = _uA()
+                    weekTrendLabels.value = _uA()
+                    weekTrendValues.value = _uA()
+                }
+                val heatmap = store.heatmapData.value
+                val dArr: UTSArray<String> = _uA()
+                val cArr: UTSArray<Number> = _uA()
+                run {
+                    var i: Number = 0
+                    while(i < heatmap.length){
+                        dArr.push(heatmap[i].date)
+                        cArr.push(heatmap[i].count)
+                        i++
+                    }
+                }
+                heatmapDates.value = dArr
+                heatmapCounts.value = cArr
                 todayDetails.value = getTodayDetail()
             }
             val loadData = ::gen_loadData_fn
@@ -200,14 +275,15 @@ open class GenPagesDataDashboard : BasePage {
                                     "status"
                                 )),
                                 _cE("view", _uM("class" to "guard-box"), _uA(
-                                    _cE("text", _uM("class" to "guard-label"), "今日守护"),
-                                    _cE("text", _uM("class" to "guard-value"), _tD(unref(guardMinutes)) + " 分钟", 1),
+                                    _cE("text", _uM("class" to "guard-label"), "今日完成"),
+                                    _cE("text", _uM("class" to "guard-value"), _tD(unref(guardCount)) + " 次", 1),
                                     _cE("text", _uM("class" to "guard-sub"), "习惯渗透度 " + _tD(unref(penetrationText)), 1)
                                 )),
                                 _cE("view", _uM("class" to "chart-container"), _uA(
                                     _cE("text", _uM("class" to "chart-label"), "各时段完成次数"),
-                                    _cV(unref(GenComponentsBarChartClass), _uM("data" to unref(hourlyData), "height" to 380, "barColor" to "#4CAF50"), null, 8, _uA(
-                                        "data"
+                                    _cV(unref(GenComponentsBarChartClass), _uM("labels" to unref(hourlyLabels), "values" to unref(hourlyValues), "height" to 280, "barColor" to "#4CAF50"), null, 8, _uA(
+                                        "labels",
+                                        "values"
                                     ))
                                 )),
                                 if (unref(detailCount) > 0) {
@@ -245,8 +321,11 @@ open class GenPagesDataDashboard : BasePage {
                             )),
                             _cE("view", _uM("class" to "section-body"), _uA(
                                 _cE("view", _uM("class" to "chart-container"), _uA(
-                                    _cV(unref(GenComponentsLineChartClass), _uM("series" to unref(weekTrend), "height" to 380, "title" to "7日三状态趋势"), null, 8, _uA(
-                                        "series"
+                                    _cV(unref(GenComponentsLineChartClass), _uM("series-values" to unref(weekTrendValues), "series-names" to unref(weekTrendNames), "series-colors" to unref(weekTrendColors), "point-labels" to unref(weekTrendLabels), "height" to 280, "title" to "7日完成次数趋势"), null, 8, _uA(
+                                        "series-values",
+                                        "series-names",
+                                        "series-colors",
+                                        "point-labels"
                                     ))
                                 ))
                             ))
@@ -257,8 +336,9 @@ open class GenPagesDataDashboard : BasePage {
                             )),
                             _cE("view", _uM("class" to "section-body"), _uA(
                                 _cE("view", _uM("class" to "chart-container"), _uA(
-                                    _cV(unref(GenComponentsHeatmapCalendarClass), _uM("data" to unref(heatmapData), "height" to 300), null, 8, _uA(
-                                        "data"
+                                    _cV(unref(GenComponentsHeatmapCalendarClass), _uM("dates" to unref(heatmapDates), "counts" to unref(heatmapCounts), "height" to 260), null, 8, _uA(
+                                        "dates",
+                                        "counts"
                                     ))
                                 )),
                                 _cE("view", _uM("class" to "heatmap-legend"), _uA(

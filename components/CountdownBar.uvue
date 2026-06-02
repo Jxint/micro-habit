@@ -13,15 +13,18 @@ const props = withDefaults(defineProps<{
   remaining: number
 }>(), {})
 
-const progressPercent = computed<number>(() : number => {
+function getProgressPercent(): number {
   if (props.total <= 0) return 0
   return ((props.total - props.remaining) / props.total) * 100
-})
+}
 
-const remainingText = computed<string>(() : string => {
+function getRemainingText(): string {
   const secs = Math.ceil(props.remaining / 1000)
   return secs + 's / ' + Math.ceil(props.total / 1000) + 's'
-})
+}
+
+const progressPercent = computed<number>(getProgressPercent)
+const remainingText = computed<string>(getRemainingText)
 </script>
 
 <style scoped>

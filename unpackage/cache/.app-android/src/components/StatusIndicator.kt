@@ -24,14 +24,14 @@ open class GenComponentsStatusIndicator : VueComponent {
             val _ctx = __ins.proxy as GenComponentsStatusIndicator
             val _cache = __ins.renderCache
             val props = __props
-            val displayPercent = computed<Number>(fun(): Number {
+            fun gen_getDisplayPercent_fn(): Number {
                 if (props.percent < 0) {
                     return 0
                 }
                 return Math.min(props.percent, 100)
             }
-            )
-            val barColor = computed<String>(fun(): String {
+            val getDisplayPercent = ::gen_getDisplayPercent_fn
+            fun gen_getBarColor_fn(): String {
                 if (props.status === "no_data") {
                     return "#D5D8DC"
                 }
@@ -43,8 +43,8 @@ open class GenComponentsStatusIndicator : VueComponent {
                 }
                 return "#E74C3C"
             }
-            )
-            val textColor = computed<String>(fun(): String {
+            val getBarColor = ::gen_getBarColor_fn
+            fun gen_getTextColor_fn(): String {
                 if (props.status === "no_data") {
                     return "#95A5A6"
                 }
@@ -56,8 +56,8 @@ open class GenComponentsStatusIndicator : VueComponent {
                 }
                 return "#C0392B"
             }
-            )
-            val statusText = computed<String>(fun(): String {
+            val getTextColor = ::gen_getTextColor_fn
+            fun gen_getStatusText_fn(): String {
                 if (props.status === "no_data") {
                     return "暂无数据"
                 }
@@ -69,14 +69,20 @@ open class GenComponentsStatusIndicator : VueComponent {
                 }
                 return "需关注"
             }
-            )
+            val getStatusText = ::gen_getStatusText_fn
+            val displayPercent = computed<Number>(getDisplayPercent)
+            val barColor = computed<String>(getBarColor)
+            val textColor = computed<String>(getTextColor)
+            val statusText = computed<String>(getStatusText)
             return fun(): Any? {
                 return _cE("view", _uM("class" to "status-card"), _uA(
-                    _cE("text", _uM("class" to "status-title"), _tD(_ctx.title), 1),
+                    _cE("view", _uM("class" to "status-header"), _uA(
+                        _cE("text", _uM("class" to "status-title"), _tD(_ctx.title), 1),
+                        _cE("text", _uM("class" to "status-label", "style" to _nS(_uM("color" to unref(textColor)))), _tD(unref(statusText)), 5)
+                    )),
                     _cE("view", _uM("class" to "progress-track"), _uA(
                         _cE("view", _uM("class" to "progress-fill", "style" to _nS(_uM("width" to (unref(displayPercent) + "%"), "backgroundColor" to unref(barColor)))), null, 4)
-                    )),
-                    _cE("text", _uM("class" to "status-label", "style" to _nS(_uM("color" to unref(textColor)))), _tD(unref(statusText)), 5)
+                    ))
                 ))
             }
         }
@@ -87,7 +93,7 @@ open class GenComponentsStatusIndicator : VueComponent {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("status-card" to _pS(_uM("flexDirection" to "column", "paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "marginTop" to 4, "marginRight" to 16, "marginBottom" to 4, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 10, "borderTopRightRadius" to 10, "borderBottomRightRadius" to 10, "borderBottomLeftRadius" to 10)), "status-title" to _pS(_uM("fontSize" to 14, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 6)), "progress-track" to _pS(_uM("height" to 8, "backgroundColor" to "#ECF0F1", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "overflow" to "hidden")), "progress-fill" to _pS(_uM("height" to 8, "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4)), "status-label" to _pS(_uM("fontSize" to 12, "marginTop" to 4, "textAlign" to "right")))
+                return _uM("status-card" to _pS(_uM("flexDirection" to "column", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 14, "paddingLeft" to 16, "marginTop" to 6, "marginRight" to 16, "marginBottom" to 6, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "status-header" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "marginBottom" to 8)), "status-title" to _pS(_uM("fontSize" to 14, "fontWeight" to "bold", "color" to "#2C3E50")), "status-label" to _pS(_uM("fontSize" to 12, "fontWeight" to "bold")), "progress-track" to _pS(_uM("height" to 8, "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "overflow" to "hidden")), "progress-fill" to _pS(_uM("height" to 8, "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

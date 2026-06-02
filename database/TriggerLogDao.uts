@@ -45,7 +45,11 @@ export function getTodayTriggerLogs(): TriggerLog[] {
     'SELECT * FROM trigger_logs WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC',
     [start, end]
   )
-  return rows.map((r: Map<string, any>): TriggerLog => mapRow(r))
+  const result: TriggerLog[] = []
+  for (let i = 0; i < rows.length; i++) {
+    result.push(mapRow(rows[i]))
+  }
+  return result
 }
 
 export function cleanOldTriggerLogs(): void {

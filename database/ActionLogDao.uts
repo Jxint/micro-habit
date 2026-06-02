@@ -24,7 +24,11 @@ export function getTodayLogs(): ActionLog[] {
     'SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? ORDER BY created_at DESC',
     [start, end]
   )
-  return rows.map((r: Map<string, any>): ActionLog => mapRow(r))
+  const result: ActionLog[] = []
+  for (let i = 0; i < rows.length; i++) {
+    result.push(mapRow(rows[i]))
+  }
+  return result
 }
 
 export function getTodayCompletedLogs(): ActionLog[] {
@@ -34,7 +38,11 @@ export function getTodayCompletedLogs(): ActionLog[] {
     'SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) ORDER BY created_at DESC',
     [start, end, 'completed', 'self_reported']
   )
-  return rows.map((r: Map<string, any>): ActionLog => mapRow(r))
+  const result: ActionLog[] = []
+  for (let i = 0; i < rows.length; i++) {
+    result.push(mapRow(rows[i]))
+  }
+  return result
 }
 
 export function getCompletedLogsByDateAndActions(date: string, actionIds: string[]): ActionLog[] {
@@ -45,7 +53,23 @@ export function getCompletedLogsByDateAndActions(date: string, actionIds: string
     'SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) AND action_id IN (' + ids + ') ORDER BY created_at DESC',
     [start, end, 'completed', 'self_reported']
   )
-  return rows.map((r: Map<string, any>): ActionLog => mapRow(r))
+  const result: ActionLog[] = []
+  for (let i = 0; i < rows.length; i++) {
+    result.push(mapRow(rows[i]))
+  }
+  return result
+}
+
+export function countCompletedByDateAndActions(date: string, actionIds: string[]): number {
+  const start = getTimestampFromDate(date)
+  const end = start + 86400
+  const ids = actionIds.map((id: string): string => "'" + id + "'").join(',')
+  const row = dbManager.queryOne(
+    'SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) AND action_id IN (' + ids + ')',
+    [start, end, 'completed', 'self_reported']
+  )
+  const rawCnt = row != null ? row.get("cnt") : null
+  return rawCnt != null ? parseFloat('' + rawCnt) : 0
 }
 
 export function getTotalCompletedDurationSec(date: string): number {
@@ -83,7 +107,11 @@ export function countSkippedToday(): number {
 
 export function getRecentLogs(count: number): ActionLog[] {
   const rows = dbManager.query('SELECT * FROM action_logs ORDER BY created_at DESC LIMIT ?', [count])
-  return rows.map((r: Map<string, any>): ActionLog => mapRow(r))
+  const result: ActionLog[] = []
+  for (let i = 0; i < rows.length; i++) {
+    result.push(mapRow(rows[i]))
+  }
+  return result
 }
 
 export type BarItem = {

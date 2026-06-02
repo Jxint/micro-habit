@@ -23,18 +23,20 @@ open class GenComponentsCountdownBar : VueComponent {
             val _ctx = __ins.proxy as GenComponentsCountdownBar
             val _cache = __ins.renderCache
             val props = __props
-            val progressPercent = computed<Number>(fun(): Number {
+            fun gen_getProgressPercent_fn(): Number {
                 if (props.total <= 0) {
                     return 0
                 }
                 return ((props.total - props.remaining) / props.total) * 100
             }
-            )
-            val remainingText = computed<String>(fun(): String {
+            val getProgressPercent = ::gen_getProgressPercent_fn
+            fun gen_getRemainingText_fn(): String {
                 val secs = Math.ceil(props.remaining / 1000)
                 return secs + "s / " + Math.ceil(props.total / 1000) + "s"
             }
-            )
+            val getRemainingText = ::gen_getRemainingText_fn
+            val progressPercent = computed<Number>(getProgressPercent)
+            val remainingText = computed<String>(getRemainingText)
             return fun(): Any? {
                 return _cE("view", _uM("class" to "countdown-container"), _uA(
                     _cE("view", _uM("class" to "countdown-track"), _uA(

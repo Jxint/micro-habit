@@ -3,21 +3,37 @@
     <scroll-view class="scroll-area" scroll-y="true">
       <view class="settings-section">
         <text class="section-title">触发设置</text>
-        <view class="setting-item">
-          <text class="setting-label">连续使用提醒阈值</text>
-          <text class="setting-value">{{ durationThreshold }} 分钟</text>
+        <view class="setting-item" @tap="openThresholdPicker">
+          <view class="setting-left">
+            <text class="setting-label">连续使用提醒阈值</text>
+            <text class="setting-hint">同一 App 连续使用多久后提醒</text>
+          </view>
+          <text class="setting-value">{{ durationThreshold }} 分钟 ›</text>
         </view>
-        <view class="setting-item">
-          <text class="setting-label">免打扰时段</text>
-          <text class="setting-value">{{ dndStart }} - {{ dndEnd }}</text>
+        <view class="setting-item" @tap="openDndPicker">
+          <view class="setting-left">
+            <text class="setting-label">免打扰时段</text>
+            <text class="setting-hint">该时段不触发提醒</text>
+          </view>
+          <text class="setting-value">{{ dndStart }} - {{ dndEnd }} ›</text>
         </view>
       </view>
 
       <view class="settings-section">
         <text class="section-title">微动作设置</text>
-        <view class="setting-item">
-          <text class="setting-label">默认时长偏好</text>
-          <text class="setting-value">{{ durationPref }} 秒</text>
+        <view class="setting-item" @tap="openDurationPrefPicker">
+          <view class="setting-left">
+            <text class="setting-label">默认时长偏好</text>
+            <text class="setting-hint">手动微动作的默认倒计时</text>
+          </view>
+          <text class="setting-value">{{ durationPref }} 秒 ›</text>
+        </view>
+        <view class="setting-item" @tap="openTargetCountPicker">
+          <view class="setting-left">
+            <text class="setting-label">每日目标次数</text>
+            <text class="setting-hint">每类动作每天完成几次算满分</text>
+          </view>
+          <text class="setting-value">{{ targetCount }} 次 ›</text>
         </view>
       </view>
 
@@ -46,40 +62,114 @@
       <view class="settings-section">
         <text class="section-title">调试</text>
         <view class="setting-item" @tap="goDebugLogs">
-          <text class="setting-label">查看触发/动作日志</text>
-          <text class="setting-value">→</text>
+          <view class="setting-left">
+            <text class="setting-label">查看触发/动作日志</text>
+          </view>
+          <text class="setting-value">›</text>
         </view>
         <view class="setting-item" @tap="goDebugDB">
-          <text class="setting-label">数据库巡检 & 配置</text>
-          <text class="setting-value">→</text>
+          <view class="setting-left">
+            <text class="setting-label">数据库巡检 & 配置</text>
+          </view>
+          <text class="setting-value">›</text>
         </view>
       </view>
 
       <view class="settings-section">
         <text class="section-title">关于</text>
         <view class="setting-item" @tap="handleDebugTap">
-          <text class="setting-label">版本号</text>
+          <view class="setting-left">
+            <text class="setting-label">版本号</text>
+          </view>
           <text class="setting-value">1.0.0</text>
         </view>
       </view>
+      <view class="bottom-spacer" />
     </scroll-view>
+
+    <NumberPickerDialog
+      :visible="showThresholdPicker"
+      title="连续使用提醒阈值"
+      hint="达到该连续时长（分钟）后弹窗提醒，建议 30-90 分钟"
+      :initial-value="durationThreshold"
+      :min-value="5"
+      :max-value="180"
+      :step="5"
+      unit="分钟"
+      :quick-values="[15, 30, 45, 60, 90, 120]"
+      @close="showThresholdPicker = false"
+      @confirm="onThresholdConfirm"
+    />
+
+    <TimeRangePickerDialog
+      :visible="showDndPicker"
+      title="免打扰时段"
+      hint="起止小时（24小时制，分钟固定为 00）"
+      :initial-start-hour="dndStartHour"
+      :initial-end-hour="dndEndHour"
+      @close="showDndPicker = false"
+      @confirm="onDndConfirm"
+    />
+
+    <NumberPickerDialog
+      :visible="showDurationPrefPicker"
+      title="默认时长偏好"
+      hint="手动微动作的默认倒计时秒数"
+      :initial-value="durationPref"
+      :min-value="5"
+      :max-value="60"
+      :step="1"
+      unit="秒"
+      :quick-values="[10, 15, 20, 30, 45, 60]"
+      @close="showDurationPrefPicker = false"
+      @confirm="onDurationPrefConfirm"
+    />
+
+    <NumberPickerDialog
+      :visible="showTargetCountPicker"
+      title="每日目标次数"
+      hint="每类动作每天完成几次算 100 分"
+      :initial-value="targetCount"
+      :min-value="1"
+      :max-value="20"
+      :step="1"
+      unit="次"
+      :quick-values="[1, 2, 3, 5, 8, 10]"
+      @close="showTargetCountPicker = false"
+      @confirm="onTargetCountConfirm"
+    />
   </view>
 </template>
 
 <script setup lang="uts">
-import { getInt, putInt } from '../../database/SettingsDao'
+import NumberPickerDialog from '../../components/NumberPickerDialog.uvue'
+import TimeRangePickerDialog from '../../components/TimeRangePickerDialog.uvue'
+import { getInt, putInt, getSetting, putSetting } from '../../database/SettingsDao'
 import { getAllEnabledRules } from '../../database/RuleDao'
 import { TriggerRule } from '../../models/TriggerRule'
 
-const durationThreshold = ref(getInt('app_duration_threshold', 60))
-const dndStart = ref('22:00')
-const dndEnd = ref('07:00')
-const durationPref = ref(getInt('action_duration_pref', 15))
+function pad2(n: number): string {
+  if (n < 10) return '0' + n
+  return '' + n
+}
+
+function parseHourFromSetting(v: string, def: number): number {
+  if (v.length === 0) return def
+  const parts = v.split(':')
+  const h = parseInt(parts[0] as string)
+  if (isNaN(h) || h < 0 || h > 23) return def
+  return h
+}
+
+const durationThreshold = ref<number>(getInt('app_duration_threshold', 60))
+const dndStartHour = ref<number>(parseHourFromSetting(getSetting('dnd_start', '22:00'), 22))
+const dndEndHour = ref<number>(parseHourFromSetting(getSetting('dnd_end', '07:00'), 7))
+const durationPref = ref<number>(getInt('action_duration_pref', 15))
+const targetCount = ref<number>(getInt('category_target_count', 3))
 const rules = ref<TriggerRule[]>([])
 
-function pad2(n: number): string {
-  return n < 10 ? '0' + n : '' + n
-}
+const dndStart = computed<string>(() : string => pad2(dndStartHour.value) + ':00')
+const dndEnd = computed<string>(() : string => pad2(dndEndHour.value) + ':00')
 
 function formatTime(t: number): string {
   if (t <= 0) return '-'
@@ -124,6 +214,46 @@ function formatCondition(json: string): string {
   }
 }
 
+const showThresholdPicker = ref<boolean>(false)
+const showDndPicker = ref<boolean>(false)
+const showDurationPrefPicker = ref<boolean>(false)
+const showTargetCountPicker = ref<boolean>(false)
+
+function openThresholdPicker(): void { showThresholdPicker.value = true }
+function openDndPicker(): void { showDndPicker.value = true }
+function openDurationPrefPicker(): void { showDurationPrefPicker.value = true }
+function openTargetCountPicker(): void { showTargetCountPicker.value = true }
+
+function onThresholdConfirm(v: number): void {
+  durationThreshold.value = v
+  putInt('app_duration_threshold', v)
+  showThresholdPicker.value = false
+  uni.showToast({ title: '已保存', icon: 'success' })
+}
+
+function onDndConfirm(s: number, e: number): void {
+  dndStartHour.value = s
+  dndEndHour.value = e
+  putSetting('dnd_start', pad2(s) + ':00')
+  putSetting('dnd_end', pad2(e) + ':00')
+  showDndPicker.value = false
+  uni.showToast({ title: '已保存', icon: 'success' })
+}
+
+function onDurationPrefConfirm(v: number): void {
+  durationPref.value = v
+  putInt('action_duration_pref', v)
+  showDurationPrefPicker.value = false
+  uni.showToast({ title: '已保存', icon: 'success' })
+}
+
+function onTargetCountConfirm(v: number): void {
+  targetCount.value = v
+  putInt('category_target_count', v)
+  showTargetCountPicker.value = false
+  uni.showToast({ title: '已保存', icon: 'success' })
+}
+
 function goDebugLogs(): void {
   uni.navigateTo({ url: '/pages/debug/logs' })
 }
@@ -149,6 +279,11 @@ function handleDebugTap(): void {
 
 onPageShow(() => {
   try { rules.value = getAllEnabledRules() } catch (_) { rules.value = [] }
+  durationThreshold.value = getInt('app_duration_threshold', 60)
+  durationPref.value = getInt('action_duration_pref', 15)
+  targetCount.value = getInt('category_target_count', 3)
+  dndStartHour.value = parseHourFromSetting(getSetting('dnd_start', '22:00'), 22)
+  dndEndHour.value = parseHourFromSetting(getSetting('dnd_end', '07:00'), 7)
 })
 </script>
 
@@ -165,9 +300,10 @@ onPageShow(() => {
   background-color: #FFFFFF;
 }
 .section-title {
-  font-size: 14px;
+  font-size: 13px;
   color: #7F8C8D;
-  padding: 12px 16px 4px 16px;
+  font-weight: bold;
+  padding: 14px 16px 6px 16px;
 }
 .setting-item {
   flex-direction: row;
@@ -178,13 +314,23 @@ onPageShow(() => {
   border-bottom-color: #F0F0F0;
   border-bottom-style: solid;
 }
+.setting-left {
+  flex: 1;
+  flex-direction: column;
+}
 .setting-label {
   font-size: 15px;
   color: #2C3E50;
 }
+.setting-hint {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
 .setting-value {
   font-size: 14px;
-  color: #95A5A6;
+  color: #3498DB;
+  font-weight: 500;
 }
 .empty-rules {
   align-items: center;
@@ -250,5 +396,8 @@ onPageShow(() => {
   font-size: 10px;
   color: #BDC3C7;
   font-family: monospace;
+}
+.bottom-spacer {
+  height: 80px;
 }
 </style>

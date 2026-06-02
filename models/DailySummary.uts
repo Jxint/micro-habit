@@ -10,5 +10,6 @@ export type DailySummary = {
   penetration: number
   phone_usage_min: number
   guard_minutes: number
+  guard_count: number
   created_at: number
 }

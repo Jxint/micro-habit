@@ -252,52 +252,95 @@ export type HomepageData = { ... }
 // ✅ 必须跨文件 import 同一类型
 // ✅ 导出所有被导出函数中引用的类型
 
-### 13. 子组件对象 prop + computed 字段访问 → 运行时 ClassCastException
-```uts
-// ❌ props.action 是 reactive proxy( MicroActionReactiveObject )，computed 中访问字段抛异常
-const props = defineProps<{ action: MicroAction }>()
-const name = computed(() => props.action.name)  // ClassCastException
+### 13. 子组件 prop 必须用基础类型 / 平行数组，**对象 prop + computed 字段访问 = 运行时 ClassCastException**
 
-// ✅ 改为原始类型 prop，避免 reactive proxy 包装
-const props = defineProps<{ actionId: string; actionName: string }>()
-const name = computed(() => props.actionName)  // 基础类型没问题
+**【最高优先级】** UTS 子组件 props 在被读取时会被包装成 reactive proxy，访问对象内部字段时与原始 Kotlin/Java 实例 ClassCast 失败。
 
-// 规则：
-// 子组件接收对象 prop + computed 中访问字段 = 运行时崩溃
-// 子组件只接收基础类型(string/number/boolean) prop = 安全
-// 在非 computed 的普通函数中访问对象 prop 字段 = 安全
+**反模式表**：
+
+| Prop 类型 | template 访问 | script 访问 | 风险 |
+|----------|--------------|-------------|------|
+| `MicroAction`（对象）| `{{ props.action.name }}` | `props.action.name` | ❌ ClassCastException |
+| `LineSeries[]`（对象数组）| `v-for="s in props.series" {{ s.name }}` | `props.series[0].name` | ❌ ClassCastException |
+| `string[]` / `number[]` / `string[][]` | `v-for="x in props.list" {{ x }}` | `props.list[0]` | ✅ 安全 |
+| `string` / `number` / `boolean` | ✅ | ✅ | 安全 |
+
+**强制规则**：
+- **强烈建议子组件 prop 全部用基础类型**（`string` / `number` / `boolean` / 基础类型数组）
+- 对象展示组件（如 `MicroAction` 详情）→ 拆成 `actionId / actionName / actionDuration` 多个基础类型 prop
+- 列表展示组件 → 拆成多个**平行数组 prop**（`labels: string[] / values: number[]`）
+- 在非 computed 的普通函数中访问对象 prop 字段 = 安全
+- 组件内部 `ref<X[]>([])` 的 ref 数组（在 script 内部）→ 元素访问安全
+
+**withDefaults 默认值必须用箭头函数**：
+```ts
+// ❌ 默认值字面量推断为 Array<Any>，赋给 string[] 失败
+const props = withDefaults(defineProps<{ labels: string[] }>(), { labels: [] })
+
+// ✅ 箭头函数返回，类型 = string[]
+const props = withDefaults(defineProps<{ labels: string[] }>(), { labels: () => [] })
+```
+**所有数组/对象 prop 默认值都要用箭头函数**。
+
+**自查**：
+```powershell
+Get-ChildItem "components" -Recurse -Filter "*.uvue" | 
+  Select-String -Pattern "defineProps|withDefaults" -Context 0,8 |
+  Where-Object { $_ -match ":\s*\w+\[\]" }
 ```
 
-### 14. `||` 运算符严格要求 Boolean 操作数
+### 14. 严格比较运算符：`||` 严格 Boolean + `=== 0` 触发 Number-Int boxing 警告
+
+**【最高优先级】** 两类常见反模式：
+
+**(A) `||` 运算符要求严格 Boolean**：
 ```uts
-// ❌ Map.get() 返回 Number?（可空），|| 期望 Boolean 操作数 → 编译失败
-//    "Condition type mismatch: inferred type is 'Number?' but 'Boolean' was expected."
-//    "Return type mismatch: expected 'Number', actual 'Boolean'."
+// ❌ Map.get() 返回 Number?（可空），|| 期望 Boolean
 return actionWeights.get(a.id) || 1.0
-
-// ❌ 字符串 || 字符串同样失败："inferred type is 'String' but 'Boolean' was expected."
-reason = customText.value || '其他'
-
-// ✅ 正确：用 if/else 或三元运算符 + null 检查
+// ✅ 显式 null 检查
 const w = actionWeights.get(a.id)
 if (w != null) { return w }
 return 1.0
+```
+- `Map<K, V>.get(key)` 返回 `V | null`，不能直接用 `||`
+- `arr[i]` 返回 `T | null`，同样不能用 `||`
+- 替代：显式 `if (x != null)` / 三元 `x != null ? x : default`（UTS 不支持 `??`）
 
-// 或者
-const existing = actionWeights.get(a.id)
-return existing != null ? existing : 1.0
+**(B) `Number === Int` 触发 boxing 警告**：
+```
+warning: Identity equality for arguments of types 'Number' and 'Int' can be unstable because of implicit boxing.
+```
+- UTS `number` = Kotlin `Number`（抽象类），整数字面量 `0`/`1` = `Int`
+- `Number === Int` 装箱比较触发 JVM identity 警告
+- **`Array.length` 返回 `Number`**（不是 `Int`），同样触发
 
-// 对于字符串长度判断：
-const ct = customText.value
-reason = ct.length > 0 ? ct : '其他'
+**修复**（**所有 `=== 0` 必须改 `< 1`**）：
+```ts
+// ❌
+if (v === 0) return -1
+if (arr.length === 0) return []
+
+// ✅ 改用范围
+if (v < 1) return -1
+if (arr.length < 1) return []
+
+// ✅ 或用非严格 ==
+if (v == 0) return -1
 ```
 
-**规则**：
-- `||` 运算符（以及 `&&`、`!`）的左操作数必须是严格的 `Boolean` 类型
-- **`Map<K, V>.get(key)` 返回 `V | null`**，不能直接用 `||` 短路
-- **`arr[i]` 返回 `T | null`**（数组索引结果可空），同样不能直接用 `||`
-- **可选字段 `T | null` 也不能用 `||`**，必须显式 `if (x != null)` 或三元
-- 替代方案：显式 null 检查、null 合并模式（`x != null ? x : default`）、或扩展函数（`x ?? default`，但 UTS 不支持 `??`）
+**注意 `String.length` 不触发**（Kotlin `String.length : Int`，非 `Number`）：
+```ts
+const s: string = "hello"
+if (s.length === 0) ...  // ✅ 不警告
+```
+
+**自查**：
+```powershell
+Get-ChildItem -Recurse -Include "*.uts","*.uvue" |
+  Select-String -Pattern "\.length\s*(===|!==)\s*0|[a-zA-Z_]\w*\s*(===|!==)\s*[01]\b" |
+  Where-Object { $_.Line -notmatch "string\.length" }
+# 命中改为 < 1 / > 0 / <= 或 ==
+```
 
 ### 15. `uni.vibrateShort` 必须传 `type` 参数
 ```uts
@@ -1205,3 +1248,353 @@ Get-ChildItem "database" -Filter "*.uts" |
 - §13 子组件对象 prop + computed 字段访问 → 运行时 ClassCastException — 类似的"UTS 对象包装陷阱"
 - §17 模块级 `let` smart cast 失效 — 局部 `const row` 可正常 smart cast，无需 `!!`
 
+### 30. UVUE CSS 子集限制：`baseline` / `linear-gradient` 兼容性
+
+**【最高优先级】** UVUE 的 CSS 子集**比 web 标窄**，两类常见兼容性问题：
+
+**(A) `align-items: baseline` 编译失败**：
+```
+[plugin:uni:app-uvue-css] ERROR: property value `baseline` is not supported for `align-items`
+```
+- UVUE 仅支持 4 个值：`center` | `flex-start` | `flex-end` | `stretch`
+- **必须用 `flex-end` 替代 `baseline`**（数字底部对齐 ≈ baseline 效果）
+
+**(B) `background: linear-gradient(...)` 兼容性差**：
+- 早期 HBuilderX / Android 4.x webview 不渲染渐变 → "白底白字看起来一片空白"
+- **必须配 `background-color` fallback**（写在渐变**之前**）：
+  ```css
+  .greeting-bar {
+    background-color: #ED8F03;       /* fallback：渐变不支持时用纯色 */
+    background: linear-gradient(135deg, #FFB75E 0%, #ED8F03 100%);
+  }
+  ```
+  `background` 会覆盖 `background-color`，但不支持时 `background` 整体忽略，`background-color` 仍生效
+
+**自查**：
+```powershell
+Get-ChildItem -Recurse -Include "*.uvue" |
+  Select-String -Pattern "align-items:\s*baseline|background:\s*linear-gradient" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# align-items: baseline 改 flex-end
+# background: linear-gradient 前加 background-color
+```
+
+**关联规则**：
+- §13 强制 prop 基础类型（同类"UVUE 子集 vs web 标"问题）
+- §31 放弃 Canvas 改 view（同类 Canvas API 子集问题）
+
+### 31. 放弃 Canvas 改 view + SVG 写图表
+
+**【最高优先级】** 实测发现 `uni.createCanvasContextAsync` + Canvas 2D 在 UVUE 中多个渲染陷阱：
+- `<scroll-view>` 内 `onReady` 时 `canvas.offsetWidth = 0` → 图表完全空白
+- `canvas.width = w * dpr` + `ctx.scale(dpr, dpr)` 后仍用逻辑坐标 → HiDPI 错位
+- `Math.random()` 生成 canvasId **1/100000 概率碰撞**
+- 内部异常被静默吞掉
+
+**修复模式**：**图表组件 100% 改用 view + SVG**：
+
+| 图表 | 实现 |
+|------|------|
+| 柱状图 | 每列 `<view>` 高度 `style="height: (val/maxVal)*100%"` |
+| 折线图 | `<svg viewBox="0 0 100 100">` + `<path>` + `<circle>` + `<text>` |
+| 热力图 | 7×N `<view>` 网格，按 count 着色（白→浅黄→浅绿→深绿）|
+| 饼图 | `<svg>` + `<path>` 画扇形（百分比转弧度算 `d`） |
+
+**SVG 饼图扇形 path 算法**：
+```ts
+function arcPath(startPct: number, endPct: number): string {
+  const startRad = (startPct / 100) * 2 * Math.PI - Math.PI / 2
+  const endRad = (endPct / 100) * 2 * Math.PI - Math.PI / 2
+  const cx = 50, cy = 50, r = 40
+  const x1 = cx + r * Math.cos(startRad)
+  const y1 = cy + r * Math.sin(startRad)
+  const x2 = cx + r * Math.cos(endRad)
+  const y2 = cy + r * Math.sin(endRad)
+  const largeArc = (endPct - startPct) > 50 ? 1 : 0
+  return 'M ' + cx + ' ' + cy + ' L ' + x1.toFixed(2) + ' ' + y1.toFixed(2) +
+         ' A ' + r + ' ' + r + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z'
+}
+```
+
+**SVG 关键约束**：
+- `viewBox` 用 `0 0 100 100`（标准化坐标）
+- 颜色用 `:fill` / `:stroke` 动态属性（**不能**用 `:class`）
+- **不要**用 `<foreignObject>`（UVUE 不支持）
+- 坐标用 `.toFixed(2)` 保留精度
+
+**自查**：
+```powershell
+Get-ChildItem "components" -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "createCanvasContextAsync|getContext\(" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中 = 漏改，立即重写
+```
+
+**关联规则**：
+- §8 Canvas API 正确用法（保留作为参考，但**新组件不要用 canvas**）
+- §13 图表 prop 必须扁平基础类型
+
+### 32. UVUE 常用模板：watch lambda + 弹窗组件
+
+**【最高优先级】** 2 个高频模板：
+
+**(A) `watch` 监听 prop 变化**：
+```ts
+// 单个 prop
+watch(
+  () : boolean => props.visible,
+  (v: boolean) : void => {
+    if (v) { refresh() }
+  }
+)
+// 多个 prop
+watch(
+  [() : number => props.startHour, () : number => props.endHour],
+  ([s, e]: [number, number]) : void => { /* ... */ }
+)
+```
+**不要**写 `watch(props.visible, ...)` —— UTS 不会自动解包。
+
+**(B) 弹窗组件标准结构**（`NumberPickerDialog` / `TimeRangePickerDialog` / `PhoneUsageDialog`）：
+```vue
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <!-- 内容 -->
+    </view>
+  </view>
+</template>
+```
+- `v-if="visible"` 控制显隐
+- `position: fixed; top/left/right/bottom: 0; z-index: 999` 覆盖全屏
+- **`@tap.stop` 在 dialog-card 阻止冒泡**（避免点内容区也关闭）
+- Props: `visible: boolean` + 业务参数
+- Emits: `close` + 业务 `confirm(value)`
+
+**父组件调用**：
+```ts
+const showDialog = ref<boolean>(false)
+function onConfirm(v: number): void {
+  showDialog.value = false
+  // 处理 v
+}
+```
+```vue
+<MyDialog :visible="showDialog" @close="showDialog = false" @confirm="onConfirm" />
+```
+
+### 33. 模块内函数不能重复 + `app_usage_snapshots` 累加时序 + `<script setup>` 多行 lambda 显式返回类型注解触发 parser bug
+
+**【最高优先级】** 三类高频坑：
+
+**(A) 模块内函数不能重复声明**——报错位置经常错乱（指向下一个函数）：
+```ts
+function barHPercent(...): ... { ... }   // ← 编译器报这里 "expected ','"
+function shouldShowLabel(...): ... { ... }   // 实际是这里重复
+function shouldShowLabel(...): ... { ... }   // ← 真正的重复声明
+```
+- UTS 不允许同名函数重复声明
+- 编辑多个文件时，**每次保存前 grep 自检**：
+  ```powershell
+  Get-ChildItem -Recurse -Include "*.uts","*.uvue" | ForEach-Object {
+    $funcs = (Get-Content $_.FullName) | Select-String -Pattern "^function\s+(\w+)" |
+      ForEach-Object { $_.Matches[0].Groups[1].Value }
+    $dupes = $funcs | Group-Object | Where-Object { $_.Count -gt 1 }
+    if ($dupes) { Write-Host "$($_.Path): duplicate: $($dupes.Name -join ', ')" }
+  }
+  ```
+
+**(B) `<script setup>` 中多行 lambda `() : T => { ... }` 触发 parser bug**：
+
+错误信息位置错乱：
+```
+[plugin:uni:app-uvue] Unexpected token, expected "," (62:0)
+59 |    return m
+60 |  }
+61 |  
+62 |  function barHPercent(v: number): number {   // ← 报这里
+   |  ^
+```
+**实际是 line 52 多行 lambda 解析失败**，错误位置错乱到下一个函数。
+
+**修复**：去掉多行 lambda 显式返回类型注解，依赖 context typing：
+```ts
+// ❌ 触发 parser bug（多行 block body + 显式 :T）
+const maxVal = computed<number>(() : number => {
+  let m = 0
+  for (...) { ... }
+  return m
+})
+
+// ✅ 多行去掉注解（依赖 computed<number> 锚定）
+const maxVal = computed<number>(() => {
+  let m = 0
+  for (...) { ... }
+  return m
+})
+
+// ✅ 单行保留 :T 注解（不会触发 bug，Kotlin 风格精确）
+const eyeScore = computed<number>(() : number => store.eyeScore.value)
+const allActions = computed<MicroAction[]>(() : MicroAction[] => getEnabledActions())
+```
+
+**判定规则**：
+- **单行** `() : T => expr`（末尾是 `=>` 直接跟表达式）→ **保留** `:T` 注解
+- **多行** `() : T => { ... }`（末尾是 `=>` 后接 `{`）→ **去掉** `:T` 注解
+
+**原理**：UTS 强类型仍生效（`computed<T>` 是 type anchor，lambda 内部 return 受 T 约束），只是**显式标注**和**上下文推断**两种合法写法中，多行 block body 形式有 parser bug，只能用上下文推断。
+
+**自查**：
+```powershell
+# 找出"多行 block body lambda 显式返回类型注解"反模式
+Get-ChildItem -Recurse -Include "*.uvue" |
+  Select-String -Pattern "computed<.*>\(\) : .* => \{$|watch\(.*\(\) : .* => \{$" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中 = 去掉 : T 注解
+```
+
+**注意 watch/getter 必须显式标注返回类型**——`watch(() => props.visible, ...)` ❌：
+```
+error: Return type mismatch: expected 'Function', actual 'Boolean'.
+at NumberPickerDialog.uvue:112
+```
+UTS 编译器对 `() => expr`（无类型注解）会把整个 lambda 推断为 `expr` 的类型（即 `Boolean`），而不是 `Function`。
+**必须用** `() : T => props.visible`（单行 OK 不会触发 parser bug）。
+
+```ts
+// ❌ UTS 推断 lambda 返回 = Boolean，watch 期望 Function
+watch(() => props.visible, (v: boolean) : void => { ... })
+
+// ✅ 显式 : boolean，lambda 是 Function
+watch(() : boolean => props.visible, (v: boolean) : void => { ... })
+```
+
+**(C) `app_usage_snapshots` 累加时序**：
+`AppMonitorService.uts.startCheck` 每 1 秒调 `cbs.onAppDurationTrigger(info)`，**不能传 `info.continuousMs` 给 `insertOrUpdateSnapshot`**（会重复累加，每秒 +1000ms × N = 真实时间 × N）。
+
+**正确：累加 1 秒**：
+```ts
+// App.uvue onAppDurationTrigger callback 中：
+onAppDurationTrigger: (info: AppForegroundInfo): void => {
+  try { insertOrUpdateSnapshot(info.packageName, info.packageName, 1) } catch (_) {}
+  // 每次回调 = 1 秒（Handler.postDelayed(..., 1000)），累加 1 = 真实时长
+  // 不需要维护 lastContinuousMs 状态
+}
+```
+
+**关联规则**：
+- §9 script setup 函数不提升（同名函数第二次声明**也不允许**）
+- §29 SqlRow 数据 API
+
+### 34. CSS 长度单位 / 函数返回类型 / 函数调用顺序
+
+**【最高优先级】** 三类高频坑：
+
+**(A) UVUE CSS 长度单位仅支持 `number` / `pixel`**——`vh` / `vw` / `em` / `rem` 全部不支持：
+
+```
+[plugin:uni:app-uvue-css] ERROR: property value `85vh` is not supported for `max-height`
+(supported values are: `number`|`pixel`)
+```
+
+| 写法 | 状态 |
+|------|------|
+| `width: 90%` | ✅ 支持（容器尺寸） |
+| `max-width: 420px` | ✅ 支持 |
+| `max-height: 85vh` | ❌ 改 `max-height: 560px` |
+| `padding: 1em` | ❌ 改 `padding: 16px` |
+| `font-size: 0.9rem` | ❌ 改 `font-size: 14px` |
+
+**(B) 函数返回类型禁用内联 Object Literal**——错误码 UTS110111101：
+```ts
+// ❌ Direct declaration of Object Literal Type is not supported
+function getSvgSegments(): { d: string, color: string }[] { ... }
+const obj: { name: string } = { name: 'x' }   // 函数返回 OK，但 inline 注解不允许
+
+// ✅ 必须用 type 抽出
+type SvgSegment = { d: string, color: string }
+function getSvgSegments(): SvgSegment[] { ... }
+const obj: NamedType = { name: 'x' }
+```
+
+**(C) `<script setup>` 块内函数必须先定义后调用**（§9 强化）：
+
+```ts
+function getSvgSegments(): SvgSegment[] {
+  for (let i = 0; i < segments.value.length; i++) {
+    const s = segments.value[i]
+    const d = arcPath(s.startAngle, s.endAngle)  // ❌ arcPath 在 getSvgSegments 之后定义
+    ...
+  }
+}
+function arcPath(startPct: number, endPct: number): string { ... }  // 实际定义
+```
+
+UTS module-level 函数有 hoisting，**但 `<script setup>` 块内没有**。被调函数必须**在调用前**出现。
+
+template 中的 `@tap="close"` 是字符串引用（runtime 解析），不触发该错误；**只有 script 块内的实际函数调用**才会触发。
+
+**修复**：把所有被调函数提到调用者之前（"自顶向下"写法）。
+
+**自查**：
+```powershell
+# 1. CSS 长度单位
+Get-ChildItem -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "max-(height|width):\s*\d+(vh|vw|%)" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber)" }
+
+# 2. 函数返回内联 Object Literal
+Get-ChildItem -Recurse -Include "*.uvue","*.uts" |
+  Select-String -Pattern "function \w+\(\):\s*\{" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber)" }
+
+# 3. <script setup> 块内函数顺序（仅 .uvue）
+# 自定义 awk 脚本：在 <script>...</script> 块内搜"调用在定义前"
+```
+
+**关联规则**：
+- §9 script setup 函数不提升
+- §19 对象类型必须用 type 禁止 interface
+- §30 UVUE CSS 子集限制
+
+### 35. watch / computed / onXxx 等 lifecycle 的 lambda 第一个参数必须显式标注返回类型
+
+**【最高优先级】** UTS 编译器对 `() => expr`（无类型注解）的 lambda 会把**整个 lambda 推断为 `expr` 的类型**（即 `Boolean`），而不是 `Function`。导致：
+```
+error: Return type mismatch: expected 'Function', actual 'Boolean'.
+at NumberPickerDialog.uvue:112
+```
+
+**错误写法**：
+```ts
+// ❌ () => props.visible → 推断为 () => Boolean，整体被当 Boolean
+watch(() => props.visible, (v: boolean) : void => { ... })
+```
+
+**正确写法**：
+```ts
+// ✅ () : boolean => props.visible → 显式标注 lambda 返回 boolean，整体是 Function
+watch(() : boolean => props.visible, (v: boolean) : void => { ... })
+
+// ✅ 同样：onXxx 生命周期
+onLoad((option) => { ... })   // option 是 any，单参数可省略 : type
+onLoad((option: OnLoadOption) => { ... })   // 也 OK
+```
+
+**多参数也适用**：
+```ts
+// ❌ watch([() => props.a, () => props.b], ...) 可能推断为 ([Boolean, Boolean])，不是 Array<Function>
+// ✅ watch([() : number => props.a, () : number => props.b], ...)
+```
+
+**自查**：
+```powershell
+# 找出 watch/onXxx 中无类型注解的 lambda
+Get-ChildItem -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "watch\(\(\) =>|onLoad\(\(\w+\) =>|onReady\(\(\w+\) =>|onShow\(\(\w+\) =>" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中 = 添加 : T 标注
+```
+
+**关联规则**：
+- §33(B) lambda 类型注解（多行 block body 不要 `:T`，单行表达式要 `:T`）

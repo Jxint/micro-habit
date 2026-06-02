@@ -504,7 +504,7 @@ open class SqliteStore : IUTSSourceMap {
         if (d == null) {
             return
         }
-        if (params.length === 0) {
+        if (params.length.toInt() === 0) {
             d.execSQL(sql)
             return
         }
@@ -582,7 +582,7 @@ open class SqliteStore : IUTSSourceMap {
         val columns: UTSArray<String> = row.columns
         val values: UTSArray<Any?> = row.values
         val n: Number = columns.length
-        if (n === 0) {
+        if (n.toInt() === 0) {
             return -1
         }
         if (values.length !== n) {
@@ -621,7 +621,7 @@ open class SqliteStore : IUTSSourceMap {
         val columns: UTSArray<String> = row.columns
         val values: UTSArray<Any?> = row.values
         val n: Number = columns.length
-        if (n === 0) {
+        if (n.toInt() === 0) {
             return 0
         }
         if (values.length !== n) {
@@ -921,14 +921,14 @@ fun isFrequencyReduced(actionType: String): Boolean {
 }
 fun selectAction(triggerType: String): String? {
     val enabled = getEnabledActions()
-    if (enabled.length === 0) {
+    if (enabled.length.toInt() === 0) {
         return null
     }
     val candidates = enabled.filter(fun(a): Boolean {
         return isSuitableForContext(a, triggerType)
     }
     )
-    if (candidates.length === 0) {
+    if (candidates.length.toInt() === 0) {
         return enabled[0].id
     }
     return weightedRandomSelect(candidates)
@@ -1012,14 +1012,10 @@ fun insertTriggerLog(log: TriggerLog): Number {
     ))
     return dbManager.insert("trigger_logs", row)
 }
-fun countTriggersByDateAndActionIds(date: String, actionIds: UTSArray<String>): Number {
-    val start = getTimestampFromDate(date)
+fun countTriggersToday(): Number {
+    val start = getDayStartTimestamp()
     val end = start + 86400
-    val ids = actionIds.map(fun(id: String): String {
-        return "'" + id + "'"
-    }
-    ).join(",")
-    val row = dbManager.queryOne("SELECT COUNT(*) as cnt FROM trigger_logs WHERE created_at >= ? AND created_at < ? AND action_id IN (" + ids + ")", _uA(
+    val row = dbManager.queryOne("SELECT COUNT(*) as cnt FROM trigger_logs WHERE created_at >= ? AND created_at < ?", _uA(
         start,
         end
     ))
@@ -1041,10 +1037,15 @@ fun getTodayTriggerLogs(): UTSArray<TriggerLog> {
         start,
         end
     ))
-    return rows.map(fun(r: Map<String, Any>): TriggerLog {
-        return mapRow(r)
+    val result: UTSArray<TriggerLog> = _uA()
+    run {
+        var i: Number = 0
+        while(i < rows.length){
+            result.push(mapRow(rows[i]))
+            i++
+        }
     }
-    )
+    return result
 }
 fun mapRow(row: Map<String, Any>): TriggerLog {
     return TriggerLog(id = row.get("id") as Number, trigger_type = row.get("trigger_type") as String, trigger_level = row.get("trigger_level") as String, app_package = row.get("app_package") as String?, app_category = row.get("app_category") as String?, continuous_minutes = row.get("continuous_minutes") as Number, action_id = row.get("action_id") as String?, user_action = row.get("user_action") as UserAction?, created_at = row.get("created_at") as Number)
@@ -1052,10 +1053,6 @@ fun mapRow(row: Map<String, Any>): TriggerLog {
 fun getDayStartTimestamp(): Number {
     val d = Date()
     return Math.floor(Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000)
-}
-fun getTimestampFromDate(date: String): Number {
-    val parts = date.split("-")
-    return Math.floor(Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime() / 1000)
 }
 typealias ActionResult = String
 open class ActionLog (
@@ -1284,10 +1281,15 @@ fun getTodayLogs(): UTSArray<ActionLog> {
         start,
         end
     ))
-    return rows.map(fun(r: Map<String, Any>): ActionLog {
-        return mapRow__1(r)
+    val result: UTSArray<ActionLog> = _uA()
+    run {
+        var i: Number = 0
+        while(i < rows.length){
+            result.push(mapRow__1(rows[i]))
+            i++
+        }
     }
-    )
+    return result
 }
 fun getTodayCompletedLogs(): UTSArray<ActionLog> {
     val start = getDayStartTimestamp__1()
@@ -1298,31 +1300,42 @@ fun getTodayCompletedLogs(): UTSArray<ActionLog> {
         "completed",
         "self_reported"
     ))
-    return rows.map(fun(r: Map<String, Any>): ActionLog {
-        return mapRow__1(r)
+    val result: UTSArray<ActionLog> = _uA()
+    run {
+        var i: Number = 0
+        while(i < rows.length){
+            result.push(mapRow__1(rows[i]))
+            i++
+        }
     }
-    )
+    return result
 }
-fun getCompletedLogsByDateAndActions(date: String, actionIds: UTSArray<String>): UTSArray<ActionLog> {
-    val start = getTimestampFromDate__1(date)
+fun countCompletedByDateAndActions(date: String, actionIds: UTSArray<String>): Number {
+    val start = getTimestampFromDate(date)
     val end = start + 86400
     val ids = actionIds.map(fun(id: String): String {
         return "'" + id + "'"
     }
     ).join(",")
-    val rows = dbManager.query("SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) AND action_id IN (" + ids + ") ORDER BY created_at DESC", _uA(
+    val row = dbManager.queryOne("SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) AND action_id IN (" + ids + ")", _uA(
         start,
         end,
         "completed",
         "self_reported"
     ))
-    return rows.map(fun(r: Map<String, Any>): ActionLog {
-        return mapRow__1(r)
+    val rawCnt = if (row != null) {
+        row.get("cnt")
+    } else {
+        null
     }
-    )
+    return if (rawCnt != null) {
+        parseFloat("" + rawCnt)
+    } else {
+        0
+    }
 }
 fun getTotalCompletedDurationSec(date: String): Number {
-    val start = getTimestampFromDate__1(date)
+    val start = getTimestampFromDate(date)
     val end = start + 86400
     val row = dbManager.queryOne("SELECT COALESCE(SUM(duration_ms), 0) as total FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
         start,
@@ -1385,52 +1398,10 @@ open class BarItem (
     open var label: String,
     @JsonNotNull
     open var value: Number,
-) : UTSReactiveObject(), IUTSSourceMap {
+) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("BarItem", "database/ActionLogDao.uts", 62, 13)
+        return UTSSourceMapPosition("BarItem", "database/ActionLogDao.uts", 86, 13)
     }
-    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
-        return BarItemReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-}
-class BarItemReactiveObject : BarItem, IUTSReactive<BarItem> {
-    override var __v_raw: BarItem
-    override var __v_isReadonly: Boolean
-    override var __v_isShallow: Boolean
-    override var __v_skip: Boolean
-    constructor(__v_raw: BarItem, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(label = __v_raw.label, value = __v_raw.value) {
-        this.__v_raw = __v_raw
-        this.__v_isReadonly = __v_isReadonly
-        this.__v_isShallow = __v_isShallow
-        this.__v_skip = __v_skip
-    }
-    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): BarItemReactiveObject {
-        return BarItemReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-    override var label: String
-        get() {
-            return _tRG(__v_raw, "label", __v_raw.label, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("label")) {
-                return
-            }
-            val oldValue = __v_raw.label
-            __v_raw.label = value
-            _tRS(__v_raw, "label", oldValue, value)
-        }
-    override var value: Number
-        get() {
-            return _tRG(__v_raw, "value", __v_raw.value, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("value")) {
-                return
-            }
-            val oldValue = __v_raw.value
-            __v_raw.value = value
-            _tRS(__v_raw, "value", oldValue, value)
-        }
 }
 fun getHourlyCompletionData(date: String): UTSArray<BarItem> {
     val result: UTSArray<BarItem> = _uA()
@@ -1448,8 +1419,8 @@ fun getHourlyCompletionData(date: String): UTSArray<BarItem> {
         }
     }
     val rows = dbManager.query("SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
-        getTimestampFromDate__1(date),
-        getTimestampFromDate__1(date) + 86400,
+        getTimestampFromDate(date),
+        getTimestampFromDate(date) + 86400,
         "completed",
         "self_reported"
     ))
@@ -1468,7 +1439,7 @@ fun getDayStartTimestamp__1(): Number {
     val d = Date()
     return Math.floor(Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 1000)
 }
-fun getTimestampFromDate__1(date: String): Number {
+fun getTimestampFromDate(date: String): Number {
     val parts = date.split("-")
     return Math.floor(Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime() / 1000)
 }
@@ -1647,7 +1618,7 @@ fun createTables(): Unit {
     runSql("CREATE TABLE IF NOT EXISTS trigger_logs (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    trigger_type TEXT NOT NULL,\n    trigger_level TEXT NOT NULL DEFAULT 'gentle',\n    app_package TEXT DEFAULT NULL,\n    app_category TEXT DEFAULT NULL,\n    continuous_minutes INTEGER DEFAULT 0,\n    action_id TEXT DEFAULT NULL,\n    user_action TEXT DEFAULT NULL,\n    created_at INTEGER NOT NULL\n  )")
     runSql("CREATE INDEX IF NOT EXISTS idx_trigger_logs_date ON trigger_logs(created_at)")
     runSql("CREATE INDEX IF NOT EXISTS idx_trigger_logs_type ON trigger_logs(trigger_type)")
-    runSql("CREATE TABLE IF NOT EXISTS daily_summaries (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    date TEXT NOT NULL UNIQUE,\n    total_completed INTEGER NOT NULL DEFAULT 0,\n    total_skipped INTEGER NOT NULL DEFAULT 0,\n    total_duration_sec INTEGER NOT NULL DEFAULT 0,\n    eye_score REAL NOT NULL DEFAULT 0,\n    posture_score REAL NOT NULL DEFAULT 0,\n    vitality_score REAL NOT NULL DEFAULT 0,\n    penetration REAL NOT NULL DEFAULT 0,\n    phone_usage_min INTEGER NOT NULL DEFAULT 0,\n    guard_minutes INTEGER NOT NULL DEFAULT 0,\n    created_at INTEGER NOT NULL\n  )")
+    runSql("CREATE TABLE IF NOT EXISTS daily_summaries (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    date TEXT NOT NULL UNIQUE,\n    total_completed INTEGER NOT NULL DEFAULT 0,\n    total_skipped INTEGER NOT NULL DEFAULT 0,\n    total_duration_sec INTEGER NOT NULL DEFAULT 0,\n    eye_score REAL NOT NULL DEFAULT 0,\n    posture_score REAL NOT NULL DEFAULT 0,\n    vitality_score REAL NOT NULL DEFAULT 0,\n    penetration REAL NOT NULL DEFAULT 0,\n    phone_usage_min INTEGER NOT NULL DEFAULT 0,\n    guard_minutes INTEGER NOT NULL DEFAULT 0,\n    guard_count INTEGER NOT NULL DEFAULT 0,\n    created_at INTEGER NOT NULL\n  )")
     runSql("CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date)")
     runSql("CREATE TABLE IF NOT EXISTS trigger_rules (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    rule_type TEXT NOT NULL,\n    trigger_type TEXT NOT NULL,\n    condition_json TEXT NOT NULL,\n    action_weights_json TEXT DEFAULT '{}',\n    enabled INTEGER NOT NULL DEFAULT 1,\n    priority INTEGER NOT NULL DEFAULT 0,\n    source TEXT DEFAULT 'local',\n    expires_at INTEGER DEFAULT NULL,\n    created_at INTEGER NOT NULL,\n    updated_at INTEGER NOT NULL\n  )")
     runSql("CREATE TABLE IF NOT EXISTS user_settings (\n    key TEXT PRIMARY KEY,\n    value TEXT NOT NULL,\n    updated_at INTEGER NOT NULL\n  )")
@@ -1692,6 +1663,8 @@ open class DailySummary (
     @JsonNotNull
     open var guard_minutes: Number,
     @JsonNotNull
+    open var guard_count: Number,
+    @JsonNotNull
     open var created_at: Number,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
@@ -1717,6 +1690,56 @@ open class ThreeStatus (
         return UTSSourceMapPosition("ThreeStatus", "models/ThreeStatus.uts", 2, 13)
     }
 }
+open class AppUsageItem (
+    @JsonNotNull
+    open var packageName: String,
+    @JsonNotNull
+    open var appLabel: String,
+    @JsonNotNull
+    open var foregroundSec: Number,
+    @JsonNotNull
+    open var minutes: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("AppUsageItem", "database/AppUsageDao.uts", 4, 13)
+    }
+}
+fun insertOrUpdateSnapshot(packageName: String, appLabel: String, foregroundSec: Number): Unit {
+    val date = today()
+    val existing = dbManager.queryOne("SELECT id, total_foreground_sec FROM app_usage_snapshots WHERE date = ? AND package_name = ?", _uA(
+        date,
+        packageName
+    ))
+    if (existing != null) {
+        val prevSec = existing.get("total_foreground_sec") as Number
+        val nextSec = prevSec + foregroundSec
+        val row = SqlRow(columns = _uA(
+            "total_foreground_sec",
+            "app_label"
+        ), values = _uA(
+            nextSec,
+            appLabel
+        ))
+        dbManager.update("app_usage_snapshots", row, "id = ?", _uA(
+            (existing.get("id") as Number)
+        ))
+    } else {
+        val row = SqlRow(columns = _uA(
+            "date",
+            "package_name",
+            "app_label",
+            "total_foreground_sec",
+            "created_at"
+        ), values = _uA(
+            date,
+            packageName,
+            appLabel,
+            foregroundSec,
+            Math.floor(Date.now() / 1000)
+        ))
+        dbManager.insert("app_usage_snapshots", row)
+    }
+}
 fun getTodayTotalUsageMinutes(): Number {
     val date = today()
     val row = dbManager.queryOne("SELECT COALESCE(SUM(total_foreground_sec), 0) as total FROM app_usage_snapshots WHERE date = ?", _uA(
@@ -1727,6 +1750,34 @@ fun getTodayTotalUsageMinutes(): Number {
     } else {
         0
     }
+}
+fun getTodayTotalUsageSeconds(): Number {
+    val date = today()
+    val row = dbManager.queryOne("SELECT COALESCE(SUM(total_foreground_sec), 0) as total FROM app_usage_snapshots WHERE date = ?", _uA(
+        date
+    ))
+    return if (row != null) {
+        (row.get("total") as Number)
+    } else {
+        0
+    }
+}
+fun getTodayAppBreakdown(): UTSArray<AppUsageItem> {
+    val date = today()
+    val rows = dbManager.query("SELECT package_name, app_label, total_foreground_sec FROM app_usage_snapshots WHERE date = ? ORDER BY total_foreground_sec DESC", _uA(
+        date
+    ))
+    val result: UTSArray<AppUsageItem> = _uA()
+    run {
+        var i: Number = 0
+        while(i < rows.length){
+            val r = rows[i]
+            val sec = r.get("total_foreground_sec") as Number
+            result.push(AppUsageItem(packageName = r.get("package_name") as String, appLabel = r.get("app_label") as String, foregroundSec = sec, minutes = Math.floor(sec / 60)))
+            i++
+        }
+    }
+    return result
 }
 open class DailyCount (
     @JsonNotNull
@@ -1794,7 +1845,8 @@ fun insertOrUpdateSummary(summary: DailySummary): Unit {
             "vitality_score",
             "penetration",
             "phone_usage_min",
-            "guard_minutes"
+            "guard_minutes",
+            "guard_count"
         ), values = _uA(
             summary.total_completed,
             summary.total_skipped,
@@ -1804,7 +1856,8 @@ fun insertOrUpdateSummary(summary: DailySummary): Unit {
             summary.vitality_score,
             summary.penetration,
             summary.phone_usage_min,
-            summary.guard_minutes
+            summary.guard_minutes,
+            summary.guard_count
         ))
         dbManager.update("daily_summaries", row, "date = ?", _uA(
             summary.date
@@ -1821,6 +1874,7 @@ fun insertOrUpdateSummary(summary: DailySummary): Unit {
             "penetration",
             "phone_usage_min",
             "guard_minutes",
+            "guard_count",
             "created_at"
         ), values = _uA(
             summary.date,
@@ -1833,6 +1887,7 @@ fun insertOrUpdateSummary(summary: DailySummary): Unit {
             summary.penetration,
             summary.phone_usage_min,
             summary.guard_minutes,
+            summary.guard_count,
             Math.floor(Date.now() / 1000)
         ))
         dbManager.insert("daily_summaries", row)
@@ -1843,10 +1898,29 @@ fun getRecent28Days(): UTSArray<DailyCount> {
     val rows = dbManager.query("SELECT date, total_completed as count FROM daily_summaries WHERE date >= ? ORDER BY date ASC", _uA(
         startDate
     ))
-    return rows.map(fun(row: Map<String, Any>): DailyCount {
-        return (DailyCount(date = row.get("date") as String, count = row.get("count") as Number))
+    val result: UTSArray<DailyCount> = _uA()
+    run {
+        var i: Number = 0
+        while(i < rows.length){
+            val row = rows[i]
+            result.push(DailyCount(date = row.get("date") as String, count = row.get("count") as Number))
+            i++
+        }
     }
-    )
+    return result
+}
+fun getSummaryByDate(date: String): DailySummary? {
+    val row = dbManager.queryOne("SELECT * FROM daily_summaries WHERE date = ?", _uA(
+        date
+    ))
+    return if (row != null) {
+        mapRow__2(row)
+    } else {
+        null
+    }
+}
+fun mapRow__2(row: Map<String, Any>): DailySummary {
+    return DailySummary(id = row.get("id") as Number, date = row.get("date") as String, total_completed = row.get("total_completed") as Number, total_skipped = row.get("total_skipped") as Number, total_duration_sec = row.get("total_duration_sec") as Number, eye_score = row.get("eye_score") as Number, posture_score = row.get("posture_score") as Number, vitality_score = row.get("vitality_score") as Number, penetration = row.get("penetration") as Number, phone_usage_min = row.get("phone_usage_min") as Number, guard_minutes = row.get("guard_minutes") as Number, guard_count = row.get("guard_count") as Number, created_at = row.get("created_at") as Number)
 }
 val EYE_ACTION_IDS = _uA(
     "eye_blink",
@@ -1863,42 +1937,61 @@ val VITALITY_ACTION_IDS = _uA(
     "heel_raise",
     "deep_breath"
 ) as UTSArray<String>
+fun getTimestampFromDate__1(date: String): Number {
+    val parts = date.split("-")
+    return Math.floor(Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime() / 1000)
+}
+fun countCompletedForDate(date: String): Number {
+    val start = getTimestampFromDate__1(date)
+    val end = start + 86400
+    val row = dbManager.queryOne("SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
+        start,
+        end,
+        "completed",
+        "self_reported"
+    ))
+    val rawCnt = if (row != null) {
+        row.get("cnt")
+    } else {
+        null
+    }
+    return if (rawCnt != null) {
+        parseFloat("" + rawCnt)
+    } else {
+        0
+    }
+}
 fun calculateThreeStatus(date: String): ThreeStatus {
-    val eyeScore = calcCategoryScore(date, EYE_ACTION_IDS)
-    val postureScore = calcCategoryScore(date, POSTURE_ACTION_IDS)
-    val vitalityScore = calcCategoryScore(date, VITALITY_ACTION_IDS)
+    val target = getTargetCount()
+    val eyeScore = calcCategoryScore(date, EYE_ACTION_IDS, target)
+    val postureScore = calcCategoryScore(date, POSTURE_ACTION_IDS, target)
+    val vitalityScore = calcCategoryScore(date, VITALITY_ACTION_IDS, target)
     return ThreeStatus(eyeScore = eyeScore, eyeLevel = getStatusLevel(eyeScore), postureScore = postureScore, postureLevel = getStatusLevel(postureScore), vitalityScore = vitalityScore, vitalityLevel = getStatusLevel(vitalityScore))
 }
-fun calcCategoryScore(date: String, actionIds: UTSArray<String>): Number {
-    val logs = getCompletedLogsByDateAndActions(date, actionIds)
-    if (logs.length === 0) {
-        return -1
+val DEFAULT_DAILY_TARGET: Number = 3
+fun getTargetCount(): Number {
+    val v = getInt("category_target_count", DEFAULT_DAILY_TARGET)
+    if (v < 1) {
+        return 1
     }
-    var totalDurationSec: Number = 0
-    for(log in resolveUTSValueIterator(logs)){
-        totalDurationSec += Math.floor(log.duration_ms / 1000)
+    if (v > 20) {
+        return 20
     }
-    val triggerCount = countTriggersByDateAndActionIds(date, actionIds)
-    val avgDurationSec = calcAvgDuration(actionIds)
-    if (triggerCount === 0 || avgDurationSec === 0) {
-        return -1
-    }
-    val idealTotalSec = triggerCount * avgDurationSec
-    val score = (totalDurationSec / idealTotalSec) * 100
-    return Math.min(score, 100)
+    return v
 }
-fun calcAvgDuration(actionIds: UTSArray<String>): Number {
-    var totalDefaultMs: Number = 0
-    for(id in resolveUTSValueIterator(actionIds)){
-        val action = getActionById(id)
-        if (action != null) {
-            totalDefaultMs += action.defaultDurationMs
-        }
+fun calcCategoryScore(date: String, actionIds: UTSArray<String>, target: Number): Number {
+    val count = countCompletedByDateAndActions(date, actionIds)
+    if (count < 1) {
+        return -1
     }
-    if (actionIds.length === 0) {
+    if (target <= 0) {
         return 0
     }
-    return Math.floor(totalDefaultMs / actionIds.length / 1000)
+    val score = (count / target) * 100
+    if (score > 100) {
+        return 100
+    }
+    return Math.round(score)
 }
 fun getStatusLevel(score: Number): StatusLevel {
     if (score < 0) {
@@ -1913,12 +2006,12 @@ fun getStatusLevel(score: Number): StatusLevel {
     return "warning"
 }
 fun calcPenetration(date: String): Number {
-    val totalActionSec = getTotalCompletedDurationSec(date)
-    val phoneUsageMin = getTodayTotalUsageMinutes()
-    if (phoneUsageMin === 0) {
+    val completed = countCompletedToday()
+    val triggered = countTriggersToday()
+    if (triggered < 1) {
         return 0
     }
-    return (totalActionSec / 60 / phoneUsageMin) * 1000
+    return (completed / triggered) * 10
 }
 open class HomepageData (
     @JsonNotNull
@@ -1934,51 +2027,55 @@ open class HomepageData (
     @JsonNotNull
     open var vitalityLevel: StatusLevel,
     @JsonNotNull
-    open var guardMinutes: Number,
+    open var guardCount: Number,
     @JsonNotNull
     open var penetration: Number,
     @JsonNotNull
     open var todayCompletedCount: Number,
     @JsonNotNull
     open var heatmapData: UTSArray<DailyCount>,
+    @JsonNotNull
+    open var targetCount: Number,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("HomepageData", "services/ScoreCalculator.uts", 68, 13)
+        return UTSSourceMapPosition("HomepageData", "services/ScoreCalculator.uts", 75, 13)
     }
 }
 fun getHomepageData(date: String): HomepageData {
     val threeStatus = calculateThreeStatus(date)
-    val guardMinutes = Math.floor(getTotalCompletedDurationSec(date) / 60)
+    val guardCount = countCompletedToday()
     val penetration = calcPenetration(date)
     val todayCompletedCount = countCompletedToday()
     val heatmapData = getRecent28Days()
-    return HomepageData(eyeScore = threeStatus.eyeScore, eyeLevel = threeStatus.eyeLevel, postureScore = threeStatus.postureScore, postureLevel = threeStatus.postureLevel, vitalityScore = threeStatus.vitalityScore, vitalityLevel = threeStatus.vitalityLevel, guardMinutes = guardMinutes, penetration = penetration, todayCompletedCount = todayCompletedCount, heatmapData = heatmapData)
+    val targetCount = getTargetCount()
+    return HomepageData(eyeScore = threeStatus.eyeScore, eyeLevel = threeStatus.eyeLevel, postureScore = threeStatus.postureScore, postureLevel = threeStatus.postureLevel, vitalityScore = threeStatus.vitalityScore, vitalityLevel = threeStatus.vitalityLevel, guardCount = guardCount, penetration = penetration, todayCompletedCount = todayCompletedCount, heatmapData = heatmapData, targetCount = targetCount)
 }
 fun getHourlyData(date: String): UTSArray<BarItem> {
     return getHourlyCompletionData(date)
 }
-open class WeekScoreRow (
+open class WeekCountRow (
     @JsonNotNull
     open var date: String,
     @JsonNotNull
-    open var eye: Number,
-    @JsonNotNull
-    open var posture: Number,
-    @JsonNotNull
-    open var vitality: Number,
+    open var count: Number,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("WeekScoreRow", "services/ScoreCalculator.uts", 102, 6)
+        return UTSSourceMapPosition("WeekCountRow", "services/ScoreCalculator.uts", 112, 6)
     }
 }
-fun getWeeklyScores(): UTSArray<WeekScoreRow> {
-    val result: UTSArray<WeekScoreRow> = _uA()
+fun getWeeklyCounts(): UTSArray<WeekCountRow> {
+    val result: UTSArray<WeekCountRow> = _uA()
     run {
         var i: Number = 6
         while(i >= 0){
             val d = daysAgo(i)
-            val ts = calculateThreeStatus(d)
-            result.push(WeekScoreRow(date = d, eye = Math.max(0, Math.round(ts.eyeScore)), posture = Math.max(0, Math.round(ts.postureScore)), vitality = Math.max(0, Math.round(ts.vitalityScore))))
+            val summary = getSummaryByDate(d)
+            val cnt = if (summary != null) {
+                summary.total_completed
+            } else {
+                countCompletedForDate(d)
+            }
+            result.push(WeekCountRow(date = d, count = cnt))
             i--
         }
     }
@@ -1989,52 +2086,10 @@ open class LinePoint (
     open var label: String,
     @JsonNotNull
     open var value: Number,
-) : UTSReactiveObject(), IUTSSourceMap {
+) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LinePoint", "services/ScoreCalculator.uts", 122, 13)
+        return UTSSourceMapPosition("LinePoint", "services/ScoreCalculator.uts", 126, 13)
     }
-    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
-        return LinePointReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-}
-class LinePointReactiveObject : LinePoint, IUTSReactive<LinePoint> {
-    override var __v_raw: LinePoint
-    override var __v_isReadonly: Boolean
-    override var __v_isShallow: Boolean
-    override var __v_skip: Boolean
-    constructor(__v_raw: LinePoint, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(label = __v_raw.label, value = __v_raw.value) {
-        this.__v_raw = __v_raw
-        this.__v_isReadonly = __v_isReadonly
-        this.__v_isShallow = __v_isShallow
-        this.__v_skip = __v_skip
-    }
-    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): LinePointReactiveObject {
-        return LinePointReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-    override var label: String
-        get() {
-            return _tRG(__v_raw, "label", __v_raw.label, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("label")) {
-                return
-            }
-            val oldValue = __v_raw.label
-            __v_raw.label = value
-            _tRS(__v_raw, "label", oldValue, value)
-        }
-    override var value: Number
-        get() {
-            return _tRG(__v_raw, "value", __v_raw.value, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("value")) {
-                return
-            }
-            val oldValue = __v_raw.value
-            __v_raw.value = value
-            _tRS(__v_raw, "value", oldValue, value)
-        }
 }
 open class LineSeries (
     @JsonNotNull
@@ -2043,81 +2098,21 @@ open class LineSeries (
     open var color: String,
     @JsonNotNull
     open var points: UTSArray<LinePoint>,
-) : UTSReactiveObject(), IUTSSourceMap {
+) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LineSeries", "services/ScoreCalculator.uts", 126, 13)
+        return UTSSourceMapPosition("LineSeries", "services/ScoreCalculator.uts", 130, 13)
     }
-    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
-        return LineSeriesReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-}
-class LineSeriesReactiveObject : LineSeries, IUTSReactive<LineSeries> {
-    override var __v_raw: LineSeries
-    override var __v_isReadonly: Boolean
-    override var __v_isShallow: Boolean
-    override var __v_skip: Boolean
-    constructor(__v_raw: LineSeries, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(name = __v_raw.name, color = __v_raw.color, points = __v_raw.points) {
-        this.__v_raw = __v_raw
-        this.__v_isReadonly = __v_isReadonly
-        this.__v_isShallow = __v_isShallow
-        this.__v_skip = __v_skip
-    }
-    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): LineSeriesReactiveObject {
-        return LineSeriesReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-    override var name: String
-        get() {
-            return _tRG(__v_raw, "name", __v_raw.name, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("name")) {
-                return
-            }
-            val oldValue = __v_raw.name
-            __v_raw.name = value
-            _tRS(__v_raw, "name", oldValue, value)
-        }
-    override var color: String
-        get() {
-            return _tRG(__v_raw, "color", __v_raw.color, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("color")) {
-                return
-            }
-            val oldValue = __v_raw.color
-            __v_raw.color = value
-            _tRS(__v_raw, "color", oldValue, value)
-        }
-    override var points: UTSArray<LinePoint>
-        get() {
-            return _tRG(__v_raw, "points", __v_raw.points, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("points")) {
-                return
-            }
-            val oldValue = __v_raw.points
-            __v_raw.points = value
-            _tRS(__v_raw, "points", oldValue, value)
-        }
 }
 fun getWeeklyTrend(): UTSArray<LineSeries> {
-    val scores = getWeeklyScores()
-    val eyePoints: UTSArray<LinePoint> = _uA()
-    val posturePoints: UTSArray<LinePoint> = _uA()
-    val vitalityPoints: UTSArray<LinePoint> = _uA()
-    for(s in resolveUTSValueIterator(scores)){
-        val parts = s.date.split("-")
+    val rows = getWeeklyCounts()
+    val points: UTSArray<LinePoint> = _uA()
+    for(r in resolveUTSValueIterator(rows)){
+        val parts = r.date.split("-")
         val label = parts[1] + "/" + parts[2]
-        eyePoints.push(LinePoint(label = label, value = s.eye))
-        posturePoints.push(LinePoint(label = label, value = s.posture))
-        vitalityPoints.push(LinePoint(label = label, value = s.vitality))
+        points.push(LinePoint(label = label, value = r.count))
     }
     return _uA(
-        LineSeries(name = "护眼", color = "#2ECC71", points = eyePoints),
-        LineSeries(name = "体态", color = "#3498DB", points = posturePoints),
-        LineSeries(name = "活力", color = "#F39C12", points = vitalityPoints)
+        LineSeries(name = "完成次数", color = "#2ECC71", points = points)
     )
 }
 open class ActionDetail (
@@ -2131,7 +2126,7 @@ open class ActionDetail (
     open var time: String,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("ActionDetail", "services/ScoreCalculator.uts", 149, 13)
+        return UTSSourceMapPosition("ActionDetail", "services/ScoreCalculator.uts", 147, 13)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return ActionDetailReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -2237,7 +2232,8 @@ fun getTodayDetail(): UTSArray<ActionDetail> {
 fun saveTodaySummary(): Unit {
     val date = today()
     val threeStatus = calculateThreeStatus(date)
-    insertOrUpdateSummary(DailySummary(id = 0, date = date, total_completed = countCompletedToday(), total_skipped = countSkippedToday(), total_duration_sec = getTotalCompletedDurationSec(date), eye_score = Math.max(0, Math.round(threeStatus.eyeScore)), posture_score = Math.max(0, Math.round(threeStatus.postureScore)), vitality_score = Math.max(0, Math.round(threeStatus.vitalityScore)), penetration = calcPenetration(date), phone_usage_min = getTodayTotalUsageMinutes(), guard_minutes = Math.floor(getTotalCompletedDurationSec(date) / 60), created_at = Math.floor(Date.now() / 1000)))
+    val completed = countCompletedToday()
+    insertOrUpdateSummary(DailySummary(id = 0, date = date, total_completed = completed, total_skipped = countSkippedToday(), total_duration_sec = getTotalCompletedDurationSec(date), eye_score = Math.max(0, Math.round(threeStatus.eyeScore)), posture_score = Math.max(0, Math.round(threeStatus.postureScore)), vitality_score = Math.max(0, Math.round(threeStatus.vitalityScore)), penetration = calcPenetration(date), phone_usage_min = getTodayTotalUsageMinutes(), guard_minutes = 0, guard_count = completed, created_at = Math.floor(Date.now() / 1000)))
 }
 val ENCOURAGE_GENERAL = _uA(
     "又完成一次，身体在偷偷感谢你",
@@ -2874,6 +2870,10 @@ open class GenApp : BaseApp {
                     }
                     , fun(oldV: Number, newV: Number): Unit {})
                     val callbacks = MonitorCallbacks(onAppDurationTrigger = fun(info: AppForegroundInfo): Unit {
+                        try {
+                            insertOrUpdateSnapshot(info.packageName, info.packageName, 1)
+                        }
+                         catch (_: Throwable) {}
                         val threshold = getInt("app_duration_threshold", 60) * 1000
                         if (info.continuousMs < threshold) {
                             return
@@ -2932,9 +2932,9 @@ open class GenApp : BaseApp {
                     startMonitorService(callbacks)
                 }
                  catch (e: Throwable) {
-                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:132")
+                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:134")
                 }
-                console.log("App Launch", " at App.uvue:134")
+                console.log("App Launch", " at App.uvue:136")
             }
             )
             onAppShow(fun(_options){
@@ -2942,11 +2942,11 @@ open class GenApp : BaseApp {
                     saveTodaySummary()
                 }
                  catch (_: Throwable) {}
-                console.log("App Show", " at App.uvue:139")
+                console.log("App Show", " at App.uvue:141")
             }
             )
             onAppHide(fun(){
-                console.log("App Hide", " at App.uvue:143")
+                console.log("App Hide", " at App.uvue:145")
             }
             )
             onLastPageBackPress(fun(){
@@ -2964,7 +2964,7 @@ open class GenApp : BaseApp {
             )
             onExit(fun(){
                 sqliteStore.close()
-                console.log("App Exit", " at App.uvue:161")
+                console.log("App Exit", " at App.uvue:163")
             }
             )
             return fun(): Any? {
@@ -3022,6 +3022,323 @@ val GenComponentsActionCardClass = CreateVueComponent(GenComponentsActionCard::c
     return GenComponentsActionCard(instance)
 }
 )
+open class PhoneUsageSummary (
+    @JsonNotNull
+    open var totalMinutes: Number,
+    @JsonNotNull
+    open var totalSeconds: Number,
+    @JsonNotNull
+    open var hourText: String,
+    @JsonNotNull
+    open var minuteText: String,
+    @JsonNotNull
+    open var appCount: Number,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("PhoneUsageSummary", "services/PhoneUsageService.uts", 3, 13)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return PhoneUsageSummaryReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class PhoneUsageSummaryReactiveObject : PhoneUsageSummary, IUTSReactive<PhoneUsageSummary> {
+    override var __v_raw: PhoneUsageSummary
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: PhoneUsageSummary, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(totalMinutes = __v_raw.totalMinutes, totalSeconds = __v_raw.totalSeconds, hourText = __v_raw.hourText, minuteText = __v_raw.minuteText, appCount = __v_raw.appCount) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): PhoneUsageSummaryReactiveObject {
+        return PhoneUsageSummaryReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var totalMinutes: Number
+        get() {
+            return _tRG(__v_raw, "totalMinutes", __v_raw.totalMinutes, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("totalMinutes")) {
+                return
+            }
+            val oldValue = __v_raw.totalMinutes
+            __v_raw.totalMinutes = value
+            _tRS(__v_raw, "totalMinutes", oldValue, value)
+        }
+    override var totalSeconds: Number
+        get() {
+            return _tRG(__v_raw, "totalSeconds", __v_raw.totalSeconds, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("totalSeconds")) {
+                return
+            }
+            val oldValue = __v_raw.totalSeconds
+            __v_raw.totalSeconds = value
+            _tRS(__v_raw, "totalSeconds", oldValue, value)
+        }
+    override var hourText: String
+        get() {
+            return _tRG(__v_raw, "hourText", __v_raw.hourText, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("hourText")) {
+                return
+            }
+            val oldValue = __v_raw.hourText
+            __v_raw.hourText = value
+            _tRS(__v_raw, "hourText", oldValue, value)
+        }
+    override var minuteText: String
+        get() {
+            return _tRG(__v_raw, "minuteText", __v_raw.minuteText, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("minuteText")) {
+                return
+            }
+            val oldValue = __v_raw.minuteText
+            __v_raw.minuteText = value
+            _tRS(__v_raw, "minuteText", oldValue, value)
+        }
+    override var appCount: Number
+        get() {
+            return _tRG(__v_raw, "appCount", __v_raw.appCount, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("appCount")) {
+                return
+            }
+            val oldValue = __v_raw.appCount
+            __v_raw.appCount = value
+            _tRS(__v_raw, "appCount", oldValue, value)
+        }
+}
+open class PieSegment (
+    @JsonNotNull
+    open var pkg: String,
+    @JsonNotNull
+    open var label: String,
+    @JsonNotNull
+    open var minutes: Number,
+    @JsonNotNull
+    open var percent: Number,
+    @JsonNotNull
+    open var color: String,
+    @JsonNotNull
+    open var startAngle: Number,
+    @JsonNotNull
+    open var endAngle: Number,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("PieSegment", "services/PhoneUsageService.uts", 10, 13)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return PieSegmentReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class PieSegmentReactiveObject : PieSegment, IUTSReactive<PieSegment> {
+    override var __v_raw: PieSegment
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: PieSegment, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(pkg = __v_raw.pkg, label = __v_raw.label, minutes = __v_raw.minutes, percent = __v_raw.percent, color = __v_raw.color, startAngle = __v_raw.startAngle, endAngle = __v_raw.endAngle) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): PieSegmentReactiveObject {
+        return PieSegmentReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var pkg: String
+        get() {
+            return _tRG(__v_raw, "pkg", __v_raw.pkg, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("pkg")) {
+                return
+            }
+            val oldValue = __v_raw.pkg
+            __v_raw.pkg = value
+            _tRS(__v_raw, "pkg", oldValue, value)
+        }
+    override var label: String
+        get() {
+            return _tRG(__v_raw, "label", __v_raw.label, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("label")) {
+                return
+            }
+            val oldValue = __v_raw.label
+            __v_raw.label = value
+            _tRS(__v_raw, "label", oldValue, value)
+        }
+    override var minutes: Number
+        get() {
+            return _tRG(__v_raw, "minutes", __v_raw.minutes, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("minutes")) {
+                return
+            }
+            val oldValue = __v_raw.minutes
+            __v_raw.minutes = value
+            _tRS(__v_raw, "minutes", oldValue, value)
+        }
+    override var percent: Number
+        get() {
+            return _tRG(__v_raw, "percent", __v_raw.percent, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("percent")) {
+                return
+            }
+            val oldValue = __v_raw.percent
+            __v_raw.percent = value
+            _tRS(__v_raw, "percent", oldValue, value)
+        }
+    override var color: String
+        get() {
+            return _tRG(__v_raw, "color", __v_raw.color, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("color")) {
+                return
+            }
+            val oldValue = __v_raw.color
+            __v_raw.color = value
+            _tRS(__v_raw, "color", oldValue, value)
+        }
+    override var startAngle: Number
+        get() {
+            return _tRG(__v_raw, "startAngle", __v_raw.startAngle, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("startAngle")) {
+                return
+            }
+            val oldValue = __v_raw.startAngle
+            __v_raw.startAngle = value
+            _tRS(__v_raw, "startAngle", oldValue, value)
+        }
+    override var endAngle: Number
+        get() {
+            return _tRG(__v_raw, "endAngle", __v_raw.endAngle, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("endAngle")) {
+                return
+            }
+            val oldValue = __v_raw.endAngle
+            __v_raw.endAngle = value
+            _tRS(__v_raw, "endAngle", oldValue, value)
+        }
+}
+val PALETTE = _uA(
+    "#3498DB",
+    "#2ECC71",
+    "#9B59B6",
+    "#E67E22",
+    "#E74C3C",
+    "#1ABC9C",
+    "#F1C40F",
+    "#34495E",
+    "#16A085",
+    "#D35400"
+) as UTSArray<String>
+fun getTodayPhoneUsageSummary(): PhoneUsageSummary {
+    val totalSeconds = getTodayTotalUsageSeconds()
+    val minutes = Math.floor(totalSeconds / 60)
+    val hours = Math.floor(minutes / 60)
+    val remainMin = minutes % 60
+    val breakdown = getTodayAppBreakdown()
+    return PhoneUsageSummary(totalMinutes = minutes, totalSeconds = totalSeconds, hourText = hours + " 小时", minuteText = remainMin + " 分钟", appCount = breakdown.length)
+}
+fun getTodayPieSegments(): UTSArray<PieSegment> {
+    val all = getTodayAppBreakdown()
+    var sumSec: Number = 0
+    run {
+        var i: Number = 0
+        while(i < all.length){
+            sumSec += all[i].foregroundSec
+            i++
+        }
+    }
+    if (sumSec < 1) {
+        return _uA()
+    }
+    val segments: UTSArray<PieSegment> = _uA()
+    var start: Number = 0
+    val cap = if (all.length > 10) {
+        10
+    } else {
+        all.length
+    }
+    run {
+        var i: Number = 0
+        while(i < cap){
+            val item = all[i]
+            val pct = (item.foregroundSec / sumSec) * 100
+            val end = start + pct
+            val color: String = if (i < PALETTE.length) {
+                (PALETTE[i] as String)
+            } else {
+                "#BDC3C7"
+            }
+            val seg = PieSegment(pkg = item.packageName, label = if (item.appLabel.length > 0) {
+                item.appLabel
+            } else {
+                item.packageName
+            }
+            , minutes = item.minutes, percent = Math.round(pct * 10) / 10, color = color, startAngle = start, endAngle = end)
+            segments.push(seg)
+            start = end
+            i++
+        }
+    }
+    if (all.length > cap) {
+        var othersMin: Number = 0
+        run {
+            var i = cap
+            while(i < all.length){
+                othersMin += all[i].minutes
+                i++
+            }
+        }
+        val pct = 100 - start
+        val seg = PieSegment(pkg = "__others__", label = "其他", minutes = othersMin, percent = Math.round(pct * 10) / 10, color = "#BDC3C7", startAngle = start, endAngle = 100)
+        segments.push(seg)
+    }
+    return segments
+}
+val LLM_RESERVED_NOTE = "LLM 接口待配置"
+fun aiEvaluateTodayUsage(onComplete: (text: String) -> Unit): Unit {
+    onComplete(LLM_RESERVED_NOTE)
+}
+open class SvgSegment (
+    @JsonNotNull
+    open var d: String,
+    @JsonNotNull
+    open var color: String,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("SvgSegment", "components/PhoneUsageDialog.uvue", 103, 6)
+    }
+}
+val GenComponentsPhoneUsageDialogClass = CreateVueComponent(GenComponentsPhoneUsageDialog::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsPhoneUsageDialog.inheritAttrs, inject = GenComponentsPhoneUsageDialog.inject, props = GenComponentsPhoneUsageDialog.props, propsNeedCastKeys = GenComponentsPhoneUsageDialog.propsNeedCastKeys, emits = GenComponentsPhoneUsageDialog.emits, components = GenComponentsPhoneUsageDialog.components, styles = GenComponentsPhoneUsageDialog.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsPhoneUsageDialog.setup(props as GenComponentsPhoneUsageDialog)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsPhoneUsageDialog {
+    return GenComponentsPhoneUsageDialog(instance)
+}
+)
 open class ScoredItem (
     @JsonNotNull
     open var action: MicroAction,
@@ -3034,7 +3351,7 @@ open class ScoredItem (
 }
 fun getRecommendedActions(): UTSArray<MicroAction> {
     val enabledActions = getEnabledActions()
-    if (enabledActions.length === 0) {
+    if (enabledActions.length.toInt() === 0) {
         return _uA()
     }
     val hour = currentHour()
@@ -3155,7 +3472,7 @@ fun getByKey(key: String): LlmCache? {
     if (row == null) {
         return null
     }
-    return mapRow__2(row)
+    return mapRow__3(row)
 }
 fun save(key: String, type: String, response: String, expiresAt: Number): Unit {
     dbManager.execSql("INSERT OR REPLACE INTO llm_cache (cache_key, cache_type, response, expires_at, created_at) VALUES (?,?,?,?,?)", _uA(
@@ -3166,7 +3483,7 @@ fun save(key: String, type: String, response: String, expiresAt: Number): Unit {
         Math.floor(Date.now() / 1000)
     ))
 }
-fun mapRow__2(row: Map<String, Any>): LlmCache {
+fun mapRow__3(row: Map<String, Any>): LlmCache {
     return LlmCache(cache_key = row.get("cache_key") as String, cache_type = row.get("cache_type") as String, response = row.get("response") as String, model = row.get("model") as String, created_at = row.get("created_at") as Number, expires_at = row.get("expires_at") as Number)
 }
 fun isNetworkAvailable(): Boolean {
@@ -3617,6 +3934,8 @@ open class DailyData (
     @JsonNotNull
     open var guardMinutes: Number,
     @JsonNotNull
+    open var guardCount: Number,
+    @JsonNotNull
     open var penetration: Number,
     @JsonNotNull
     open var eyeScore: Number,
@@ -3639,11 +3958,11 @@ open class CloudResponse (
     open var error: String? = null,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("CloudResponse", "services/CloudService.uts", 14, 6)
+        return UTSSourceMapPosition("CloudResponse", "services/CloudService.uts", 15, 6)
     }
 }
 fun callDaily(date: String, data: DailyData, onOK: (result: Any) -> Unit, onFail: () -> Unit): Unit {
-    callCloudFn("llm-daily", _uO("date" to date, "data" to _uO("totalCompleted" to data.totalCompleted, "totalSkipped" to data.totalSkipped, "totalDurationSec" to data.totalDurationSec, "guardMinutes" to data.guardMinutes, "penetration" to data.penetration, "eyeScore" to data.eyeScore, "postureScore" to data.postureScore, "vitalityScore" to data.vitalityScore)), onOK, onFail)
+    callCloudFn("llm-daily", _uO("date" to date, "data" to _uO("totalCompleted" to data.totalCompleted, "totalSkipped" to data.totalSkipped, "totalDurationSec" to data.totalDurationSec, "guardMinutes" to data.guardMinutes, "guardCount" to data.guardCount, "penetration" to data.penetration, "eyeScore" to data.eyeScore, "postureScore" to data.postureScore, "vitalityScore" to data.vitalityScore)), onOK, onFail)
 }
 fun callWeekly(data: WeeklyReportStats, onOK: (result: Any) -> Unit, onFail: () -> Unit): Unit {
     callCloudFn("llm-weekly", _uO("data" to _uO("totalCompleted" to data.totalCompleted, "totalDurationSec" to data.totalDurationSec, "avgPenetration" to data.avgPenetration, "avgGuardMinutes" to data.avgGuardMinutes, "bestDay" to data.bestDay, "bestDayCount" to data.bestDayCount, "worstDay" to data.worstDay, "worstDayCount" to data.worstDayCount)), onOK, onFail)
@@ -3663,7 +3982,7 @@ fun callCloudFn(name: String, payload: Any, onOK: (result: Any) -> Unit, onFail:
         uni_request<Any>(RequestOptions(url = "https://fc-mp-xxx.bspapp.com/" + name, method = "POST", header = _uO("Content-Type" to "application/json"), data = payloadStr, timeout = 15000, success = fun(res) {
             try {
                 val dataJson = JSON.stringify(res.data)
-                val obj = UTSAndroid.consoleDebugError(JSON.parse(dataJson), " at services/CloudService.uts:94") as CloudResponse
+                val obj = UTSAndroid.consoleDebugError(JSON.parse(dataJson), " at services/CloudService.uts:96") as CloudResponse
                 if (obj.code === 0 && obj.data != null) {
                     onOK(obj.data)
                 } else {
@@ -3717,9 +4036,9 @@ fun generateWeeklyData(): WeeklyReportStats {
             val d = daysAgo(i)
             val data = getHomepageData(d)
             totalCompleted += data.todayCompletedCount
-            totalDurationSec += data.guardMinutes * 60
+            totalDurationSec += data.guardCount * 60
             totalPenetration += data.penetration
-            totalGuardMinutes += data.guardMinutes
+            totalGuardMinutes += data.guardCount
             if (data.todayCompletedCount > 0) {
                 daysWithData++
             }
@@ -3793,7 +4112,7 @@ open class DailyOutput (
     open var encourage: String,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("DailyOutput", "stores/appStore.uts", 12, 13)
+        return UTSSourceMapPosition("DailyOutput", "stores/appStore.uts", 13, 13)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return DailyOutputReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -3876,9 +4195,11 @@ open class AppStore (
     @JsonNotNull
     open var vitalityStatus: Ref<String>,
     @JsonNotNull
-    open var guardMinutes: Ref<Number>,
+    open var guardCount: Ref<Number>,
     @JsonNotNull
     open var penetration: Ref<Number>,
+    @JsonNotNull
+    open var phoneMinutes: Ref<Number>,
     @JsonNotNull
     open var todayCompletedCount: Ref<Number>,
     @JsonNotNull
@@ -3899,7 +4220,7 @@ open class AppStore (
     open var refreshWeeklyReport: () -> Unit,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("AppStore", "stores/appStore.uts", 18, 13)
+        return UTSSourceMapPosition("AppStore", "stores/appStore.uts", 19, 13)
     }
 }
 val eyeScore = ref<Number>(0)
@@ -3908,8 +4229,9 @@ val postureScore = ref<Number>(0)
 val postureStatus = ref<String>("no_data")
 val vitalityScore = ref<Number>(0)
 val vitalityStatus = ref<String>("no_data")
-val guardMinutes = ref<Number>(0)
+val guardCount = ref<Number>(0)
 val penetration = ref<Number>(0)
+val phoneMinutes = ref<Number>(0)
 val todayCompletedCount = ref<Number>(0)
 @JvmField
 val recommendedActions = ref(_uA<MicroAction>())
@@ -3920,7 +4242,7 @@ val homeDataLoaded = ref<Boolean>(false)
 val weeklyReport = ref<WeeklyReport?>(null)
 val weeklyReportLoading = ref<Boolean>(false)
 fun useAppStore(): AppStore {
-    val store = AppStore(eyeScore = eyeScore, eyeStatus = eyeStatus, postureScore = postureScore, postureStatus = postureStatus, vitalityScore = vitalityScore, vitalityStatus = vitalityStatus, guardMinutes = guardMinutes, penetration = penetration, todayCompletedCount = todayCompletedCount, recommendedActions = recommendedActions, heatmapData = heatmapData, dailySummary = dailySummary, dailySummaryLoading = dailySummaryLoading, homeDataLoaded = homeDataLoaded, weeklyReport = weeklyReport, weeklyReportLoading = weeklyReportLoading, refreshHomeData = fun(): Unit {
+    val store = AppStore(eyeScore = eyeScore, eyeStatus = eyeStatus, postureScore = postureScore, postureStatus = postureStatus, vitalityScore = vitalityScore, vitalityStatus = vitalityStatus, guardCount = guardCount, penetration = penetration, phoneMinutes = phoneMinutes, todayCompletedCount = todayCompletedCount, recommendedActions = recommendedActions, heatmapData = heatmapData, dailySummary = dailySummary, dailySummaryLoading = dailySummaryLoading, homeDataLoaded = homeDataLoaded, weeklyReport = weeklyReport, weeklyReportLoading = weeklyReportLoading, refreshHomeData = fun(): Unit {
         homeDataLoaded.value = false
         try {
             val date = today()
@@ -3931,13 +4253,17 @@ fun useAppStore(): AppStore {
             }
              catch (_: Throwable) {}
             val data = getHomepageData(date)
+            try {
+                phoneMinutes.value = getTodayTotalUsageMinutes()
+            }
+             catch (_: Throwable) {}
             eyeScore.value = Math.round(data.eyeScore)
             eyeStatus.value = data.eyeLevel
             postureScore.value = Math.round(data.postureScore)
             postureStatus.value = data.postureLevel
             vitalityScore.value = Math.round(data.vitalityScore)
             vitalityStatus.value = data.vitalityLevel
-            guardMinutes.value = data.guardMinutes
+            guardCount.value = data.guardCount
             penetration.value = Math.round(data.penetration * 100) / 100
             todayCompletedCount.value = data.todayCompletedCount
             heatmapData.value = data.heatmapData
@@ -3945,7 +4271,7 @@ fun useAppStore(): AppStore {
             val todayCache = getByKey(todayKey)
             if (todayCache != null) {
                 try {
-                    val parsed = UTSAndroid.consoleDebugError(JSON.parse(todayCache.response), " at stores/appStore.uts:97")
+                    val parsed = UTSAndroid.consoleDebugError(JSON.parse(todayCache.response), " at stores/appStore.uts:105")
                     dailySummary.value = parsed as DailyOutput
                 } catch (_: Throwable) {}
                 dailySummaryLoading.value = false
@@ -3962,7 +4288,7 @@ fun useAppStore(): AppStore {
             val yesterdayKey = "daily_summary:" + yDate
             if (getByKey(yesterdayKey) == null) {
                 val ydata = getHomepageData(yDate)
-                val fallback = DailyOutput(one_liner = "昨天完成" + ydata.todayCompletedCount + "次微动作", summary = "累计" + ydata.guardMinutes + "分钟", tomorrow_goal = "", encourage = "")
+                val fallback = DailyOutput(one_liner = "昨天完成" + ydata.todayCompletedCount + "次微动作", summary = "累计" + ydata.guardCount + "次", tomorrow_goal = "", encourage = "")
                 save(yesterdayKey, "daily_summary", JSON.stringify(fallback), nowMs + 2592000000)
             }
         }
@@ -4000,30 +4326,30 @@ fun parseSummaryHour(setting: String): Number {
     }
     return h
 }
-fun buildLocalSummary(completedCount: Number, minutes: Number): DailyOutput {
-    return DailyOutput(one_liner = "今日完成" + completedCount + "次微动作", summary = "守护" + minutes + "分钟，继续加油", tomorrow_goal = "继续保持！", encourage = "你做得很好")
+fun buildLocalSummary(completedCount: Number, count: Number): DailyOutput {
+    return DailyOutput(one_liner = "今日完成" + completedCount + "次微动作", summary = "累计" + count + "次，继续加油", tomorrow_goal = "继续保持！", encourage = "你做得很好")
 }
 fun generateDailySummary(date: String, onComplete: (summary: DailyOutput) -> Unit): Unit {
     val data = getHomepageData(date)
     if (!isNetworkAvailable()) {
-        onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+        onComplete(buildLocalSummary(data.todayCompletedCount, data.guardCount))
         return
     }
-    val dto = DailyData(totalCompleted = data.todayCompletedCount, totalSkipped = 0, totalDurationSec = data.guardMinutes * 60, guardMinutes = data.guardMinutes, penetration = data.penetration, eyeScore = Math.max(0, Math.round(data.eyeScore)), postureScore = Math.max(0, Math.round(data.postureScore)), vitalityScore = Math.max(0, Math.round(data.vitalityScore)), todayCompletedCount = data.todayCompletedCount)
+    val dto = DailyData(totalCompleted = data.todayCompletedCount, totalSkipped = 0, totalDurationSec = 0, guardMinutes = 0, guardCount = data.guardCount, penetration = data.penetration, eyeScore = Math.max(0, Math.round(data.eyeScore)), postureScore = Math.max(0, Math.round(data.postureScore)), vitalityScore = Math.max(0, Math.round(data.vitalityScore)), todayCompletedCount = data.todayCompletedCount)
     callDaily(date, dto, fun(result: Any){
         try {
             val jsonStr = JSON.stringify(result)
-            val obj = UTSAndroid.consoleDebugError(JSON.parse(jsonStr), " at stores/appStore.uts:179") as DailyOutput
+            val obj = UTSAndroid.consoleDebugError(JSON.parse(jsonStr), " at stores/appStore.uts:188") as DailyOutput
             if (obj.one_liner != null) {
                 onComplete(obj)
                 return
             }
         }
          catch (_: Throwable) {}
-        onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+        onComplete(buildLocalSummary(data.todayCompletedCount, data.guardCount))
     }
     , fun(){
-        onComplete(buildLocalSummary(data.todayCompletedCount, data.guardMinutes))
+        onComplete(buildLocalSummary(data.todayCompletedCount, data.guardCount))
     }
     )
 }
@@ -4067,12 +4393,20 @@ val GenComponentsFeedbackDialogClass = CreateVueComponent(GenComponentsFeedbackD
     return GenComponentsFeedbackDialog(instance)
 }
 )
+fun mapRow__4(row: Map<String, Any>): TriggerRule {
+    return TriggerRule(id = row.get("id") as Number, rule_type = row.get("rule_type") as String, trigger_type = row.get("trigger_type") as String, condition_json = row.get("condition_json") as String, action_weights_json = row.get("action_weights_json") as String, enabled = row.get("enabled") as Number, priority = row.get("priority") as Number, source = row.get("source") as String, expires_at = row.get("expires_at") as Number?, created_at = row.get("created_at") as Number, updated_at = row.get("updated_at") as Number)
+}
 fun getAllEnabledRules(): UTSArray<TriggerRule> {
     val rows = dbManager.query("SELECT * FROM trigger_rules WHERE enabled = 1 ORDER BY priority DESC")
-    return rows.map(fun(r: Map<String, Any>): TriggerRule {
-        return mapRow__3(r)
+    val result: UTSArray<TriggerRule> = _uA()
+    run {
+        var i: Number = 0
+        while(i < rows.length){
+            result.push(mapRow__4(rows[i]))
+            i++
+        }
     }
-    )
+    return result
 }
 fun insertRule(rule: TriggerRule): Number {
     val row = SqlRow(columns = _uA(
@@ -4100,9 +4434,6 @@ fun insertRule(rule: TriggerRule): Number {
     ))
     return dbManager.insert("trigger_rules", row)
 }
-fun mapRow__3(row: Map<String, Any>): TriggerRule {
-    return TriggerRule(id = row.get("id") as Number, rule_type = row.get("rule_type") as String, trigger_type = row.get("trigger_type") as String, condition_json = row.get("condition_json") as String, action_weights_json = row.get("action_weights_json") as String, enabled = row.get("enabled") as Number, priority = row.get("priority") as Number, source = row.get("source") as String, expires_at = row.get("expires_at") as Number?, created_at = row.get("created_at") as Number, updated_at = row.get("updated_at") as Number)
-}
 val GenPagesActionExecuteClass = CreateVueComponent(GenPagesActionExecute::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesActionExecute.inheritAttrs, inject = GenPagesActionExecute.inject, props = GenPagesActionExecute.props, propsNeedCastKeys = GenPagesActionExecute.propsNeedCastKeys, emits = GenPagesActionExecute.emits, components = GenPagesActionExecute.components, styles = GenPagesActionExecute.styles, setup = fun(props: ComponentPublicInstance): Any? {
         return GenPagesActionExecute.setup(props as GenPagesActionExecute)
@@ -4113,58 +4444,6 @@ val GenPagesActionExecuteClass = CreateVueComponent(GenPagesActionExecute::class
     return GenPagesActionExecute(instance, renderer)
 }
 )
-open class BarItem__1 (
-    @JsonNotNull
-    open var label: String,
-    @JsonNotNull
-    open var value: Number,
-) : UTSReactiveObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("BarItem", "components/BarChart.uvue", 8, 6)
-    }
-    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
-        return BarItem__1ReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-}
-class BarItem__1ReactiveObject : BarItem__1, IUTSReactive<BarItem__1> {
-    override var __v_raw: BarItem__1
-    override var __v_isReadonly: Boolean
-    override var __v_isShallow: Boolean
-    override var __v_skip: Boolean
-    constructor(__v_raw: BarItem__1, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(label = __v_raw.label, value = __v_raw.value) {
-        this.__v_raw = __v_raw
-        this.__v_isReadonly = __v_isReadonly
-        this.__v_isShallow = __v_isShallow
-        this.__v_skip = __v_skip
-    }
-    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): BarItem__1ReactiveObject {
-        return BarItem__1ReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-    override var label: String
-        get() {
-            return _tRG(__v_raw, "label", __v_raw.label, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("label")) {
-                return
-            }
-            val oldValue = __v_raw.label
-            __v_raw.label = value
-            _tRS(__v_raw, "label", oldValue, value)
-        }
-    override var value: Number
-        get() {
-            return _tRG(__v_raw, "value", __v_raw.value, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("value")) {
-                return
-            }
-            val oldValue = __v_raw.value
-            __v_raw.value = value
-            _tRS(__v_raw, "value", oldValue, value)
-        }
-}
 val GenComponentsBarChartClass = CreateVueComponent(GenComponentsBarChart::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsBarChart.inheritAttrs, inject = GenComponentsBarChart.inject, props = GenComponentsBarChart.props, propsNeedCastKeys = GenComponentsBarChart.propsNeedCastKeys, emits = GenComponentsBarChart.emits, components = GenComponentsBarChart.components, styles = GenComponentsBarChart.styles, setup = fun(props: ComponentPublicInstance): Any? {
         return GenComponentsBarChart.setup(props as GenComponentsBarChart)
@@ -4175,124 +4454,6 @@ val GenComponentsBarChartClass = CreateVueComponent(GenComponentsBarChart::class
     return GenComponentsBarChart(instance)
 }
 )
-open class LinePoint__1 (
-    @JsonNotNull
-    open var label: String,
-    @JsonNotNull
-    open var value: Number,
-) : UTSReactiveObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LinePoint", "components/LineChart.uvue", 8, 6)
-    }
-    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
-        return LinePoint__1ReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-}
-class LinePoint__1ReactiveObject : LinePoint__1, IUTSReactive<LinePoint__1> {
-    override var __v_raw: LinePoint__1
-    override var __v_isReadonly: Boolean
-    override var __v_isShallow: Boolean
-    override var __v_skip: Boolean
-    constructor(__v_raw: LinePoint__1, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(label = __v_raw.label, value = __v_raw.value) {
-        this.__v_raw = __v_raw
-        this.__v_isReadonly = __v_isReadonly
-        this.__v_isShallow = __v_isShallow
-        this.__v_skip = __v_skip
-    }
-    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): LinePoint__1ReactiveObject {
-        return LinePoint__1ReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-    override var label: String
-        get() {
-            return _tRG(__v_raw, "label", __v_raw.label, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("label")) {
-                return
-            }
-            val oldValue = __v_raw.label
-            __v_raw.label = value
-            _tRS(__v_raw, "label", oldValue, value)
-        }
-    override var value: Number
-        get() {
-            return _tRG(__v_raw, "value", __v_raw.value, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("value")) {
-                return
-            }
-            val oldValue = __v_raw.value
-            __v_raw.value = value
-            _tRS(__v_raw, "value", oldValue, value)
-        }
-}
-open class LineSeries__1 (
-    @JsonNotNull
-    open var name: String,
-    @JsonNotNull
-    open var color: String,
-    @JsonNotNull
-    open var points: UTSArray<LinePoint__1>,
-) : UTSReactiveObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LineSeries", "components/LineChart.uvue", 13, 6)
-    }
-    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
-        return LineSeries__1ReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-}
-class LineSeries__1ReactiveObject : LineSeries__1, IUTSReactive<LineSeries__1> {
-    override var __v_raw: LineSeries__1
-    override var __v_isReadonly: Boolean
-    override var __v_isShallow: Boolean
-    override var __v_skip: Boolean
-    constructor(__v_raw: LineSeries__1, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(name = __v_raw.name, color = __v_raw.color, points = __v_raw.points) {
-        this.__v_raw = __v_raw
-        this.__v_isReadonly = __v_isReadonly
-        this.__v_isShallow = __v_isShallow
-        this.__v_skip = __v_skip
-    }
-    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): LineSeries__1ReactiveObject {
-        return LineSeries__1ReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-    override var name: String
-        get() {
-            return _tRG(__v_raw, "name", __v_raw.name, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("name")) {
-                return
-            }
-            val oldValue = __v_raw.name
-            __v_raw.name = value
-            _tRS(__v_raw, "name", oldValue, value)
-        }
-    override var color: String
-        get() {
-            return _tRG(__v_raw, "color", __v_raw.color, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("color")) {
-                return
-            }
-            val oldValue = __v_raw.color
-            __v_raw.color = value
-            _tRS(__v_raw, "color", oldValue, value)
-        }
-    override var points: UTSArray<LinePoint__1>
-        get() {
-            return _tRG(__v_raw, "points", __v_raw.points, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("points")) {
-                return
-            }
-            val oldValue = __v_raw.points
-            __v_raw.points = value
-            _tRS(__v_raw, "points", oldValue, value)
-        }
-}
 val GenComponentsLineChartClass = CreateVueComponent(GenComponentsLineChart::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsLineChart.inheritAttrs, inject = GenComponentsLineChart.inject, props = GenComponentsLineChart.props, propsNeedCastKeys = GenComponentsLineChart.propsNeedCastKeys, emits = GenComponentsLineChart.emits, components = GenComponentsLineChart.components, styles = GenComponentsLineChart.styles, setup = fun(props: ComponentPublicInstance): Any? {
         return GenComponentsLineChart.setup(props as GenComponentsLineChart)
@@ -4303,72 +4464,13 @@ val GenComponentsLineChartClass = CreateVueComponent(GenComponentsLineChart::cla
     return GenComponentsLineChart(instance)
 }
 )
-open class DailyCount__1 (
-    @JsonNotNull
-    open var date: String,
+open class CellInfo (
+    open var day: Number? = null,
     @JsonNotNull
     open var count: Number,
-) : UTSReactiveObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("DailyCount", "components/HeatmapCalendar.uvue", 8, 6)
-    }
-    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
-        return DailyCount__1ReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-}
-class DailyCount__1ReactiveObject : DailyCount__1, IUTSReactive<DailyCount__1> {
-    override var __v_raw: DailyCount__1
-    override var __v_isReadonly: Boolean
-    override var __v_isShallow: Boolean
-    override var __v_skip: Boolean
-    constructor(__v_raw: DailyCount__1, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(date = __v_raw.date, count = __v_raw.count) {
-        this.__v_raw = __v_raw
-        this.__v_isReadonly = __v_isReadonly
-        this.__v_isShallow = __v_isShallow
-        this.__v_skip = __v_skip
-    }
-    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): DailyCount__1ReactiveObject {
-        return DailyCount__1ReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
-    }
-    override var date: String
-        get() {
-            return _tRG(__v_raw, "date", __v_raw.date, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("date")) {
-                return
-            }
-            val oldValue = __v_raw.date
-            __v_raw.date = value
-            _tRS(__v_raw, "date", oldValue, value)
-        }
-    override var count: Number
-        get() {
-            return _tRG(__v_raw, "count", __v_raw.count, __v_isReadonly, __v_isShallow)
-        }
-        set(value) {
-            if (!__v_canSet("count")) {
-                return
-            }
-            val oldValue = __v_raw.count
-            __v_raw.count = value
-            _tRS(__v_raw, "count", oldValue, value)
-        }
-}
-open class CellRect (
-    @JsonNotNull
-    open var x: Number,
-    @JsonNotNull
-    open var y: Number,
-    @JsonNotNull
-    open var w: Number,
-    @JsonNotNull
-    open var h: Number,
-    @JsonNotNull
-    open var day: DailyCount__1,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("CellRect", "components/HeatmapCalendar.uvue", 13, 6)
+        return UTSSourceMapPosition("CellInfo", "components/HeatmapCalendar.uvue", 42, 6)
     }
 }
 val GenComponentsHeatmapCalendarClass = CreateVueComponent(GenComponentsHeatmapCalendar::class.java, fun(): VueComponentOptions {
@@ -4389,6 +4491,26 @@ val GenPagesDataDashboardClass = CreateVueComponent(GenPagesDataDashboard::class
 }
 , fun(instance, renderer): GenPagesDataDashboard {
     return GenPagesDataDashboard(instance, renderer)
+}
+)
+val GenComponentsNumberPickerDialogClass = CreateVueComponent(GenComponentsNumberPickerDialog::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsNumberPickerDialog.inheritAttrs, inject = GenComponentsNumberPickerDialog.inject, props = GenComponentsNumberPickerDialog.props, propsNeedCastKeys = GenComponentsNumberPickerDialog.propsNeedCastKeys, emits = GenComponentsNumberPickerDialog.emits, components = GenComponentsNumberPickerDialog.components, styles = GenComponentsNumberPickerDialog.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsNumberPickerDialog.setup(props as GenComponentsNumberPickerDialog)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsNumberPickerDialog {
+    return GenComponentsNumberPickerDialog(instance)
+}
+)
+val GenComponentsTimeRangePickerDialogClass = CreateVueComponent(GenComponentsTimeRangePickerDialog::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsTimeRangePickerDialog.inheritAttrs, inject = GenComponentsTimeRangePickerDialog.inject, props = GenComponentsTimeRangePickerDialog.props, propsNeedCastKeys = GenComponentsTimeRangePickerDialog.propsNeedCastKeys, emits = GenComponentsTimeRangePickerDialog.emits, components = GenComponentsTimeRangePickerDialog.components, styles = GenComponentsTimeRangePickerDialog.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsTimeRangePickerDialog.setup(props as GenComponentsTimeRangePickerDialog)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsTimeRangePickerDialog {
+    return GenComponentsTimeRangePickerDialog(instance)
 }
 )
 val GenPagesSettingsIndexClass = CreateVueComponent(GenPagesSettingsIndex::class.java, fun(): VueComponentOptions {

@@ -47,8 +47,8 @@ open class GenPagesHomeIndex : BasePage {
                 return store.vitalityStatus.value
             }
             )
-            val guardMinutes = computed<Number>(fun(): Number {
-                return store.guardMinutes.value
+            val guardCount = computed<Number>(fun(): Number {
+                return store.guardCount.value
             }
             )
             val penetration = computed<Number>(fun(): Number {
@@ -75,7 +75,7 @@ open class GenPagesHomeIndex : BasePage {
                 return store.dailySummaryLoading.value
             }
             )
-            val summaryOneLiner = computed<String>(fun(): String {
+            fun gen_getSummaryOneLiner_fn(): String {
                 val s = dailySummary.value
                 return if (s != null && s.one_liner.length > 0) {
                     s.one_liner
@@ -83,8 +83,8 @@ open class GenPagesHomeIndex : BasePage {
                     "今日小结待生成"
                 }
             }
-            )
-            val summaryBody = computed<String>(fun(): String {
+            val getSummaryOneLiner = ::gen_getSummaryOneLiner_fn
+            fun gen_getSummaryBody_fn(): String {
                 val s = dailySummary.value
                 return if (s != null) {
                     s.summary
@@ -92,8 +92,8 @@ open class GenPagesHomeIndex : BasePage {
                     ""
                 }
             }
-            )
-            val summaryGoal = computed<String>(fun(): String {
+            val getSummaryBody = ::gen_getSummaryBody_fn
+            fun gen_getSummaryGoal_fn(): String {
                 val s = dailySummary.value
                 return if (s != null) {
                     s.tomorrow_goal
@@ -101,8 +101,8 @@ open class GenPagesHomeIndex : BasePage {
                     ""
                 }
             }
-            )
-            val summaryEncourage = computed<String>(fun(): String {
+            val getSummaryGoal = ::gen_getSummaryGoal_fn
+            fun gen_getSummaryEncourage_fn(): String {
                 val s = dailySummary.value
                 return if (s != null) {
                     s.encourage
@@ -110,8 +110,8 @@ open class GenPagesHomeIndex : BasePage {
                     ""
                 }
             }
-            )
-            val summaryHour = computed<Number>(fun(): Number {
+            val getSummaryEncourage = ::gen_getSummaryEncourage_fn
+            fun gen_getSummaryHour_fn(): Number {
                 val raw = getSetting("daily_summary_time", "21:00")
                 val sep = raw.indexOf(":")
                 val h = parseInt(if (sep > 0) {
@@ -125,41 +125,131 @@ open class GenPagesHomeIndex : BasePage {
                 }
                 return h
             }
-            )
-            val summaryPlaceholder = computed<String>(fun(): String {
+            val getSummaryHour = ::gen_getSummaryHour_fn
+            fun gen_getSummaryPlaceholder_fn(): String {
                 if (dailySummaryLoading.value) {
                     return "正在生成今日小结…"
                 }
                 val cnt = store.todayCompletedCount.value
-                if (cnt === 0) {
+                if (cnt < 1) {
                     return "完成一个微动作，开启今日小结"
                 }
-                return "已完成" + cnt + "次，" + summaryHour.value + ":00 后自动小结"
+                return "已完成" + cnt + "次，" + getSummaryHour() + ":00 后自动小结"
             }
-            )
-            val greeting = computed<String>(fun(): String {
+            val getSummaryPlaceholder = ::gen_getSummaryPlaceholder_fn
+            val summaryOneLiner = computed<String>(getSummaryOneLiner)
+            val summaryBody = computed<String>(getSummaryBody)
+            val summaryGoal = computed<String>(getSummaryGoal)
+            val summaryEncourage = computed<String>(getSummaryEncourage)
+            val summaryHour = computed<Number>(getSummaryHour)
+            val summaryPlaceholder = computed<String>(getSummaryPlaceholder)
+            fun gen_getGreeting_fn(): String {
                 val h = currentHour()
                 if (h < 6) {
-                    return "夜深了 🌙"
+                    return "夜深了"
                 }
                 if (h < 9) {
-                    return "早上好 ☀️"
+                    return "早上好"
                 }
                 if (h < 12) {
-                    return "上午好 ☀️"
+                    return "上午好"
                 }
                 if (h < 14) {
-                    return "中午好 🌤"
+                    return "中午好"
                 }
                 if (h < 18) {
-                    return "下午好 ⛅"
+                    return "下午好"
                 }
                 if (h < 22) {
-                    return "晚上好 🌆"
+                    return "晚上好"
                 }
-                return "夜深了 🌙"
+                return "夜深了"
+            }
+            val getGreeting = ::gen_getGreeting_fn
+            fun gen_getGreetingEmoji_fn(): String {
+                val h = currentHour()
+                if (h < 6) {
+                    return "🌙"
+                }
+                if (h < 9) {
+                    return "☀️"
+                }
+                if (h < 12) {
+                    return "☀️"
+                }
+                if (h < 14) {
+                    return "🌤"
+                }
+                if (h < 18) {
+                    return "⛅"
+                }
+                if (h < 22) {
+                    return "🌆"
+                }
+                return "🌙"
+            }
+            val getGreetingEmoji = ::gen_getGreetingEmoji_fn
+            val greeting = computed<String>(getGreeting)
+            val greetingEmoji = computed<String>(getGreetingEmoji)
+            val phoneMinutes = computed<Number>(fun(): Number {
+                return store.phoneMinutes.value
             }
             )
+            fun gen_getPhoneUsageHint_fn(): String {
+                if (phoneMinutes.value < 1) {
+                    return "👆 点击查看手机使用详情"
+                }
+                return "今日已使用 " + phoneMinutes.value + " 分钟，点击查看详情 →"
+            }
+            val getPhoneUsageHint = ::gen_getPhoneUsageHint_fn
+            val phoneUsageHint = computed<String>(getPhoneUsageHint)
+            val showPhoneDialog = ref<Boolean>(false)
+            fun gen_openPhoneDialog_fn(): Unit {
+                showPhoneDialog.value = true
+            }
+            val openPhoneDialog = ::gen_openPhoneDialog_fn
+            fun gen_closePhoneDialog_fn(): Unit {
+                showPhoneDialog.value = false
+            }
+            val closePhoneDialog = ::gen_closePhoneDialog_fn
+            fun gen_getGreetingClass_fn(): String {
+                val h = currentHour()
+                if (h < 6) {
+                    return "bg-night"
+                }
+                if (h < 9) {
+                    return "bg-morning"
+                }
+                if (h < 14) {
+                    return "bg-noon"
+                }
+                if (h < 18) {
+                    return "bg-afternoon"
+                }
+                if (h < 22) {
+                    return "bg-evening"
+                }
+                return "bg-night"
+            }
+            val getGreetingClass = ::gen_getGreetingClass_fn
+            fun gen_getDateStr_fn(): String {
+                val d = Date()
+                val m = d.getMonth() + 1
+                val day = d.getDate()
+                val weekDays = _uA(
+                    "日",
+                    "一",
+                    "二",
+                    "三",
+                    "四",
+                    "五",
+                    "六"
+                ) as UTSArray<String>
+                return m + "月" + day + "日 · 星期" + weekDays[d.getDay()]
+            }
+            val getDateStr = ::gen_getDateStr_fn
+            val greetingClass = computed<String>(getGreetingClass)
+            val dateStr = computed<String>(getDateStr)
             onPageShow(fun(){
                 store.refreshHomeData()
             }
@@ -176,9 +266,33 @@ open class GenPagesHomeIndex : BasePage {
             return fun(): Any? {
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("scroll-view", _uM("class" to "scroll-area", "scroll-y" to "true"), _uA(
-                        _cE("view", _uM("class" to "greeting-bar"), _uA(
-                            _cE("text", _uM("class" to "greeting-text"), _tD(unref(greeting)), 1),
-                            _cE("text", _uM("class" to "settings-icon", "onClick" to goSettings), "⚙")
+                        _cE("view", _uM("class" to _nC(_uA(
+                            "greeting-bar",
+                            unref(greetingClass)
+                        ))), _uA(
+                            _cE("view", _uM("class" to "greeting-left"), _uA(
+                                _cE("text", _uM("class" to "greeting-text"), _tD(unref(greeting)), 1),
+                                _cE("text", _uM("class" to "greeting-date"), _tD(unref(dateStr)), 1)
+                            )),
+                            _cE("view", _uM("class" to "greeting-right"), _uA(
+                                _cE("view", _uM("class" to "emoji-button", "onClick" to openPhoneDialog), _uA(
+                                    _cE("text", _uM("class" to "emoji-button-text"), _tD(unref(greetingEmoji)), 1)
+                                )),
+                                _cE("view", _uM("class" to "settings-icon", "onClick" to goSettings), _uA(
+                                    _cE("text", _uM("class" to "settings-icon-text"), "⚙")
+                                ))
+                            ))
+                        ), 2),
+                        _cE("view", _uM("class" to "phone-usage-hint", "onClick" to openPhoneDialog), _uA(
+                            _cE("text", _uM("class" to "phone-usage-hint-text"), _tD(unref(phoneUsageHint)), 1)
+                        )),
+                        _cE("view", _uM("class" to "guard-card"), _uA(
+                            _cE("text", _uM("class" to "guard-eyebrow"), "今日已完成"),
+                            _cE("view", _uM("class" to "guard-row"), _uA(
+                                _cE("text", _uM("class" to "guard-number"), _tD(unref(guardCount)), 1),
+                                _cE("text", _uM("class" to "guard-unit"), "次")
+                            )),
+                            _cE("text", _uM("class" to "guard-sub"), "微动作累计 " + _tD(unref(guardCount)) + " 次 · 每一次都是对健康的投资", 1)
                         )),
                         _cV(unref(GenComponentsStatusIndicatorClass), _uM("title" to "护眼", "percent" to unref(eyeScore), "status" to unref(eyeStatus)), null, 8, _uA(
                             "percent",
@@ -191,9 +305,6 @@ open class GenPagesHomeIndex : BasePage {
                         _cV(unref(GenComponentsStatusIndicatorClass), _uM("title" to "活力", "percent" to unref(vitalityScore), "status" to unref(vitalityStatus)), null, 8, _uA(
                             "percent",
                             "status"
-                        )),
-                        _cE("view", _uM("class" to "guard-section"), _uA(
-                            _cE("text", _uM("class" to "guard-text"), "今日已为你守护 " + _tD(unref(guardMinutes)) + " 分钟", 1)
                         )),
                         _cE("view", _uM("class" to "penetration-section"), _uA(
                             _cE("text", _uM("class" to "section-label"), "习惯渗透度"),
@@ -238,7 +349,9 @@ open class GenPagesHomeIndex : BasePage {
                         }
                         ,
                         _cE("view", _uM("class" to "recommend-section"), _uA(
-                            _cE("text", _uM("class" to "section-title"), "🎯 今日推荐"),
+                            _cE("view", _uM("class" to "section-header-row"), _uA(
+                                _cE("text", _uM("class" to "section-title"), "🎯 今日推荐")
+                            )),
                             if (unref(recommendedActions).length === 0) {
                                 _cE("view", _uM("key" to 0, "class" to "empty-recommend"), _uA(
                                     _cE("text", _uM("class" to "empty-text"), "暂无推荐")
@@ -249,7 +362,7 @@ open class GenPagesHomeIndex : BasePage {
                             ,
                             _cE(Fragment, null, RenderHelpers.renderList(unref(recommendedActions), fun(action, idx, __index, _cached): Any {
                                 return _cE("view", _uM("key" to ("r-" + idx)), _uA(
-                                    _cV(unref(GenComponentsActionCardClass), _uM("action-id" to action.id, "action-name" to action.name, "action-duration" to Math.ceil(action.defaultDurationMs / 1000), "onActionTap" to startAction), null, 8, _uA(
+                                    _cV(unref(GenComponentsActionCardClass), _uM("action-id" to action.id, "action-name" to action.name, "action-duration" to Math.ceil(action.defaultDurationMs / 1000), "variant" to "recommend", "onActionTap" to startAction), null, 8, _uA(
                                         "action-id",
                                         "action-name",
                                         "action-duration"
@@ -265,7 +378,7 @@ open class GenPagesHomeIndex : BasePage {
                             )),
                             _cE(Fragment, null, RenderHelpers.renderList(unref(allActions), fun(action, idx, __index, _cached): Any {
                                 return _cE("view", _uM("key" to ("a-" + idx), "class" to "library-item"), _uA(
-                                    _cV(unref(GenComponentsActionCardClass), _uM("action-id" to action.id, "action-name" to action.name, "action-duration" to Math.ceil(action.defaultDurationMs / 1000), "onActionTap" to startAction), null, 8, _uA(
+                                    _cV(unref(GenComponentsActionCardClass), _uM("action-id" to action.id, "action-name" to action.name, "action-duration" to Math.ceil(action.defaultDurationMs / 1000), "variant" to "library", "onActionTap" to startAction), null, 8, _uA(
                                         "action-id",
                                         "action-name",
                                         "action-duration"
@@ -273,7 +386,11 @@ open class GenPagesHomeIndex : BasePage {
                                 ))
                             }
                             ), 128)
-                        ))
+                        )),
+                        _cE("view", _uM("class" to "bottom-spacer"))
+                    )),
+                    _cV(unref(GenComponentsPhoneUsageDialogClass), _uM("visible" to unref(showPhoneDialog), "onClose" to closePhoneDialog), null, 8, _uA(
+                        "visible"
                     ))
                 ))
             }
@@ -285,7 +402,7 @@ open class GenPagesHomeIndex : BasePage {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "greeting-bar" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingTop" to 50, "paddingRight" to 20, "paddingBottom" to 16, "paddingLeft" to 20)), "greeting-text" to _pS(_uM("fontSize" to 22, "fontWeight" to "bold", "color" to "#2C3E50")), "settings-icon" to _pS(_uM("fontSize" to 22, "color" to "#7F8C8D")), "guard-section" to _pS(_uM("alignItems" to "center", "paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16)), "guard-text" to _pS(_uM("fontSize" to 18, "fontWeight" to "bold", "color" to "#2ECC71")), "penetration-section" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 8, "paddingLeft" to 16, "marginTop" to 4, "marginRight" to 16, "marginBottom" to 4, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 10, "borderTopRightRadius" to 10, "borderBottomRightRadius" to 10, "borderBottomLeftRadius" to 10)), "section-label" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "width" to 80)), "penetration-track" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "height" to 6, "backgroundColor" to "#ECF0F1", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3, "overflow" to "hidden")), "penetration-fill" to _pS(_uM("height" to 6, "backgroundColor" to "#9B59B6", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3)), "penetration-value" to _pS(_uM("fontSize" to 13, "color" to "#9B59B6", "width" to 40, "textAlign" to "right")), "summary-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 12, "marginRight" to 16, "marginBottom" to 12, "marginLeft" to 16, "paddingTop" to 16, "paddingRight" to 16, "paddingBottom" to 16, "paddingLeft" to 16, "borderTopLeftRadius" to 12, "borderTopRightRadius" to 12, "borderBottomRightRadius" to 12, "borderBottomLeftRadius" to 12, "borderLeftWidth" to 4, "borderLeftColor" to "#3498DB", "borderLeftStyle" to "solid", "flexDirection" to "column")), "summary-empty" to _pS(_uM("borderLeftColor" to "#BDC3C7", "alignItems" to "center")), "summary-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#3498DB", "fontWeight" to "bold", "marginBottom" to 6)), "summary-oneliner" to _pS(_uM("fontSize" to 17, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 8)), "summary-body" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to "20px", "marginBottom" to 8)), "summary-goal-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "backgroundColor" to "#F8F9FA", "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "paddingTop" to 8, "paddingRight" to 10, "paddingBottom" to 8, "paddingLeft" to 10, "marginBottom" to 8)), "summary-goal-label" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginRight" to 8)), "summary-goal-text" to _pS(_uM("fontSize" to 13, "color" to "#2C3E50", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "summary-encourage" to _pS(_uM("fontSize" to 13, "color" to "#E67E22", "fontStyle" to "italic", "marginTop" to 4)), "summary-empty-text" to _pS(_uM("fontSize" to 14, "color" to "#7F8C8D", "marginBottom" to 4)), "summary-empty-hint" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "recommend-section" to _pS(_uM("marginTop" to 8, "paddingBottom" to 12)), "library-section" to _pS(_uM("marginTop" to 8, "paddingBottom" to 24)), "library-header" to _pS(_uM("flexDirection" to "column", "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "library-item" to _pS(_uM("marginTop" to 0, "marginRight" to 0, "marginBottom" to 8, "marginLeft" to 0)), "section-title" to _pS(_uM("fontSize" to 16, "fontWeight" to "bold", "color" to "#2C3E50", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 8, "paddingLeft" to 16)), "empty-recommend" to _pS(_uM("paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "alignItems" to "center")), "empty-text" to _pS(_uM("fontSize" to 14, "color" to "#BDC3C7")))
+                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "greeting-bar" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingTop" to 56, "paddingRight" to 20, "paddingBottom" to 24, "paddingLeft" to 20, "backgroundColor" to "#2C3E50")), "bg-morning" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #FFB75E 0%, #ED8F03 100%)")), "bg-noon" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #56CCF2 0%, #2F80ED 100%)")), "bg-afternoon" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #F6D365 0%, #FDA085 100%)")), "bg-evening" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #6A11CB 0%, #2575FC 100%)")), "bg-night" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #232526 0%, #414345 100%)")), "greeting-left" to _pS(_uM("flexDirection" to "column")), "greeting-text" to _pS(_uM("fontSize" to 24, "fontWeight" to "bold", "color" to "#FFFFFF")), "greeting-date" to _pS(_uM("fontSize" to 12, "color" to "rgba(255,255,255,0.85)", "marginTop" to 4)), "greeting-right" to _pS(_uM("flexDirection" to "row", "alignItems" to "center")), "emoji-button" to _pS(_uM("width" to 44, "height" to 44, "borderTopLeftRadius" to 22, "borderTopRightRadius" to 22, "borderBottomRightRadius" to 22, "borderBottomLeftRadius" to 22, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center", "marginRight" to 10)), "emoji-button-text" to _pS(_uM("fontSize" to 24)), "settings-icon" to _pS(_uM("width" to 36, "height" to 36, "borderTopLeftRadius" to 18, "borderTopRightRadius" to 18, "borderBottomRightRadius" to 18, "borderBottomLeftRadius" to 18, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center")), "settings-icon-text" to _pS(_uM("fontSize" to 18, "color" to "#FFFFFF")), "phone-usage-hint" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "justifyContent" to "center", "paddingTop" to 10, "paddingRight" to 16, "paddingBottom" to 10, "paddingLeft" to 16, "backgroundColor" to "rgba(0,0,0,0.15)")), "phone-usage-hint-text" to _pS(_uM("fontSize" to 12, "color" to "#FFFFFF", "fontWeight" to 500)), "guard-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to -16, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "paddingTop" to 18, "paddingRight" to 20, "paddingBottom" to 18, "paddingLeft" to 20, "borderTopLeftRadius" to 16, "borderTopRightRadius" to 16, "borderBottomRightRadius" to 16, "borderBottomLeftRadius" to 16, "flexDirection" to "column", "boxShadow" to "0 4px 12px rgba(0, 0, 0, 0.06)")), "guard-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginBottom" to 4)), "guard-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "flex-end", "marginBottom" to 6)), "guard-number" to _pS(_uM("fontSize" to 36, "fontWeight" to "bold", "color" to "#2ECC71")), "guard-unit" to _pS(_uM("fontSize" to 16, "color" to "#2ECC71", "fontWeight" to "bold", "marginLeft" to 4)), "guard-sub" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "penetration-section" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 12, "borderTopRightRadius" to 12, "borderBottomRightRadius" to 12, "borderBottomLeftRadius" to 12, "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "section-label" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "width" to 80)), "penetration-track" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "height" to 6, "backgroundColor" to "#F0E6F6", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3, "overflow" to "hidden")), "penetration-fill" to _pS(_uM("height" to 6, "backgroundImage" to "linear-gradient(90deg, #9B59B6 0%, #E91E63 100%)", "backgroundColor" to "rgba(0,0,0,0)", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3)), "penetration-value" to _pS(_uM("fontSize" to 13, "color" to "#9B59B6", "fontWeight" to "bold", "width" to 40, "textAlign" to "right")), "summary-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 12, "marginRight" to 16, "marginBottom" to 12, "marginLeft" to 16, "paddingTop" to 16, "paddingRight" to 16, "paddingBottom" to 16, "paddingLeft" to 16, "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "borderLeftWidth" to 4, "borderLeftColor" to "#3498DB", "borderLeftStyle" to "solid", "flexDirection" to "column", "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "summary-empty" to _pS(_uM("borderLeftColor" to "#BDC3C7", "alignItems" to "center")), "summary-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#3498DB", "fontWeight" to "bold", "marginBottom" to 6)), "summary-oneliner" to _pS(_uM("fontSize" to 17, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 8)), "summary-body" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to "20px", "marginBottom" to 8)), "summary-goal-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "backgroundColor" to "#F8F9FA", "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "paddingTop" to 8, "paddingRight" to 10, "paddingBottom" to 8, "paddingLeft" to 10, "marginBottom" to 8)), "summary-goal-label" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginRight" to 8)), "summary-goal-text" to _pS(_uM("fontSize" to 13, "color" to "#2C3E50", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "summary-encourage" to _pS(_uM("fontSize" to 13, "color" to "#E67E22", "fontStyle" to "italic", "marginTop" to 4)), "summary-empty-text" to _pS(_uM("fontSize" to 14, "color" to "#7F8C8D", "marginBottom" to 4)), "summary-empty-hint" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "recommend-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "section-header-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "library-header" to _pS(_uM("flexDirection" to "column", "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "library-item" to _pS(_uM("marginTop" to 0, "marginRight" to 0, "marginBottom" to 8, "marginLeft" to 0)), "section-title" to _pS(_uM("fontSize" to 16, "fontWeight" to "bold", "color" to "#2C3E50")), "empty-recommend" to _pS(_uM("paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "alignItems" to "center")), "empty-text" to _pS(_uM("fontSize" to 14, "color" to "#BDC3C7")), "bottom-spacer" to _pS(_uM("height" to 40)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

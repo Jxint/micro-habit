@@ -10,12 +10,12 @@ export function insertOrUpdateSummary(summary: DailySummary): void {
       columns: [
         'total_completed', 'total_skipped', 'total_duration_sec',
         'eye_score', 'posture_score', 'vitality_score',
-        'penetration', 'phone_usage_min', 'guard_minutes'
+        'penetration', 'phone_usage_min', 'guard_minutes', 'guard_count'
       ],
       values: [
         summary.total_completed, summary.total_skipped, summary.total_duration_sec,
         summary.eye_score, summary.posture_score, summary.vitality_score,
-        summary.penetration, summary.phone_usage_min, summary.guard_minutes
+        summary.penetration, summary.phone_usage_min, summary.guard_minutes, summary.guard_count
       ]
     }
     dbManager.update('daily_summaries', row, 'date = ?', [summary.date])
@@ -24,12 +24,12 @@ export function insertOrUpdateSummary(summary: DailySummary): void {
       columns: [
         'date', 'total_completed', 'total_skipped', 'total_duration_sec',
         'eye_score', 'posture_score', 'vitality_score',
-        'penetration', 'phone_usage_min', 'guard_minutes', 'created_at'
+        'penetration', 'phone_usage_min', 'guard_minutes', 'guard_count', 'created_at'
       ],
       values: [
         summary.date, summary.total_completed, summary.total_skipped, summary.total_duration_sec,
         summary.eye_score, summary.posture_score, summary.vitality_score,
-        summary.penetration, summary.phone_usage_min, summary.guard_minutes, Math.floor(Date.now() / 1000)
+        summary.penetration, summary.phone_usage_min, summary.guard_minutes, summary.guard_count, Math.floor(Date.now() / 1000)
       ]
     }
     dbManager.insert('daily_summaries', row)
@@ -42,7 +42,12 @@ export function getRecent28Days(): DailyCount[] {
     'SELECT date, total_completed as count FROM daily_summaries WHERE date >= ? ORDER BY date ASC',
     [startDate]
   )
-  return rows.map((row: Map<string, any>): DailyCount => ({ date: row.get("date") as string, count: row.get("count") as number }))
+  const result: DailyCount[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    result.push({ date: row.get("date") as string, count: row.get("count") as number })
+  }
+  return result
 }
 
 export function getSummaryByDate(date: string): DailySummary | null {
@@ -63,6 +68,7 @@ function mapRow(row: Map<string, any>): DailySummary {
     penetration: row.get("penetration") as number,
     phone_usage_min: row.get("phone_usage_min") as number,
     guard_minutes: row.get("guard_minutes") as number,
+    guard_count: row.get("guard_count") as number,
     created_at: row.get("created_at") as number
   }
 }

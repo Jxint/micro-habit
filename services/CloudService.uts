@@ -3,6 +3,7 @@ export type DailyData = {
   totalSkipped: number
   totalDurationSec: number
   guardMinutes: number
+  guardCount: number
   penetration: number
   eyeScore: number
   postureScore: number
@@ -27,6 +28,7 @@ export function callDaily(date: string, data: DailyData, onOK: (result: any) => 
       totalSkipped: data.totalSkipped,
       totalDurationSec: data.totalDurationSec,
       guardMinutes: data.guardMinutes,
+      guardCount: data.guardCount,
       penetration: data.penetration,
       eyeScore: data.eyeScore,
       postureScore: data.postureScore,

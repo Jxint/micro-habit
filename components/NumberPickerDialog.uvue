@@ -1,0 +1,254 @@
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <view class="dialog-header">
+        <text class="dialog-title">{{ title }}</text>
+        <view class="dialog-close" @tap="close">
+          <text class="dialog-close-text">×</text>
+        </view>
+      </view>
+
+      <view class="hint-block">
+        <text class="hint-text">{{ hint }}</text>
+      </view>
+
+      <view class="picker-row">
+        <view class="picker-btn" @tap="onMinus">
+          <text class="picker-btn-text">−</text>
+        </view>
+        <view class="picker-value-box">
+          <text class="picker-value">{{ currentValue }}</text>
+          <text class="picker-unit" v-if="unit.length > 0">{{ unit }}</text>
+        </view>
+        <view class="picker-btn" @tap="onPlus">
+          <text class="picker-btn-text">+</text>
+        </view>
+      </view>
+
+      <view class="quick-row">
+        <view
+          v-for="(q, qi) in quickValues"
+          :key="'q-' + qi"
+          class="quick-chip"
+          :class="q === currentValue ? 'quick-chip-active' : ''"
+          @tap="setValue(q)"
+        >
+          <text class="quick-chip-text" :class="q === currentValue ? 'quick-chip-text-active' : ''">{{ q }}</text>
+        </view>
+      </view>
+
+      <view class="action-row">
+        <view class="action-btn action-cancel" @tap="close">
+          <text class="action-cancel-text">取消</text>
+        </view>
+        <view class="action-btn action-confirm" @tap="confirm">
+          <text class="action-confirm-text">确认</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  visible: boolean
+  title: string
+  hint: string
+  initialValue: number
+  minValue: number
+  maxValue: number
+  step: number
+  unit: string
+  quickValues: number[]
+}>(), {
+  visible: false,
+  title: '调整数值',
+  hint: '请选择合适的数值',
+  initialValue: 1,
+  minValue: 1,
+  maxValue: 100,
+  step: 1,
+  unit: '',
+  quickValues: () => []
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'confirm', value: number): void
+}>()
+
+const currentValue = ref<number>(props.initialValue)
+
+function clamp(v: number): number {
+  if (v < props.minValue) return props.minValue
+  if (v > props.maxValue) return props.maxValue
+  return v
+}
+
+function setValue(v: number): void {
+  currentValue.value = clamp(v)
+}
+
+function onMinus(): void {
+  setValue(currentValue.value - props.step)
+}
+
+function onPlus(): void {
+  setValue(currentValue.value + props.step)
+}
+
+function close(): void {
+  emit('close')
+}
+
+function confirm(): void {
+  emit('confirm', currentValue.value)
+}
+
+function onMaskTap(): void {
+  close()
+}
+
+watch(() : boolean => props.visible, (v: boolean) : void => {
+  if (v) {
+    currentValue.value = clamp(props.initialValue)
+  }
+})
+</script>
+
+<style scoped>
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.dialog-card {
+  width: 80%;
+  max-width: 360px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 20px;
+  flex-direction: column;
+}
+.dialog-header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0 8px 0;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: #F0F3F4;
+  align-items: center;
+  justify-content: center;
+}
+.dialog-close-text {
+  font-size: 18px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.hint-block {
+  padding: 4px 4px 16px 4px;
+}
+.hint-text {
+  font-size: 13px;
+  color: #7F8C8D;
+}
+.picker-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 8px;
+}
+.picker-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: #EBF5FB;
+  align-items: center;
+  justify-content: center;
+}
+.picker-btn-text {
+  font-size: 24px;
+  color: #2980B9;
+  font-weight: bold;
+}
+.picker-value-box {
+  flex-direction: row;
+  align-items: flex-end;
+}
+.picker-value {
+  font-size: 36px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.picker-unit {
+  font-size: 14px;
+  color: #7F8C8D;
+  margin-left: 4px;
+}
+.quick-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  padding: 8px 0 16px 0;
+}
+.quick-chip {
+  padding: 6px 12px;
+  border-radius: 14px;
+  background-color: #F0F3F4;
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+.quick-chip-active {
+  background-color: #3498DB;
+}
+.quick-chip-text {
+  font-size: 13px;
+  color: #7F8C8D;
+}
+.quick-chip-text-active {
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.action-row {
+  flex-direction: row;
+  margin-top: 4px;
+}
+.action-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 4px;
+}
+.action-cancel {
+  background-color: #F0F3F4;
+}
+.action-confirm {
+  background-color: #3498DB;
+}
+.action-cancel-text {
+  font-size: 14px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.action-confirm-text {
+  font-size: 14px;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+</style>

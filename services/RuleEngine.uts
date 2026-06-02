@@ -51,10 +51,10 @@ export function isFrequencyReduced(actionType: string): boolean {
 
 export function selectAction(triggerType: string): string | null {
   const enabled = getEnabledActions()
-  if (enabled.length === 0) return null
+  if (enabled.length.toInt() === 0) return null
 
   const candidates = enabled.filter(a => isSuitableForContext(a, triggerType))
-  if (candidates.length === 0) return enabled[0].id
+  if (candidates.length.toInt() === 0) return enabled[0].id
 
   return weightedRandomSelect(candidates)
 }

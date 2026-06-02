@@ -64,7 +64,7 @@ class SqliteStore {
   execSql(sql: string, params: any[] = []): void {
     const d = this.db
     if (d == null) return
-    if (params.length === 0) {
+    if (params.length.toInt() === 0) {
       d.execSQL(sql)
       return
     }
@@ -124,7 +124,7 @@ class SqliteStore {
     const columns: string[] = row.columns
     const values: (any | null)[] = row.values
     const n: number = columns.length
-    if (n === 0) return -1
+    if (n.toInt() === 0) return -1
     if (values.length !== n) return -1
     const placeholders: string[] = []
     for (let i = 0; i < n; i++) placeholders.push('?')
@@ -147,7 +147,7 @@ class SqliteStore {
     const columns: string[] = row.columns
     const values: (any | null)[] = row.values
     const n: number = columns.length
-    if (n === 0) return 0
+    if (n.toInt() === 0) return 0
     if (values.length !== n) return 0
     const sets: string[] = []
     for (let i = 0; i < n; i++) {

@@ -1,11 +1,31 @@
 import { dbManager, type SqlRow } from './DatabaseManager'
 import { TriggerRule } from '../models/TriggerRule'
 
+function mapRow(row: Map<string, any>): TriggerRule {
+  return {
+    id: row.get("id") as number,
+    rule_type: row.get("rule_type") as string,
+    trigger_type: row.get("trigger_type") as string,
+    condition_json: row.get("condition_json") as string,
+    action_weights_json: row.get("action_weights_json") as string,
+    enabled: row.get("enabled") as number,
+    priority: row.get("priority") as number,
+    source: row.get("source") as string,
+    expires_at: row.get("expires_at") as number | null,
+    created_at: row.get("created_at") as number,
+    updated_at: row.get("updated_at") as number
+  }
+}
+
 export function getAllEnabledRules(): TriggerRule[] {
   const rows = dbManager.query(
     'SELECT * FROM trigger_rules WHERE enabled = 1 ORDER BY priority DESC'
   )
-  return rows.map((r: Map<string, any>): TriggerRule => mapRow(r))
+  const result: TriggerRule[] = []
+  for (let i = 0; i < rows.length; i++) {
+    result.push(mapRow(rows[i]))
+  }
+  return result
 }
 
 export function getRulesByTriggerType(triggerType: string): TriggerRule[] {
@@ -13,7 +33,11 @@ export function getRulesByTriggerType(triggerType: string): TriggerRule[] {
     'SELECT * FROM trigger_rules WHERE trigger_type = ? AND enabled = 1 ORDER BY priority DESC',
     [triggerType]
   )
-  return rows.map((r: Map<string, any>): TriggerRule => mapRow(r))
+  const result: TriggerRule[] = []
+  for (let i = 0; i < rows.length; i++) {
+    result.push(mapRow(rows[i]))
+  }
+  return result
 }
 
 export function insertRule(rule: TriggerRule): number {
@@ -39,20 +63,4 @@ export function updateRuleEnabled(id: number, enabled: number): void {
     values: [enabled, now]
   }
   dbManager.update('trigger_rules', row, 'id = ?', [id])
-}
-
-function mapRow(row: Map<string, any>): TriggerRule {
-  return {
-    id: row.get("id") as number,
-    rule_type: row.get("rule_type") as string,
-    trigger_type: row.get("trigger_type") as string,
-    condition_json: row.get("condition_json") as string,
-    action_weights_json: row.get("action_weights_json") as string,
-    enabled: row.get("enabled") as number,
-    priority: row.get("priority") as number,
-    source: row.get("source") as string,
-    expires_at: row.get("expires_at") as number | null,
-    created_at: row.get("created_at") as number,
-    updated_at: row.get("updated_at") as number
-  }
 }

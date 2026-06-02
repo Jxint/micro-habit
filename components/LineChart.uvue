@@ -1,163 +1,196 @@
 <template>
-  <view class="chart-wrapper">
-    <canvas :id="canvasId" class="chart-canvas" :style="{ height: canvasH + 'px' }"></canvas>
+  <view class="chart-wrapper" :style="{ height: wrapperH + 'px' }">
+    <view v-if="title.length > 0" class="chart-title">
+      <text class="chart-title-text">{{ title }}</text>
+    </view>
+    <view class="chart-legend">
+      <view
+        v-for="(name, si) in seriesNames"
+        :key="'leg-' + si"
+        class="legend-item"
+      >
+        <view class="legend-dot" :style="{ backgroundColor: seriesColors[si] }"></view>
+        <text class="legend-text">{{ name }}</text>
+      </view>
+    </view>
+    <view class="chart-area" :style="{ height: chartAreaH + 'px' }">
+      <view class="y-axis">
+        <text class="y-tick">100</text>
+        <text class="y-tick">75</text>
+        <text class="y-tick">50</text>
+        <text class="y-tick">25</text>
+        <text class="y-tick">0</text>
+      </view>
+      <view class="plot-area">
+        <view class="grid-area">
+          <view v-for="g in 4" :key="'g-' + g" class="grid-line"></view>
+        </view>
+        <view
+          v-for="(values, si) in seriesValues"
+          :key="'series-' + si"
+          class="series-layer"
+        >
+          <view
+            v-for="(v, pi) in values"
+            :key="'pt-' + si + '-' + pi"
+            class="point"
+            :style="{
+              left: pointLeft(pi, values.length) + '%',
+              bottom: pointBottom(v) + '%',
+              backgroundColor: seriesColors[si]
+            }"
+          ></view>
+        </view>
+      </view>
+    </view>
+    <view class="x-axis">
+      <text
+        v-for="(p, pi) in pointLabels"
+        :key="'xl-' + pi"
+        class="x-tick"
+        :style="{ left: xLabelLeft(pi) + '%' }"
+      >{{ p }}</text>
+    </view>
   </view>
 </template>
 
 <script setup lang="uts">
-type LinePoint = {
-  label: string
-  value: number
-}
-
-type LineSeries = {
-  name: string
-  color: string
-  points: LinePoint[]
-}
-
 const props = withDefaults(defineProps<{
-  series: LineSeries[]
+  seriesValues: number[][]
+  seriesNames: string[]
+  seriesColors: string[]
+  pointLabels: string[]
   title: string
   height: number
 }>(), {
-  series: () => [],
+  seriesValues: () => [],
+  seriesNames: () => [],
+  seriesColors: () => [],
+  pointLabels: () => [],
   title: '',
   height: 260
 })
 
-const canvasId = 'line_' + Math.floor(Math.random() * 100000)
-const canvasH = props.height
+const titleAreaH = 24
+const legendAreaH = 24
+const xAxisAreaH = 22
+const wrapperH = props.height
+const chartAreaH = wrapperH - titleAreaH - legendAreaH - xAxisAreaH
 
-let ctx: CanvasRenderingContext2D | null = null
-let canvasW = 0
-let canvasHPhys = 0
-
-function draw(): void {
-  if (ctx == null) return
-  const c = ctx as CanvasRenderingContext2D
-  const w = canvasW
-  const h = canvasHPhys
-  const padLeft = 36
-  const padTop = 30
-  const padRight = 16
-  const padBottom = 24
-  const chartW = w - padLeft - padRight
-  const chartH = h - padTop - padBottom
-
-  c.clearRect(0, 0, w, h)
-
-  if (props.title !== '') {
-    c.fillStyle = '#2C3E50'
-    c.font = '12px sans-serif'
-    c.textAlign = 'center'
-    c.fillText(props.title, w / 2, 14)
-    c.textAlign = 'start'
-  }
-
-  const seriesArr = props.series
-  if (seriesArr.length === 0 || seriesArr[0].points.length === 0) return
-
-  const maxPoints = seriesArr[0].points.length
-
-  const gridLines = 4
-  c.strokeStyle = '#E8E8E8'
-  c.lineWidth = 0.5
-  for (let i = 0; i <= gridLines; i++) {
-    const y = padTop + (chartH * i) / gridLines
-    c.beginPath()
-    c.moveTo(padLeft, y)
-    c.lineTo(w - padRight, y)
-    c.stroke()
-
-    const label = Math.round(100 * (1 - i / gridLines))
-    c.fillStyle = '#95A5A6'
-    c.font = '9px sans-serif'
-    c.textAlign = 'right'
-    c.fillText('' + label, padLeft - 4, y + 3)
-    c.textAlign = 'start'
-  }
-
-  for (let si = 0; si < seriesArr.length; si++) {
-    const s = seriesArr[si]
-    if (s.points.length === 0) continue
-
-    c.strokeStyle = s.color
-    c.lineWidth = 2
-    c.beginPath()
-    for (let i = 0; i < s.points.length; i++) {
-      const x = padLeft + (chartW * i) / (s.points.length - 1)
-      const val = Math.max(0, Math.min(100, s.points[i].value))
-      const y = padTop + chartH * (1 - val / 100)
-      if (i === 0) c.moveTo(x, y)
-      else c.lineTo(x, y)
-    }
-    c.stroke()
-
-    c.fillStyle = s.color
-    for (let i = 0; i < s.points.length; i++) {
-      const x = padLeft + (chartW * i) / (s.points.length - 1)
-      const val = Math.max(0, Math.min(100, s.points[i].value))
-      const y = padTop + chartH * (1 - val / 100)
-      c.beginPath()
-      c.arc(x, y, 3, 0, Math.PI * 2, false)
-      c.fill()
-    }
-  }
-
-  let legendX: number = padLeft
-  for (let si = 0; si < seriesArr.length; si++) {
-    const s = seriesArr[si]
-    c.fillStyle = s.color
-    c.fillRect(legendX, padTop - 14, 10, 10)
-    c.fillStyle = '#2C3E50'
-    c.font = '10px sans-serif'
-    c.textAlign = 'start'
-    c.fillText(s.name, legendX + 14, padTop - 6)
-    legendX += 70
-  }
-  c.textAlign = 'start'
-
-  const firstSeries = seriesArr[0]
-  c.fillStyle = '#95A5A6'
-  c.font = '9px sans-serif'
-  c.textAlign = 'center'
-  for (let i = 0; i < maxPoints; i++) {
-    const x = padLeft + (chartW * i) / (maxPoints - 1)
-    c.fillText(firstSeries.points[i].label, x, padTop + chartH + 14)
-  }
-  c.textAlign = 'start'
+function pointLeft(pi: number, total: number): number {
+  if (total <= 1) return 0
+  return (pi / (total - 1)) * 100
 }
 
-onReady(() => {
-  const instance = getCurrentInstance()?.proxy
-  if (instance == null) return
-  uni.createCanvasContextAsync({
-    id: canvasId,
-    component: instance,
-    success: (context: CanvasContext) => {
-      ctx = context.getContext('2d')!
-      if (ctx == null) return
-      const canvas = ctx.canvas
-      const dpr = uni.getDeviceInfo().devicePixelRatio ?? 1
-      canvasW = canvas.offsetWidth
-      canvas.width = canvasW * dpr
-      canvas.height = canvasH * dpr
-      ctx.scale(dpr, dpr)
-      canvasHPhys = canvasH
-      draw()
-    }
-  })
-})
+function pointBottom(value: number): number {
+  const v = value < 0 ? 0 : (value > 100 ? 100 : value)
+  return v
+}
+
+function xLabelLeft(pi: number): number {
+  const total = props.pointLabels.length
+  if (total <= 1) return 0
+  return (pi / (total - 1)) * 100
+}
 </script>
 
 <style scoped>
 .chart-wrapper {
   flex-direction: column;
   width: 100%;
-  padding: 4px 0;
+  background-color: #FFFFFF;
+  border-radius: 10px;
+  padding: 8px 8px 4px 8px;
 }
-.chart-canvas {
+.chart-title {
+  padding: 0 4px 4px 4px;
+}
+.chart-title-text {
+  font-size: 13px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.chart-legend {
+  flex-direction: row;
+  padding: 0 4px 6px 4px;
+}
+.legend-item {
+  flex-direction: row;
+  align-items: center;
+  margin-right: 16px;
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  margin-right: 4px;
+}
+.legend-text {
+  font-size: 11px;
+  color: #7F8C8D;
+}
+.chart-area {
+  flex-direction: row;
   width: 100%;
+}
+.y-axis {
+  width: 30px;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-right: 4px;
+}
+.y-tick {
+  font-size: 9px;
+  color: #95A5A6;
+}
+.plot-area {
+  flex: 1;
+  flex-direction: column;
+  position: relative;
+}
+.grid-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.grid-line {
+  width: 100%;
+  height: 1px;
+  background-color: #ECF0F1;
+}
+.series-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.point {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  margin-left: -4px;
+  margin-bottom: -4px;
+}
+.x-axis {
+  height: 22px;
+  width: 100%;
+  flex-direction: row;
+  position: relative;
+  margin-left: 30px;
+}
+.x-tick {
+  position: absolute;
+  font-size: 9px;
+  color: #95A5A6;
+  width: 30px;
+  text-align: center;
+  margin-left: -15px;
 }
 </style>

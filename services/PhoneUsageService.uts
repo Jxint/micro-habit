@@ -1,0 +1,106 @@
+import { getTodayAppBreakdown, getTop5Apps, getTodayTotalUsageSeconds, type AppUsageItem } from '../database/AppUsageDao'
+import { today } from '../utils/TimeUtils'
+
+export type PhoneUsageSummary = {
+  totalMinutes: number
+  totalSeconds: number
+  hourText: string
+  minuteText: string
+  appCount: number
+}
+
+export type PieSegment = {
+  pkg: string
+  label: string
+  minutes: number
+  percent: number
+  color: string
+  startAngle: number
+  endAngle: number
+}
+
+const PALETTE: string[] = [
+  '#3498DB',
+  '#2ECC71',
+  '#9B59B6',
+  '#E67E22',
+  '#E74C3C',
+  '#1ABC9C',
+  '#F1C40F',
+  '#34495E',
+  '#16A085',
+  '#D35400'
+]
+
+export function getTodayPhoneUsageSummary(): PhoneUsageSummary {
+  const totalSeconds = getTodayTotalUsageSeconds()
+  const minutes = Math.floor(totalSeconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const remainMin = minutes % 60
+  const breakdown = getTodayAppBreakdown()
+  return {
+    totalMinutes: minutes,
+    totalSeconds: totalSeconds,
+    hourText: hours + ' 小时',
+    minuteText: remainMin + ' 分钟',
+    appCount: breakdown.length
+  }
+}
+
+export function getTodayPieSegments(): PieSegment[] {
+  const all = getTodayAppBreakdown()
+  let sumSec = 0
+  for (let i = 0; i < all.length; i++) {
+    sumSec += all[i].foregroundSec
+  }
+  if (sumSec < 1) return []
+  const segments: PieSegment[] = []
+  let start = 0
+  const cap = all.length > 10 ? 10 : all.length
+  for (let i = 0; i < cap; i++) {
+    const item = all[i]
+    const pct = (item.foregroundSec / sumSec) * 100
+    const end = start + pct
+    const color: string = i < PALETTE.length ? (PALETTE[i] as string) : '#BDC3C7'
+    const seg: PieSegment = {
+      pkg: item.packageName,
+      label: item.appLabel.length > 0 ? item.appLabel : item.packageName,
+      minutes: item.minutes,
+      percent: Math.round(pct * 10) / 10,
+      color: color,
+      startAngle: start,
+      endAngle: end
+    }
+    segments.push(seg)
+    start = end
+  }
+  if (all.length > cap) {
+    let othersMin = 0
+    for (let i = cap; i < all.length; i++) {
+      othersMin += all[i].minutes
+    }
+    const pct = 100 - start
+    const seg: PieSegment = {
+      pkg: '__others__',
+      label: '其他',
+      minutes: othersMin,
+      percent: Math.round(pct * 10) / 10,
+      color: '#BDC3C7',
+      startAngle: start,
+      endAngle: 100
+    }
+    segments.push(seg)
+  }
+  return segments
+}
+
+export function getTop5PhoneApps(): AppUsageItem[] {
+  return getTop5Apps()
+}
+
+const LLM_RESERVED_NOTE = 'LLM 接口待配置'
+
+export function aiEvaluateTodayUsage(onComplete: (text: string) => void): void {
+  onComplete(LLM_RESERVED_NOTE)
+}
+

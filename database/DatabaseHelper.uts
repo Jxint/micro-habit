@@ -2,7 +2,7 @@ import { DEFAULT_SETTINGS } from '../constants/DefaultSettings'
 import { sqliteStore } from '../uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore'
 
 const DB_NAME = 'micro_habit_v2.db'
-const DB_VERSION = 1
+const DB_VERSION = 3
 
 export function getDbName(): string {
   return DB_NAME
@@ -26,7 +26,7 @@ export function onUpgrade(db: any, oldVersion: number, newVersion: number): void
     runSql("ALTER TABLE daily_summaries ADD COLUMN llm_one_liner TEXT DEFAULT ''")
   }
   if (oldVersion < 3) {
-    runSql("CREATE TABLE IF NOT EXISTS weekly_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, week_start TEXT, week_end TEXT, content TEXT, created_at INTEGER)")
+    runSql("ALTER TABLE daily_summaries ADD COLUMN guard_count INTEGER NOT NULL DEFAULT 0")
   }
 }
 
@@ -75,6 +75,7 @@ function createTables(): void {
     penetration REAL NOT NULL DEFAULT 0,
     phone_usage_min INTEGER NOT NULL DEFAULT 0,
     guard_minutes INTEGER NOT NULL DEFAULT 0,
+    guard_count INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL
   )`)
   runSql("CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date)")

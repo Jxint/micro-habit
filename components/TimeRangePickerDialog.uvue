@@ -1,0 +1,274 @@
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <view class="dialog-header">
+        <text class="dialog-title">{{ title }}</text>
+        <view class="dialog-close" @tap="close">
+          <text class="dialog-close-text">×</text>
+        </view>
+      </view>
+
+      <view class="hint-block">
+        <text class="hint-text">{{ hint }}</text>
+      </view>
+
+      <view class="range-block">
+        <view class="range-cell">
+          <text class="range-label">开始</text>
+          <view class="time-picker">
+            <view class="time-step" @tap="onStartMinus">
+              <text class="time-step-text">−</text>
+            </view>
+            <view class="time-value-box">
+              <text class="time-value">{{ pad2(startHour) }}</text>
+              <text class="time-colon">:</text>
+              <text class="time-value">{{ '00' }}</text>
+            </view>
+            <view class="time-step" @tap="onStartPlus">
+              <text class="time-step-text">+</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="range-cell">
+          <text class="range-label">结束</text>
+          <view class="time-picker">
+            <view class="time-step" @tap="onEndMinus">
+              <text class="time-step-text">−</text>
+            </view>
+            <view class="time-value-box">
+              <text class="time-value">{{ pad2(endHour) }}</text>
+              <text class="time-colon">:</text>
+              <text class="time-value">{{ '00' }}</text>
+            </view>
+            <view class="time-step" @tap="onEndPlus">
+              <text class="time-step-text">+</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="preview-block">
+        <text class="preview-text">免打扰时段：{{ pad2(startHour) }}:00 — {{ pad2(endHour) }}:00</text>
+      </view>
+
+      <view class="action-row">
+        <view class="action-btn action-cancel" @tap="close">
+          <text class="action-cancel-text">取消</text>
+        </view>
+        <view class="action-btn action-confirm" @tap="confirm">
+          <text class="action-confirm-text">确认</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  visible: boolean
+  title: string
+  hint: string
+  initialStartHour: number
+  initialEndHour: number
+}>(), {
+  visible: false,
+  title: '免打扰时段',
+  hint: '设置免打扰的起止小时',
+  initialStartHour: 22,
+  initialEndHour: 7
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'confirm', startHour: number, endHour: number): void
+}>()
+
+const startHour = ref<number>(props.initialStartHour)
+const endHour = ref<number>(props.initialEndHour)
+
+function pad2(n: number): string {
+  if (n < 10) return '0' + n
+  return '' + n
+}
+
+function clampHour(v: number): number {
+  if (v < 0) return 23
+  if (v > 23) return 0
+  return v
+}
+
+function onStartMinus(): void {
+  startHour.value = clampHour(startHour.value - 1)
+}
+
+function onStartPlus(): void {
+  startHour.value = clampHour(startHour.value + 1)
+}
+
+function onEndMinus(): void {
+  endHour.value = clampHour(endHour.value - 1)
+}
+
+function onEndPlus(): void {
+  endHour.value = clampHour(endHour.value + 1)
+}
+
+function close(): void {
+  emit('close')
+}
+
+function confirm(): void {
+  emit('confirm', startHour.value, endHour.value)
+}
+
+function onMaskTap(): void {
+  close()
+}
+
+watch(() : boolean => props.visible, (v: boolean) : void => {
+  if (v) {
+    startHour.value = clampHour(props.initialStartHour)
+    endHour.value = clampHour(props.initialEndHour)
+  }
+})
+</script>
+
+<style scoped>
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.dialog-card {
+  width: 80%;
+  max-width: 360px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 20px;
+  flex-direction: column;
+}
+.dialog-header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0 8px 0;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: #F0F3F4;
+  align-items: center;
+  justify-content: center;
+}
+.dialog-close-text {
+  font-size: 18px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.hint-block {
+  padding: 4px 4px 12px 4px;
+}
+.hint-text {
+  font-size: 13px;
+  color: #7F8C8D;
+}
+.range-block {
+  padding: 4px 0;
+}
+.range-cell {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+}
+.range-label {
+  font-size: 14px;
+  color: #2C3E50;
+}
+.time-picker {
+  flex-direction: row;
+  align-items: center;
+}
+.time-step {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background-color: #EBF5FB;
+  align-items: center;
+  justify-content: center;
+}
+.time-step-text {
+  font-size: 18px;
+  color: #2980B9;
+  font-weight: bold;
+}
+.time-value-box {
+  flex-direction: row;
+  align-items: flex-end;
+  margin: 0 12px;
+  min-width: 80px;
+  justify-content: center;
+}
+.time-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.time-colon {
+  font-size: 22px;
+  color: #2C3E50;
+  margin: 0 2px;
+}
+.preview-block {
+  padding: 16px 4px 8px 4px;
+}
+.preview-text {
+  font-size: 13px;
+  color: #3498DB;
+  font-weight: bold;
+}
+.action-row {
+  flex-direction: row;
+  margin-top: 4px;
+}
+.action-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 4px;
+}
+.action-cancel {
+  background-color: #F0F3F4;
+}
+.action-confirm {
+  background-color: #3498DB;
+}
+.action-cancel-text {
+  font-size: 14px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.action-confirm-text {
+  font-size: 14px;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+</style>

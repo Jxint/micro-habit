@@ -28,9 +28,9 @@ export function generateWeeklyData(): WeeklyReportStats {
     const d = daysAgo(i)
     const data = getHomepageData(d)
     totalCompleted += data.todayCompletedCount
-    totalDurationSec += data.guardMinutes * 60
+    totalDurationSec += data.guardCount * 60
     totalPenetration += data.penetration
-    totalGuardMinutes += data.guardMinutes
+    totalGuardMinutes += data.guardCount
 
     if (data.todayCompletedCount > 0) {
       daysWithData++
