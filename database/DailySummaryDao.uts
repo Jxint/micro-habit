@@ -2,6 +2,7 @@ import { dbManager, type SqlRow } from './DatabaseManager'
 import { DailySummary } from '../models/DailySummary'
 import { daysAgo } from '../utils/TimeUtils'
 import { DailyCount } from '../models/DailyCount'
+import { getNum, getStr } from '../utils/DbRowUtils'
 
 export function insertOrUpdateSummary(summary: DailySummary): void {
   const existing = dbManager.queryOne('SELECT id FROM daily_summaries WHERE date = ?', [summary.date])
@@ -45,7 +46,7 @@ export function getRecent28Days(): DailyCount[] {
   const result: DailyCount[] = []
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    result.push({ date: row.get("date") as string, count: row.get("count") as number })
+    result.push({ date: getStr(row, 'date'), count: getNum(row, 'count') })
   }
   return result
 }
@@ -57,18 +58,18 @@ export function getSummaryByDate(date: string): DailySummary | null {
 
 function mapRow(row: Map<string, any>): DailySummary {
   return {
-    id: row.get("id") as number,
-    date: row.get("date") as string,
-    total_completed: row.get("total_completed") as number,
-    total_skipped: row.get("total_skipped") as number,
-    total_duration_sec: row.get("total_duration_sec") as number,
-    eye_score: row.get("eye_score") as number,
-    posture_score: row.get("posture_score") as number,
-    vitality_score: row.get("vitality_score") as number,
-    penetration: row.get("penetration") as number,
-    phone_usage_min: row.get("phone_usage_min") as number,
-    guard_minutes: row.get("guard_minutes") as number,
-    guard_count: row.get("guard_count") as number,
-    created_at: row.get("created_at") as number
+    id: getNum(row, 'id'),
+    date: getStr(row, 'date'),
+    total_completed: getNum(row, 'total_completed'),
+    total_skipped: getNum(row, 'total_skipped'),
+    total_duration_sec: getNum(row, 'total_duration_sec'),
+    eye_score: getNum(row, 'eye_score'),
+    posture_score: getNum(row, 'posture_score'),
+    vitality_score: getNum(row, 'vitality_score'),
+    penetration: getNum(row, 'penetration'),
+    phone_usage_min: getNum(row, 'phone_usage_min'),
+    guard_minutes: getNum(row, 'guard_minutes'),
+    guard_count: getNum(row, 'guard_count'),
+    created_at: getNum(row, 'created_at')
   }
 }

@@ -75,8 +75,8 @@
 
 <script setup lang="uts">
 import { putInt } from '../../database/SettingsDao'
-import { isAccessibilityServiceEnabled, openAccessibilitySettings } from '../../uni_modules/uts-accessibility-service/utssdk/app-android/AppMonitorService'
-import { hasOverlayPermission, requestOverlayPermission } from '../../uni_modules/uts-floating-overlay/utssdk/app-android/FloatingOverlay'
+import { isAccessibilityServiceEnabled, openAccessibilitySettings } from '../../uni_modules/uts-accessibility-service/utssdk/app-android/index'
+import { hasOverlayPermission, requestOverlayPermission } from '../../uni_modules/uts-floating-overlay/utssdk/app-android/index'
 
 const accEnabled = ref<boolean>(isAccessibilityServiceEnabled())
 const overlayEnabled = ref<boolean>(hasOverlayPermission())

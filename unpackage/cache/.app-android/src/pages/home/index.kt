@@ -12,7 +12,9 @@ import io.dcloud.uts.Map
 import io.dcloud.uts.Set
 import io.dcloud.uts.UTSAndroid
 import kotlin.properties.Delegates
+import io.dcloud.uniapp.extapi.`$on` as uni__on
 import io.dcloud.uniapp.extapi.navigateTo as uni_navigateTo
+import io.dcloud.uniapp.extapi.showToast as uni_showToast
 import io.dcloud.uniapp.extapi.switchTab as uni_switchTab
 open class GenPagesHomeIndex : BasePage {
     constructor(__ins: ComponentInternalInstance, __renderer: String?) : super(__ins, __renderer) {}
@@ -204,6 +206,70 @@ open class GenPagesHomeIndex : BasePage {
             val getPhoneUsageHint = ::gen_getPhoneUsageHint_fn
             val phoneUsageHint = computed<String>(getPhoneUsageHint)
             val showPhoneDialog = ref<Boolean>(false)
+            val showRuleDialog = ref<Boolean>(false)
+            val pendingRule = ref<EffectiveTriggerRule?>(null)
+            val pendingReasoning = ref<String>("")
+            val ruleActionName = computed<String>(fun(): String {
+                val r = pendingRule.value
+                if (r == null) {
+                    return ""
+                }
+                val a = getActionById(r.actionId)
+                return if (a != null) {
+                    a.name
+                } else {
+                    r.actionId
+                }
+            }
+            )
+            val ruleTimeWindowStart = computed<String>(fun(): String {
+                val r = pendingRule.value
+                if (r == null || r.timeWindow == null) {
+                    return ""
+                }
+                return r.timeWindow!!.start
+            }
+            )
+            val ruleTimeWindowEnd = computed<String>(fun(): String {
+                val r = pendingRule.value
+                if (r == null || r.timeWindow == null) {
+                    return ""
+                }
+                return r.timeWindow!!.end
+            }
+            )
+            val ruleTimeThresholdMinutes = computed<Number>(fun(): Number {
+                val r = pendingRule.value
+                if (r == null) {
+                    return 0
+                }
+                return r.timeThresholdMinutes
+            }
+            )
+            val ruleScreenCondText = computed<String>(fun(): String {
+                val r = pendingRule.value
+                if (r == null || r.screenConditions == null) {
+                    return ""
+                }
+                val sc = r.screenConditions!!
+                val parts: UTSArray<String> = _uA()
+                if (sc.includeHome) {
+                    parts.push("桌面")
+                }
+                if (sc.appPackages.length > 0) {
+                    parts.push(sc.appPackages.join(", "))
+                }
+                return if (parts.length > 0) {
+                    parts.join(" / ")
+                } else {
+                    "任意"
+                }
+            }
+            )
+            val llmHistoryEntries = computed<UTSArray<LlmHistoryEntry>>(fun(): UTSArray<LlmHistoryEntry> {
+                return store.llmHistory.value
+            }
+            )
             fun gen_openPhoneDialog_fn(): Unit {
                 showPhoneDialog.value = true
             }
@@ -212,6 +278,25 @@ open class GenPagesHomeIndex : BasePage {
                 showPhoneDialog.value = false
             }
             val closePhoneDialog = ::gen_closePhoneDialog_fn
+            fun gen_closeRuleDialog_fn(): Unit {
+                showRuleDialog.value = false
+                pendingRule.value = null
+                pendingReasoning.value = ""
+            }
+            val closeRuleDialog = ::gen_closeRuleDialog_fn
+            fun gen_acceptRule_fn(): Unit {
+                showRuleDialog.value = false
+                pendingRule.value = null
+                pendingReasoning.value = ""
+                uni_showToast(ShowToastOptions(title = "规则已接受（持久化待 Day 5）", icon = "none"))
+            }
+            val acceptRule = ::gen_acceptRule_fn
+            fun gen_neverAskRule_fn(): Unit {
+                putBool("llm_trigger_ask_each_time", false)
+                closeRuleDialog()
+                uni_showToast(ShowToastOptions(title = "已关闭\"每次问询\"", icon = "none"))
+            }
+            val neverAskRule = ::gen_neverAskRule_fn
             fun gen_getGreetingClass_fn(): String {
                 val h = currentHour()
                 if (h < 6) {
@@ -252,6 +337,7 @@ open class GenPagesHomeIndex : BasePage {
             val dateStr = computed<String>(getDateStr)
             onPageShow(fun(){
                 store.refreshHomeData()
+                store.refreshLlmHistory()
             }
             )
             fun gen_startAction_fn(actionId: String): Unit {
@@ -263,6 +349,44 @@ open class GenPagesHomeIndex : BasePage {
                 uni_switchTab(SwitchTabOptions(url = "/pages/settings/index"))
             }
             val goSettings = ::gen_goSettings_fn
+            onLoad(fun(_options): Unit {
+                try {
+                    uni__on("showTriggerRuleDialog", fun(data: Any): Unit {
+                        try {
+                            if (data == null) {
+                                return
+                            }
+                            val obj = data as UTSJSONObject
+                            if (obj == null) {
+                                return
+                            }
+                            val ruleRaw = obj["rule"]
+                            val reasoningRaw = obj["reasoning"]
+                            val ruleStr = JSON.stringify(ruleRaw)
+                            val rule = UTSAndroid.consoleDebugError(JSON.parse(ruleStr), " at pages/home/index.uvue:341") as EffectiveTriggerRule
+                            if (rule == null) {
+                                return
+                            }
+                            pendingRule.value = rule
+                            val reasoning = if (UTSAndroid.`typeof`(reasoningRaw) === "string") {
+                                (reasoningRaw as String)
+                            } else {
+                                ""
+                            }
+                            pendingReasoning.value = reasoning
+                            showRuleDialog.value = true
+                        }
+                         catch (e: Throwable) {
+                            console.warn("[home] showTriggerRuleDialog 处理异常: " + JSON.stringify(e), " at pages/home/index.uvue:348")
+                        }
+                    }
+                    )
+                }
+                 catch (e: Throwable) {
+                    console.warn("[home] \$on showTriggerRuleDialog 异常: " + JSON.stringify(e), " at pages/home/index.uvue:352")
+                }
+            }
+            )
             return fun(): Any? {
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("scroll-view", _uM("class" to "scroll-area", "scroll-y" to "true"), _uA(
@@ -270,22 +394,24 @@ open class GenPagesHomeIndex : BasePage {
                             "greeting-bar",
                             unref(greetingClass)
                         ))), _uA(
-                            _cE("view", _uM("class" to "greeting-left"), _uA(
-                                _cE("text", _uM("class" to "greeting-text"), _tD(unref(greeting)), 1),
-                                _cE("text", _uM("class" to "greeting-date"), _tD(unref(dateStr)), 1)
-                            )),
-                            _cE("view", _uM("class" to "greeting-right"), _uA(
-                                _cE("view", _uM("class" to "emoji-button", "onClick" to openPhoneDialog), _uA(
-                                    _cE("text", _uM("class" to "emoji-button-text"), _tD(unref(greetingEmoji)), 1)
+                            _cE("view", _uM("class" to "greeting-header"), _uA(
+                                _cE("view", _uM("class" to "greeting-left"), _uA(
+                                    _cE("text", _uM("class" to "greeting-text"), _tD(unref(greeting)), 1),
+                                    _cE("text", _uM("class" to "greeting-date"), _tD(unref(dateStr)), 1)
                                 )),
-                                _cE("view", _uM("class" to "settings-icon", "onClick" to goSettings), _uA(
-                                    _cE("text", _uM("class" to "settings-icon-text"), "⚙")
+                                _cE("view", _uM("class" to "greeting-right"), _uA(
+                                    _cE("view", _uM("class" to "emoji-button", "onClick" to openPhoneDialog), _uA(
+                                        _cE("text", _uM("class" to "emoji-button-text"), _tD(unref(greetingEmoji)), 1)
+                                    )),
+                                    _cE("view", _uM("class" to "settings-icon", "onClick" to goSettings), _uA(
+                                        _cE("text", _uM("class" to "settings-icon-text"), "⚙")
+                                    ))
                                 ))
+                            )),
+                            _cE("view", _uM("class" to "phone-usage-hint", "onClick" to openPhoneDialog), _uA(
+                                _cE("text", _uM("class" to "phone-usage-hint-text"), _tD(unref(phoneUsageHint)), 1)
                             ))
                         ), 2),
-                        _cE("view", _uM("class" to "phone-usage-hint", "onClick" to openPhoneDialog), _uA(
-                            _cE("text", _uM("class" to "phone-usage-hint-text"), _tD(unref(phoneUsageHint)), 1)
-                        )),
                         _cE("view", _uM("class" to "guard-card"), _uA(
                             _cE("text", _uM("class" to "guard-eyebrow"), "今日已完成"),
                             _cE("view", _uM("class" to "guard-row"), _uA(
@@ -387,10 +513,22 @@ open class GenPagesHomeIndex : BasePage {
                             }
                             ), 128)
                         )),
+                        _cV(unref(GenComponentsLlmHistoryCardClass), _uM("entries" to unref(llmHistoryEntries)), null, 8, _uA(
+                            "entries"
+                        )),
                         _cE("view", _uM("class" to "bottom-spacer"))
                     )),
                     _cV(unref(GenComponentsPhoneUsageDialogClass), _uM("visible" to unref(showPhoneDialog), "onClose" to closePhoneDialog), null, 8, _uA(
                         "visible"
+                    )),
+                    _cV(unref(GenComponentsTriggerRuleDialogClass), _uM("visible" to unref(showRuleDialog), "action-name" to unref(ruleActionName), "time-window-start" to unref(ruleTimeWindowStart), "time-window-end" to unref(ruleTimeWindowEnd), "time-threshold-minutes" to unref(ruleTimeThresholdMinutes), "screen-cond-text" to unref(ruleScreenCondText), "reasoning" to unref(pendingReasoning), "onClose" to closeRuleDialog, "onAccept" to acceptRule, "onDecline" to closeRuleDialog, "onNeverAsk" to neverAskRule), null, 8, _uA(
+                        "visible",
+                        "action-name",
+                        "time-window-start",
+                        "time-window-end",
+                        "time-threshold-minutes",
+                        "screen-cond-text",
+                        "reasoning"
                     ))
                 ))
             }
@@ -402,7 +540,7 @@ open class GenPagesHomeIndex : BasePage {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "greeting-bar" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingTop" to 56, "paddingRight" to 20, "paddingBottom" to 24, "paddingLeft" to 20, "backgroundColor" to "#2C3E50")), "bg-morning" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #FFB75E 0%, #ED8F03 100%)")), "bg-noon" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #56CCF2 0%, #2F80ED 100%)")), "bg-afternoon" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #F6D365 0%, #FDA085 100%)")), "bg-evening" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #6A11CB 0%, #2575FC 100%)")), "bg-night" to _pS(_uM("backgroundColor" to "rgba(0,0,0,0)", "backgroundImage" to "linear-gradient(135deg, #232526 0%, #414345 100%)")), "greeting-left" to _pS(_uM("flexDirection" to "column")), "greeting-text" to _pS(_uM("fontSize" to 24, "fontWeight" to "bold", "color" to "#FFFFFF")), "greeting-date" to _pS(_uM("fontSize" to 12, "color" to "rgba(255,255,255,0.85)", "marginTop" to 4)), "greeting-right" to _pS(_uM("flexDirection" to "row", "alignItems" to "center")), "emoji-button" to _pS(_uM("width" to 44, "height" to 44, "borderTopLeftRadius" to 22, "borderTopRightRadius" to 22, "borderBottomRightRadius" to 22, "borderBottomLeftRadius" to 22, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center", "marginRight" to 10)), "emoji-button-text" to _pS(_uM("fontSize" to 24)), "settings-icon" to _pS(_uM("width" to 36, "height" to 36, "borderTopLeftRadius" to 18, "borderTopRightRadius" to 18, "borderBottomRightRadius" to 18, "borderBottomLeftRadius" to 18, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center")), "settings-icon-text" to _pS(_uM("fontSize" to 18, "color" to "#FFFFFF")), "phone-usage-hint" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "justifyContent" to "center", "paddingTop" to 10, "paddingRight" to 16, "paddingBottom" to 10, "paddingLeft" to 16, "backgroundColor" to "rgba(0,0,0,0.15)")), "phone-usage-hint-text" to _pS(_uM("fontSize" to 12, "color" to "#FFFFFF", "fontWeight" to 500)), "guard-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to -16, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "paddingTop" to 18, "paddingRight" to 20, "paddingBottom" to 18, "paddingLeft" to 20, "borderTopLeftRadius" to 16, "borderTopRightRadius" to 16, "borderBottomRightRadius" to 16, "borderBottomLeftRadius" to 16, "flexDirection" to "column", "boxShadow" to "0 4px 12px rgba(0, 0, 0, 0.06)")), "guard-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginBottom" to 4)), "guard-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "flex-end", "marginBottom" to 6)), "guard-number" to _pS(_uM("fontSize" to 36, "fontWeight" to "bold", "color" to "#2ECC71")), "guard-unit" to _pS(_uM("fontSize" to 16, "color" to "#2ECC71", "fontWeight" to "bold", "marginLeft" to 4)), "guard-sub" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "penetration-section" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 12, "borderTopRightRadius" to 12, "borderBottomRightRadius" to 12, "borderBottomLeftRadius" to 12, "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "section-label" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "width" to 80)), "penetration-track" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "height" to 6, "backgroundColor" to "#F0E6F6", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3, "overflow" to "hidden")), "penetration-fill" to _pS(_uM("height" to 6, "backgroundImage" to "linear-gradient(90deg, #9B59B6 0%, #E91E63 100%)", "backgroundColor" to "rgba(0,0,0,0)", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3)), "penetration-value" to _pS(_uM("fontSize" to 13, "color" to "#9B59B6", "fontWeight" to "bold", "width" to 40, "textAlign" to "right")), "summary-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 12, "marginRight" to 16, "marginBottom" to 12, "marginLeft" to 16, "paddingTop" to 16, "paddingRight" to 16, "paddingBottom" to 16, "paddingLeft" to 16, "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "borderLeftWidth" to 4, "borderLeftColor" to "#3498DB", "borderLeftStyle" to "solid", "flexDirection" to "column", "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "summary-empty" to _pS(_uM("borderLeftColor" to "#BDC3C7", "alignItems" to "center")), "summary-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#3498DB", "fontWeight" to "bold", "marginBottom" to 6)), "summary-oneliner" to _pS(_uM("fontSize" to 17, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 8)), "summary-body" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to "20px", "marginBottom" to 8)), "summary-goal-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "backgroundColor" to "#F8F9FA", "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "paddingTop" to 8, "paddingRight" to 10, "paddingBottom" to 8, "paddingLeft" to 10, "marginBottom" to 8)), "summary-goal-label" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginRight" to 8)), "summary-goal-text" to _pS(_uM("fontSize" to 13, "color" to "#2C3E50", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "summary-encourage" to _pS(_uM("fontSize" to 13, "color" to "#E67E22", "fontStyle" to "italic", "marginTop" to 4)), "summary-empty-text" to _pS(_uM("fontSize" to 14, "color" to "#7F8C8D", "marginBottom" to 4)), "summary-empty-hint" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "recommend-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "section-header-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "library-header" to _pS(_uM("flexDirection" to "column", "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "library-item" to _pS(_uM("marginTop" to 0, "marginRight" to 0, "marginBottom" to 8, "marginLeft" to 0)), "section-title" to _pS(_uM("fontSize" to 16, "fontWeight" to "bold", "color" to "#2C3E50")), "empty-recommend" to _pS(_uM("paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "alignItems" to "center")), "empty-text" to _pS(_uM("fontSize" to 14, "color" to "#BDC3C7")), "bottom-spacer" to _pS(_uM("height" to 40)))
+                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "greeting-bar" to _pS(_uM("flexDirection" to "column", "paddingTop" to 56, "paddingRight" to 20, "paddingBottom" to 0, "paddingLeft" to 20, "backgroundColor" to "#2C3E50")), "greeting-header" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingBottom" to 12)), "bg-morning" to _pS(_uM("backgroundColor" to "#A93226")), "bg-noon" to _pS(_uM("backgroundColor" to "#1A5490")), "bg-afternoon" to _pS(_uM("backgroundColor" to "#8B4513")), "bg-evening" to _pS(_uM("backgroundColor" to "#1A237E")), "bg-night" to _pS(_uM("backgroundColor" to "#1B2631")), "greeting-left" to _pS(_uM("flexDirection" to "column")), "greeting-text" to _pS(_uM("fontSize" to 24, "fontWeight" to "bold", "color" to "#FFFFFF")), "greeting-date" to _pS(_uM("fontSize" to 12, "color" to "rgba(255,255,255,0.85)", "marginTop" to 4)), "greeting-right" to _pS(_uM("flexDirection" to "row", "alignItems" to "center")), "emoji-button" to _pS(_uM("width" to 44, "height" to 44, "borderTopLeftRadius" to 22, "borderTopRightRadius" to 22, "borderBottomRightRadius" to 22, "borderBottomLeftRadius" to 22, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center", "marginRight" to 10)), "emoji-button-text" to _pS(_uM("fontSize" to 24)), "settings-icon" to _pS(_uM("width" to 36, "height" to 36, "borderTopLeftRadius" to 18, "borderTopRightRadius" to 18, "borderBottomRightRadius" to 18, "borderBottomLeftRadius" to 18, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center")), "settings-icon-text" to _pS(_uM("fontSize" to 18, "color" to "#FFFFFF")), "phone-usage-hint" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "justifyContent" to "center", "paddingTop" to 10, "paddingRight" to 16, "paddingBottom" to 10, "paddingLeft" to 16, "marginTop" to 0, "marginRight" to -20, "marginBottom" to 0, "marginLeft" to -20, "backgroundColor" to "rgba(0,0,0,0.15)")), "phone-usage-hint-text" to _pS(_uM("fontSize" to 12, "color" to "#FFFFFF", "fontWeight" to 500)), "guard-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "paddingTop" to 18, "paddingRight" to 20, "paddingBottom" to 18, "paddingLeft" to 20, "borderTopLeftRadius" to 16, "borderTopRightRadius" to 16, "borderBottomRightRadius" to 16, "borderBottomLeftRadius" to 16, "flexDirection" to "column", "boxShadow" to "0 4px 12px rgba(0, 0, 0, 0.06)")), "guard-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginBottom" to 4)), "guard-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "flex-end", "marginBottom" to 6)), "guard-number" to _pS(_uM("fontSize" to 36, "fontWeight" to "bold", "color" to "#2ECC71")), "guard-unit" to _pS(_uM("fontSize" to 16, "color" to "#2ECC71", "fontWeight" to "bold", "marginLeft" to 4)), "guard-sub" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "penetration-section" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 12, "borderTopRightRadius" to 12, "borderBottomRightRadius" to 12, "borderBottomLeftRadius" to 12, "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "section-label" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "width" to 80)), "penetration-track" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "height" to 6, "backgroundColor" to "#F0E6F6", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3, "overflow" to "hidden")), "penetration-fill" to _pS(_uM("height" to 6, "backgroundImage" to "linear-gradient(90deg, #9B59B6 0%, #E91E63 100%)", "backgroundColor" to "rgba(0,0,0,0)", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3)), "penetration-value" to _pS(_uM("fontSize" to 13, "color" to "#9B59B6", "fontWeight" to "bold", "width" to 40, "textAlign" to "right")), "summary-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 12, "marginRight" to 16, "marginBottom" to 12, "marginLeft" to 16, "paddingTop" to 16, "paddingRight" to 16, "paddingBottom" to 16, "paddingLeft" to 16, "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "borderLeftWidth" to 4, "borderLeftColor" to "#3498DB", "borderLeftStyle" to "solid", "flexDirection" to "column", "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "summary-empty" to _pS(_uM("borderLeftColor" to "#BDC3C7", "alignItems" to "center")), "summary-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#3498DB", "fontWeight" to "bold", "marginBottom" to 6)), "summary-oneliner" to _pS(_uM("fontSize" to 17, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 8)), "summary-body" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to "20px", "marginBottom" to 8)), "summary-goal-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "backgroundColor" to "#F8F9FA", "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "paddingTop" to 8, "paddingRight" to 10, "paddingBottom" to 8, "paddingLeft" to 10, "marginBottom" to 8)), "summary-goal-label" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginRight" to 8)), "summary-goal-text" to _pS(_uM("fontSize" to 13, "color" to "#2C3E50", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "summary-encourage" to _pS(_uM("fontSize" to 13, "color" to "#E67E22", "fontStyle" to "italic", "marginTop" to 4)), "summary-empty-text" to _pS(_uM("fontSize" to 14, "color" to "#7F8C8D", "marginBottom" to 4)), "summary-empty-hint" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "recommend-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "section-header-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "library-header" to _pS(_uM("flexDirection" to "column", "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "library-item" to _pS(_uM("marginTop" to 0, "marginRight" to 0, "marginBottom" to 8, "marginLeft" to 0)), "section-title" to _pS(_uM("fontSize" to 16, "fontWeight" to "bold", "color" to "#2C3E50")), "empty-recommend" to _pS(_uM("paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "alignItems" to "center")), "empty-text" to _pS(_uM("fontSize" to 14, "color" to "#BDC3C7")), "bottom-spacer" to _pS(_uM("height" to 40)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

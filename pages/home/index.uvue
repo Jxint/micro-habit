@@ -2,21 +2,23 @@
   <view class="page">
     <scroll-view class="scroll-area" scroll-y="true">
       <view class="greeting-bar" :class="greetingClass">
-        <view class="greeting-left">
-          <text class="greeting-text">{{ greeting }}</text>
-          <text class="greeting-date">{{ dateStr }}</text>
-        </view>
-        <view class="greeting-right">
-          <view class="emoji-button" @tap="openPhoneDialog">
-            <text class="emoji-button-text">{{ greetingEmoji }}</text>
+        <view class="greeting-header">
+          <view class="greeting-left">
+            <text class="greeting-text">{{ greeting }}</text>
+            <text class="greeting-date">{{ dateStr }}</text>
           </view>
-          <view class="settings-icon" @tap="goSettings">
-            <text class="settings-icon-text">⚙</text>
+          <view class="greeting-right">
+            <view class="emoji-button" @tap="openPhoneDialog">
+              <text class="emoji-button-text">{{ greetingEmoji }}</text>
+            </view>
+            <view class="settings-icon" @tap="goSettings">
+              <text class="settings-icon-text">⚙</text>
+            </view>
           </view>
         </view>
-      </view>
-      <view class="phone-usage-hint" @tap="openPhoneDialog">
-        <text class="phone-usage-hint-text">{{ phoneUsageHint }}</text>
+        <view class="phone-usage-hint" @tap="openPhoneDialog">
+          <text class="phone-usage-hint-text">{{ phoneUsageHint }}</text>
+        </view>
       </view>
 
       <view class="guard-card">
@@ -100,9 +102,24 @@
           />
         </view>
       </view>
+      <LlmHistoryCard :entries="llmHistoryEntries" />
+
       <view class="bottom-spacer" />
     </scroll-view>
     <PhoneUsageDialog :visible="showPhoneDialog" @close="closePhoneDialog" />
+    <TriggerRuleDialog
+      :visible="showRuleDialog"
+      :action-name="ruleActionName"
+      :time-window-start="ruleTimeWindowStart"
+      :time-window-end="ruleTimeWindowEnd"
+      :time-threshold-minutes="ruleTimeThresholdMinutes"
+      :screen-cond-text="ruleScreenCondText"
+      :reasoning="pendingReasoning"
+      @close="closeRuleDialog"
+      @accept="acceptRule"
+      @decline="closeRuleDialog"
+      @never-ask="neverAskRule"
+    />
   </view>
 </template>
 
@@ -110,12 +127,17 @@
 import StatusIndicator from '../../components/StatusIndicator.uvue'
 import ActionCard from '../../components/ActionCard.uvue'
 import PhoneUsageDialog from '../../components/PhoneUsageDialog.uvue'
+import LlmHistoryCard from '../../components/LlmHistoryCard.uvue'
+import TriggerRuleDialog from '../../components/TriggerRuleDialog.uvue'
 import { useAppStore, DailyOutput } from '../../stores/appStore'
 import { MicroAction } from '../../models/MicroAction'
+import { LlmHistoryEntry } from '../../models/LlmHistoryEntry'
+import { EffectiveTriggerRule, ScreenConditions } from '../../models/EffectiveTriggerRule'
 import { currentHour } from '../../utils/TimeUtils'
 import { getEnabledActions } from '../../services/ActionManager'
-import { getSetting } from '../../database/SettingsDao'
+import { getSetting, putBool } from '../../database/SettingsDao'
 import { setActionIdForNextPage } from '../../utils/NavigationHelper'
+import { getActionById } from '../../constants/Actions'
 
 const store = useAppStore()
 
@@ -203,6 +225,42 @@ function getPhoneUsageHint(): string {
 const phoneUsageHint = computed<string>(getPhoneUsageHint)
 
 const showPhoneDialog = ref<boolean>(false)
+const showRuleDialog = ref<boolean>(false)
+const pendingRule = ref<EffectiveTriggerRule | null>(null)
+const pendingReasoning = ref<string>('')
+
+const ruleActionName = computed<string>(() : string => {
+  const r = pendingRule.value
+  if (r == null) return ''
+  const a = getActionById(r.actionId)
+  return a != null ? a.name : r.actionId
+})
+const ruleTimeWindowStart = computed<string>(() : string => {
+  const r = pendingRule.value
+  if (r == null || r.timeWindow == null) return ''
+  return r.timeWindow.start
+})
+const ruleTimeWindowEnd = computed<string>(() : string => {
+  const r = pendingRule.value
+  if (r == null || r.timeWindow == null) return ''
+  return r.timeWindow.end
+})
+const ruleTimeThresholdMinutes = computed<number>(() : number => {
+  const r = pendingRule.value
+  if (r == null) return 0
+  return r.timeThresholdMinutes
+})
+const ruleScreenCondText = computed<string>(() : string => {
+  const r = pendingRule.value
+  if (r == null || r.screenConditions == null) return ''
+  const sc = r.screenConditions
+  const parts: string[] = []
+  if (sc.includeHome) parts.push('桌面')
+  if (sc.appPackages.length > 0) parts.push(sc.appPackages.join(', '))
+  return parts.length > 0 ? parts.join(' / ') : '任意'
+})
+
+const llmHistoryEntries = computed<LlmHistoryEntry[]>(() : LlmHistoryEntry[] => store.llmHistory.value)
 
 function openPhoneDialog(): void {
   showPhoneDialog.value = true
@@ -210,6 +268,25 @@ function openPhoneDialog(): void {
 
 function closePhoneDialog(): void {
   showPhoneDialog.value = false
+}
+
+function closeRuleDialog(): void {
+  showRuleDialog.value = false
+  pendingRule.value = null
+  pendingReasoning.value = ''
+}
+
+function acceptRule(): void {
+  showRuleDialog.value = false
+  pendingRule.value = null
+  pendingReasoning.value = ''
+  uni.showToast({ title: '规则已接受（持久化待 Day 5）', icon: 'none' })
+}
+
+function neverAskRule(): void {
+  putBool('llm_trigger_ask_each_time', false)
+  closeRuleDialog()
+  uni.showToast({ title: '已关闭"每次问询"', icon: 'none' })
 }
 
 function getGreetingClass(): string {
@@ -235,6 +312,7 @@ const dateStr = computed<string>(getDateStr)
 
 onPageShow(() => {
   store.refreshHomeData()
+  store.refreshLlmHistory()
 })
 
 function startAction(actionId: string): void {
@@ -249,7 +327,34 @@ function goSettings(): void {
     url: '/pages/settings/index'
   })
 }
+
+onLoad((): void => {
+  try {
+    uni.$on('showTriggerRuleDialog', (data: any): void => {
+      try {
+        if (data == null) return
+        const obj = data as UTSJSONObject
+        if (obj == null) return
+        const ruleRaw = obj['rule']
+        const reasoningRaw = obj['reasoning']
+        const ruleStr = JSON.stringify(ruleRaw)
+        const rule = JSON.parse(ruleStr) as EffectiveTriggerRule
+        if (rule == null) return
+        pendingRule.value = rule
+        const reasoning = typeof reasoningRaw === 'string' ? (reasoningRaw as string) : ''
+        pendingReasoning.value = reasoning
+        showRuleDialog.value = true
+      } catch (e) {
+        console.warn('[home] showTriggerRuleDialog 处理异常: ' + JSON.stringify(e))
+      }
+    })
+  } catch (e) {
+    console.warn('[home] $on showTriggerRuleDialog 异常: ' + JSON.stringify(e))
+  }
+})
 </script>
+
+
 
 <style scoped>
 .page {
@@ -260,32 +365,30 @@ function goSettings(): void {
   flex: 1;
 }
 .greeting-bar {
+  flex-direction: column;
+  padding: 56px 20px 0 20px;
+  background-color: #2C3E50;
+}
+.greeting-header {
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 20px 24px 20px;
-  padding-top: 56px;
-  background-color: #2C3E50;
+  padding-bottom: 12px;
 }
 .bg-morning {
-  background-color: #ED8F03;
-  background: linear-gradient(135deg, #FFB75E 0%, #ED8F03 100%);
+  background-color: #A93226;
 }
 .bg-noon {
-  background-color: #2F80ED;
-  background: linear-gradient(135deg, #56CCF2 0%, #2F80ED 100%);
+  background-color: #1A5490;
 }
 .bg-afternoon {
-  background-color: #FDA085;
-  background: linear-gradient(135deg, #F6D365 0%, #FDA085 100%);
+  background-color: #8B4513;
 }
 .bg-evening {
-  background-color: #2575FC;
-  background: linear-gradient(135deg, #6A11CB 0%, #2575FC 100%);
+  background-color: #1A237E;
 }
 .bg-night {
-  background-color: #232526;
-  background: linear-gradient(135deg, #232526 0%, #414345 100%);
+  background-color: #1B2631;
 }
 .greeting-left {
   flex-direction: column;
@@ -333,6 +436,7 @@ function goSettings(): void {
   align-items: center;
   justify-content: center;
   padding: 10px 16px;
+  margin: 0 -20px;
   background-color: rgba(0, 0, 0, 0.15);
 }
 .phone-usage-hint-text {
@@ -342,7 +446,7 @@ function goSettings(): void {
 }
 .guard-card {
   background-color: #FFFFFF;
-  margin: -16px 16px 8px 16px;
+  margin: 8px 16px 8px 16px;
   padding: 18px 20px;
   border-radius: 16px;
   flex-direction: column;

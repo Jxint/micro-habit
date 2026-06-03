@@ -17,7 +17,7 @@
             <view
               class="bar-fill"
               :style="{
-                height: barHPercent(v) + '%',
+                height: barHpx(v) + 'px',
                 backgroundColor: v < 1 ? '#E8E8E8' : barColor
               }"
             ></view>
@@ -48,6 +48,7 @@ const props = withDefaults(defineProps<{
 
 const wrapperH = props.height
 const rowW = 600
+const barAreaH = 180
 
 function getMaxVal(): number {
   let m = 0
@@ -61,12 +62,13 @@ function getMaxVal(): number {
 
 const maxVal = computed<number>(getMaxVal)
 
-function barHPercent(v: number): number {
+function barHpx(v: number): number {
   if (v <= 0) return 0
   const m = maxVal.value
   if (m <= 0) return 0
-  const r = (v / m) * 100
-  return r < 2 ? 2 : r
+  const px = Math.round((v / m) * barAreaH)
+  if (px < 4) return 4
+  return px
 }
 
 function shouldShowLabel(idx: number): boolean {
@@ -120,7 +122,7 @@ function shouldShowLabel(idx: number): boolean {
 }
 .bar-track {
   width: 100%;
-  flex: 1;
+  height: 180px;
   flex-direction: column;
   justify-content: flex-end;
   align-items: stretch;

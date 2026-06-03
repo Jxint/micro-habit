@@ -1,19 +1,20 @@
 import { dbManager, type SqlRow } from './DatabaseManager'
 import { TriggerRule } from '../models/TriggerRule'
+import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
 
 function mapRow(row: Map<string, any>): TriggerRule {
   return {
-    id: row.get("id") as number,
-    rule_type: row.get("rule_type") as string,
-    trigger_type: row.get("trigger_type") as string,
-    condition_json: row.get("condition_json") as string,
-    action_weights_json: row.get("action_weights_json") as string,
-    enabled: row.get("enabled") as number,
-    priority: row.get("priority") as number,
-    source: row.get("source") as string,
-    expires_at: row.get("expires_at") as number | null,
-    created_at: row.get("created_at") as number,
-    updated_at: row.get("updated_at") as number
+    id: getNum(row, 'id'),
+    rule_type: getStr(row, 'rule_type'),
+    trigger_type: getStr(row, 'trigger_type'),
+    condition_json: getStr(row, 'condition_json'),
+    action_weights_json: getStr(row, 'action_weights_json'),
+    enabled: getNum(row, 'enabled'),
+    priority: getNum(row, 'priority'),
+    source: getStr(row, 'source'),
+    expires_at: getStrOrNull(row, 'expires_at') == null ? null : getNum(row, 'expires_at'),
+    created_at: getNum(row, 'created_at'),
+    updated_at: getNum(row, 'updated_at')
   }
 }
 

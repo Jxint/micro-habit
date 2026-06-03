@@ -1,5 +1,6 @@
 import { dbManager, type SqlRow } from './DatabaseManager'
 import { HeartbeatLog } from '../models/HeartbeatLog'
+import { getNum, getStr } from '../utils/DbRowUtils'
 
 export function insertHeartbeat(status: string): void {
   const row: SqlRow = {
@@ -15,9 +16,9 @@ export function getRecentHeartbeats(limit: number): HeartbeatLog[] {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     const item: HeartbeatLog = {
-      id: row.get("id") as number,
-      service_status: row.get("service_status") as string,
-      timestamp: row.get("timestamp") as number
+      id: getNum(row, 'id'),
+      service_status: getStr(row, 'service_status'),
+      timestamp: getNum(row, 'timestamp')
     }
     result.push(item)
   }

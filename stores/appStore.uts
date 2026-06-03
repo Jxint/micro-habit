@@ -10,6 +10,8 @@ import { callDaily, DailyData } from '../services/CloudService'
 import { WeeklyReport } from '../models/WeeklyReport'
 import { generateWeeklyReport } from '../services/WeeklyReportService'
 import { getTodayTotalUsageMinutes } from '../database/AppUsageDao'
+import * as LlmHistoryDao from '../database/LlmHistoryDao'
+import { LlmHistoryEntry } from '../models/LlmHistoryEntry'
 
 export type DailyOutput = {
   one_liner: string
@@ -36,8 +38,10 @@ export type AppStore = {
   homeDataLoaded: Ref<boolean>
   weeklyReport: Ref<WeeklyReport | null>
   weeklyReportLoading: Ref<boolean>
+  llmHistory: Ref<LlmHistoryEntry[]>
   refreshHomeData(): void
   refreshWeeklyReport(): void
+  refreshLlmHistory(): void
 }
 
 const eyeScore = ref<number>(0)
@@ -57,6 +61,16 @@ const dailySummaryLoading = ref<boolean>(false)
 const homeDataLoaded = ref<boolean>(false)
 const weeklyReport = ref<WeeklyReport | null>(null)
 const weeklyReportLoading = ref<boolean>(false)
+const llmHistory = ref<LlmHistoryEntry[]>([])
+
+function refreshLlmHistory(): void {
+  try {
+    llmHistory.value = LlmHistoryDao.getAllHistory(200)
+  } catch (e) {
+    console.warn('[appStore] refreshLlmHistory 失败: ' + JSON.stringify(e))
+    llmHistory.value = []
+  }
+}
 
 export function useAppStore(): AppStore {
   const store: AppStore = {
@@ -77,6 +91,11 @@ export function useAppStore(): AppStore {
     homeDataLoaded,
     weeklyReport,
     weeklyReportLoading,
+    llmHistory,
+
+    refreshLlmHistory(): void {
+      refreshLlmHistory()
+    },
 
     refreshHomeData(): void {
       homeDataLoaded.value = false

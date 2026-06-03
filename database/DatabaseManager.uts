@@ -1,4 +1,4 @@
-import { sqliteStore, type SqlRow } from '../uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore'
+import { sqliteStore, type SqlRow } from '../uni_modules/uts-sqlite-store/utssdk/app-android/index'
 
 export { type SqlRow }
 

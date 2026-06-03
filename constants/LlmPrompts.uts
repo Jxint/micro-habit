@@ -1,0 +1,70 @@
+import { EffectiveTriggerRule, TimeWindow, ScreenConditions } from '../models/EffectiveTriggerRule'
+
+export type PreTriggerContext = {
+  appLabel: string
+  appPackage: string
+  continuousMinutes: number
+  hour: number
+  todayCompletedCount: number
+  guardMinutes: number
+  recentActions: string[]
+}
+
+export type PostActionContext = {
+  actionId: string
+  actionName: string
+  actionCategory: string
+  durationMs: number
+  originalContext: string
+  todayCompletedCount: number
+  guardMinutes: number
+  recentActions: string[]
+  currentRules: string
+}
+
+export const SYSTEM_PROMPT_EVALUATE = '你是一个微习惯健康助手，正在帮用户做碎片化健康动作。\n你的回答必须严格按 JSON 格式输出，不要有额外文字（包括 ```json``` 标记）。\n基调用温柔+轻度幽默+不油腻的中文风格。避免医学恐吓和引发焦虑的表述。\n绝对禁止读取用户隐私内容，只能使用提供的脱敏聚合数据。'
+
+export function buildPreTriggerPrompt(context: PreTriggerContext): string {
+  const recentStr = context.recentActions.length > 0 ? context.recentActions.join('、') : '无'
+  return '用户当前状态：\n' +
+    '- 正在使用：' + context.appLabel + '\n' +
+    '- 已连续前台：' + context.continuousMinutes + ' 分钟\n' +
+    '- 当前时间：' + context.hour + ':00\n' +
+    '- 今日已完成微动作：' + context.todayCompletedCount + ' 次\n' +
+    '- 今日已守护：' + context.guardMinutes + ' 分钟\n' +
+    '- 最近 5 次动作：' + recentStr + '\n\n' +
+    '请基于以上状态生成：\n' +
+    '1. adhocText：一句 10-30 字的 TTS 即兴文案，温暖+轻度幽默，要提到当前 app 和时长\n' +
+    '2. stateDescription：用 5-15 字概括当前状态（用于"为什么提醒我"展示）\n\n' +
+    '严格按 JSON 格式输出：{"adhocText": "...", "stateDescription": "..."}'
+}
+
+export function buildPostActionPrompt(context: PostActionContext): string {
+  const recentStr = context.recentActions.length > 0 ? context.recentActions.join('、') : '无'
+  return '用户刚完成微动作：' + context.actionName + '（' + context.actionCategory + '，' +
+    Math.round(context.durationMs / 1000) + '秒）\n' +
+    '原触发上下文：' + context.originalContext + '\n' +
+    '今日累计：' + context.todayCompletedCount + ' 次，' + context.guardMinutes + ' 分钟\n' +
+    '最近 5 次：' + recentStr + '\n' +
+    '当前生效的触发规则：' + context.currentRules + '\n\n' +
+    '请评估：\n' +
+    '1. 用户的健康习惯是否稳定？是否需要调整触发频率或类型？\n' +
+    '2. 是否需要新增一条更个性化的触发规则？\n\n' +
+    '如果要新增规则，输出 JSON：\n' +
+    '{"suggestedRule": {"actionId": "eye_blink", "timeWindow": {"start": "22:00", "end": "07:00"}, "screenConditions": {"appPackages": [], "includeHome": true}, "timeThresholdMinutes": 60}, "reasoning": "..."}\n\n' +
+    '如果不需要新规则，输出：\n' +
+    '{"suggestedRule": null, "reasoning": "当前规则合理，继续观察"}'
+}
+
+export const FALLBACK_ADHOC_TEXTS: string[] = [
+  '该起来动动了——',
+  '休息一下，来——',
+  '你的身体发来一条提醒——',
+  '眼睛有点累，眨一眨吧——',
+  '坐久了吗？动一动——'
+]
+
+export function getFallbackAdhoc(): string {
+  const idx = Math.floor(Math.random() * FALLBACK_ADHOC_TEXTS.length)
+  return FALLBACK_ADHOC_TEXTS[idx]
+}

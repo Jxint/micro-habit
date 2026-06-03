@@ -17,6 +17,20 @@
           </view>
           <text class="setting-value">{{ dndStart }} - {{ dndEnd }} ›</text>
         </view>
+        <view class="setting-item">
+          <view class="setting-left">
+            <text class="setting-label">启用 LLM 实时建议</text>
+            <text class="setting-hint">触发时调用 LLM 生成即兴文案 + 复评触发规则</text>
+          </view>
+          <switch :checked="llmEnabled" @change="onLlmEnabledChange" />
+        </view>
+        <view class="setting-item">
+          <view class="setting-left">
+            <text class="setting-label">每次微动作后询问 AI 触发建议</text>
+            <text class="setting-hint">关闭后静默接受 LLM 建议（不开每次问询）</text>
+          </view>
+          <switch :checked="askEachTime" :disabled="!llmEnabled" @change="onAskEachTimeChange" />
+        </view>
       </view>
 
       <view class="settings-section">
@@ -144,7 +158,7 @@
 <script setup lang="uts">
 import NumberPickerDialog from '../../components/NumberPickerDialog.uvue'
 import TimeRangePickerDialog from '../../components/TimeRangePickerDialog.uvue'
-import { getInt, putInt, getSetting, putSetting } from '../../database/SettingsDao'
+import { getInt, putInt, getBool, putBool, getSetting, putSetting } from '../../database/SettingsDao'
 import { getAllEnabledRules } from '../../database/RuleDao'
 import { TriggerRule } from '../../models/TriggerRule'
 
@@ -167,6 +181,8 @@ const dndEndHour = ref<number>(parseHourFromSetting(getSetting('dnd_end', '07:00
 const durationPref = ref<number>(getInt('action_duration_pref', 15))
 const targetCount = ref<number>(getInt('category_target_count', 3))
 const rules = ref<TriggerRule[]>([])
+const llmEnabled = ref<boolean>(getBool('llm_trigger_enabled', true))
+const askEachTime = ref<boolean>(getBool('llm_trigger_ask_each_time', true))
 
 const dndStart = computed<string>(() : string => pad2(dndStartHour.value) + ':00')
 const dndEnd = computed<string>(() : string => pad2(dndEndHour.value) + ':00')
@@ -277,6 +293,42 @@ function handleDebugTap(): void {
   }
 }
 
+function onLlmEnabledChange(e: any): void {
+  try {
+    const obj = e as UTSJSONObject
+    if (obj == null) return
+    const v = obj['detail']
+    if (v == null) return
+    const detail = v as UTSJSONObject
+    if (detail == null) return
+    const valRaw = detail['value']
+    if (valRaw == null) return
+    const enabled = valRaw as boolean
+    llmEnabled.value = enabled === true
+    putBool('llm_trigger_enabled', enabled === true)
+  } catch (err) {
+    console.warn('[settings] onLlmEnabledChange 异常: ' + JSON.stringify(err))
+  }
+}
+
+function onAskEachTimeChange(e: any): void {
+  try {
+    const obj = e as UTSJSONObject
+    if (obj == null) return
+    const v = obj['detail']
+    if (v == null) return
+    const detail = v as UTSJSONObject
+    if (detail == null) return
+    const valRaw = detail['value']
+    if (valRaw == null) return
+    const v2 = valRaw as boolean
+    askEachTime.value = v2 === true
+    putBool('llm_trigger_ask_each_time', v2 === true)
+  } catch (err) {
+    console.warn('[settings] onAskEachTimeChange 异常: ' + JSON.stringify(err))
+  }
+}
+
 onPageShow(() => {
   try { rules.value = getAllEnabledRules() } catch (_) { rules.value = [] }
   durationThreshold.value = getInt('app_duration_threshold', 60)
@@ -284,6 +336,8 @@ onPageShow(() => {
   targetCount.value = getInt('category_target_count', 3)
   dndStartHour.value = parseHourFromSetting(getSetting('dnd_start', '22:00'), 22)
   dndEndHour.value = parseHourFromSetting(getSetting('dnd_end', '07:00'), 7)
+  llmEnabled.value = getBool('llm_trigger_enabled', true)
+  askEachTime.value = getBool('llm_trigger_ask_each_time', true)
 })
 </script>
 

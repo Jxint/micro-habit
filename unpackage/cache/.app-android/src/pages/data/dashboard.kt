@@ -280,8 +280,8 @@ open class GenPagesDataDashboard : BasePage {
                                     _cE("text", _uM("class" to "guard-sub"), "习惯渗透度 " + _tD(unref(penetrationText)), 1)
                                 )),
                                 _cE("view", _uM("class" to "chart-container"), _uA(
-                                    _cE("text", _uM("class" to "chart-label"), "各时段完成次数"),
-                                    _cV(unref(GenComponentsBarChartClass), _uM("labels" to unref(hourlyLabels), "values" to unref(hourlyValues), "height" to 280, "barColor" to "#4CAF50"), null, 8, _uA(
+                                    _cE("text", _uM("class" to "chart-label"), "各时段完成次数（相对高度）"),
+                                    _cV(unref(GenComponentsBarChartClass), _uM("labels" to unref(hourlyLabels), "values" to unref(hourlyValues), "height" to 300, "barColor" to "#4CAF50"), null, 8, _uA(
                                         "labels",
                                         "values"
                                     ))
@@ -321,7 +321,7 @@ open class GenPagesDataDashboard : BasePage {
                             )),
                             _cE("view", _uM("class" to "section-body"), _uA(
                                 _cE("view", _uM("class" to "chart-container"), _uA(
-                                    _cV(unref(GenComponentsLineChartClass), _uM("series-values" to unref(weekTrendValues), "series-names" to unref(weekTrendNames), "series-colors" to unref(weekTrendColors), "point-labels" to unref(weekTrendLabels), "height" to 280, "title" to "7日完成次数趋势"), null, 8, _uA(
+                                    _cV(unref(GenComponentsLineChartClass), _uM("series-values" to unref(weekTrendValues), "series-names" to unref(weekTrendNames), "series-colors" to unref(weekTrendColors), "point-labels" to unref(weekTrendLabels), "height" to 360, "title" to "本周完成次数趋势（左右可拖动）"), null, 8, _uA(
                                         "series-values",
                                         "series-names",
                                         "series-colors",
@@ -336,7 +336,7 @@ open class GenPagesDataDashboard : BasePage {
                             )),
                             _cE("view", _uM("class" to "section-body"), _uA(
                                 _cE("view", _uM("class" to "chart-container"), _uA(
-                                    _cV(unref(GenComponentsHeatmapCalendarClass), _uM("dates" to unref(heatmapDates), "counts" to unref(heatmapCounts), "height" to 260), null, 8, _uA(
+                                    _cV(unref(GenComponentsHeatmapCalendarClass), _uM("dates" to unref(heatmapDates), "counts" to unref(heatmapCounts), "height" to 320), null, 8, _uA(
                                         "dates",
                                         "counts"
                                     ))

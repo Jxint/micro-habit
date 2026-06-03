@@ -1,5 +1,6 @@
 import { getInt, getBool } from '../database/SettingsDao'
 import { currentHour } from '../utils/TimeUtils'
+import { speakSystemTts as pluginSpeakSystemTts } from '../uni_modules/uts-audio-player/utssdk/app-android/index'
 
 type AdhocContext = {
   appLabel: string
@@ -14,10 +15,19 @@ export function speakAdhocOpen(context: AdhocContext): void {
   playFallbackIntro(volume)
 }
 
+export function speakAdhoc(text: string): void {
+  if (isSystemMuted()) return
+  if (text.length < 1) return
+  try { pluginSpeakSystemTts(text) } catch (e) {
+    console.warn('[TtsService] speakAdhoc plugin 调用失败: ' + JSON.stringify(e))
+  }
+}
+
 export function speakFixedGuide(text: string): void {
   if (isSystemMuted()) return
-  const volume = getAdjustedVolume()
-  speakSystemTts(text, volume)
+  try { pluginSpeakSystemTts(text) } catch (e) {
+    console.warn('[TtsService] speakFixedGuide plugin 调用失败: ' + JSON.stringify(e))
+  }
 }
 
 export function preGenerateAll(): void {
@@ -30,14 +40,13 @@ function playFallbackIntro(volume: number): void {
     '你的身体发来一条提醒——'
   ]
   const idx = Math.floor(Math.random() * intros.length)
-  speakSystemTts(intros[idx], volume)
-}
-
-function speakSystemTts(text: string, volume: number): void {
+  try { pluginSpeakSystemTts(intros[idx]) } catch (e) {
+    console.warn('[TtsService] playFallbackIntro plugin 调用失败: ' + JSON.stringify(e))
+  }
 }
 
 function getAdjustedVolume(): number {
-  let vol = getInt('tts_volume', 70) / 100
+  let vol: number = getInt('tts_volume', 70) / 100
   if (isNightTime()) vol *= 0.5
   return vol
 }

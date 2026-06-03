@@ -9,6 +9,20 @@ export type AppUsageItem = {
   minutes: number
 }
 
+function getNum(row: Map<string, any> | null, col: string): number {
+  if (row == null) return 0
+  const v = row.get(col)
+  if (v == null) return 0
+  return v as number
+}
+
+function getStr(row: Map<string, any> | null, col: string): string {
+  if (row == null) return ''
+  const v = row.get(col)
+  if (v == null) return ''
+  return v as string
+}
+
 export function insertOrUpdateSnapshot(packageName: string, appLabel: string, foregroundSec: number): void {
   const date = today()
   const existing = dbManager.queryOne(
@@ -16,13 +30,14 @@ export function insertOrUpdateSnapshot(packageName: string, appLabel: string, fo
     [date, packageName]
   )
   if (existing != null) {
-    const prevSec = existing.get("total_foreground_sec") as number
+    const prevSec = getNum(existing, 'total_foreground_sec')
     const nextSec = prevSec + foregroundSec
+    const id = getNum(existing, 'id')
     const row: SqlRow = {
       columns: ['total_foreground_sec', 'app_label'],
       values: [nextSec, appLabel]
     }
-    dbManager.update('app_usage_snapshots', row, 'id = ?', [(existing.get("id") as number)])
+    dbManager.update('app_usage_snapshots', row, 'id = ?', [id])
   } else {
     const row: SqlRow = {
       columns: ['date', 'package_name', 'app_label', 'total_foreground_sec', 'created_at'],
@@ -38,7 +53,7 @@ export function getTodayTotalUsageMinutes(): number {
     'SELECT COALESCE(SUM(total_foreground_sec), 0) as total FROM app_usage_snapshots WHERE date = ?',
     [date]
   )
-  return row != null ? Math.floor((row.get("total") as number) / 60) : 0
+  return Math.floor(getNum(row, 'total') / 60)
 }
 
 export function getTodayTotalUsageSeconds(): number {
@@ -47,7 +62,7 @@ export function getTodayTotalUsageSeconds(): number {
     'SELECT COALESCE(SUM(total_foreground_sec), 0) as total FROM app_usage_snapshots WHERE date = ?',
     [date]
   )
-  return row != null ? (row.get("total") as number) : 0
+  return getNum(row, 'total')
 }
 
 export function getTodayAppBreakdown(): AppUsageItem[] {
@@ -59,10 +74,13 @@ export function getTodayAppBreakdown(): AppUsageItem[] {
   const result: AppUsageItem[] = []
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]
-    const sec = r.get("total_foreground_sec") as number
+    const sec = getNum(r, 'total_foreground_sec')
+    const pkg = getStr(r, 'package_name')
+    const label = getStr(r, 'app_label')
+    if (pkg.length < 1) continue
     result.push({
-      packageName: r.get("package_name") as string,
-      appLabel: r.get("app_label") as string,
+      packageName: pkg,
+      appLabel: label.length > 0 ? label : pkg,
       foregroundSec: sec,
       minutes: Math.floor(sec / 60)
     })

@@ -1,0 +1,295 @@
+import { callLlmEvaluate } from './CloudService'
+import * as LlmHistoryDao from '../database/LlmHistoryDao'
+import { EffectiveTriggerRule, TimeWindow, ScreenConditions } from '../models/EffectiveTriggerRule'
+import { ParsedLlmResult, LlmHistoryStage } from '../models/LlmHistoryEntry'
+import {
+  PreTriggerContext,
+  PostActionContext,
+  getFallbackAdhoc
+} from '../constants/LlmPrompts'
+
+export type PreTriggerResult = {
+  adhocText: string
+  stateDescription: string
+  fallback: boolean
+}
+
+export type PostActionResult = {
+  suggestedRule: EffectiveTriggerRule | null
+  reasoning: string
+  fallback: boolean
+}
+
+let preContextCache: PreTriggerContext | null = null
+let postContextCache: PostActionContext | null = null
+
+export function setPreContext(ctx: PreTriggerContext): void {
+  preContextCache = ctx
+}
+
+export function getPreContext(): PreTriggerContext | null {
+  return preContextCache
+}
+
+export function clearPreContext(): void {
+  preContextCache = null
+}
+
+export function setPostContext(ctx: PostActionContext): void {
+  postContextCache = ctx
+}
+
+export function clearPostContext(): void {
+  postContextCache = null
+}
+
+export function evaluatePre(
+  onReady: (result: PreTriggerResult) => void,
+  onFail: () => void
+): void {
+  const ctx = preContextCache
+  if (ctx == null) {
+    onFail()
+    return
+  }
+  const contextJson = JSON.stringify(ctx)
+  try {
+    callLlmEvaluate(
+      'pre',
+      contextJson,
+      (raw: string): void => {
+        try {
+          const parsed = parsePreResponse(raw)
+          const adhoc = parsed.adhocText != null ? parsed.adhocText : getFallbackAdhoc()
+          const stateDesc = parsed.stateDescription != null ? parsed.stateDescription : '检测到需要休息'
+          try {
+            LlmHistoryDao.insertHistory('pre', contextJson, raw, parsed, adhoc, null, stateDesc)
+          } catch (e) {
+            console.warn('[LlmTriggerFlow] 写 pre history 失败: ' + JSON.stringify(e))
+          }
+          const result: PreTriggerResult = {
+            adhocText: adhoc,
+            stateDescription: stateDesc,
+            fallback: false
+          }
+          onReady(result)
+        } catch (e) {
+          console.warn('[LlmTriggerFlow] pre parse 失败: ' + JSON.stringify(e))
+          const fallback: PreTriggerResult = buildFallbackPre()
+          try {
+            LlmHistoryDao.insertHistory('pre', contextJson, raw, {}, fallback.adhocText, null, fallback.stateDescription)
+          } catch (_) {}
+          onReady(fallback)
+        }
+      },
+      (): void => {
+        const fallback: PreTriggerResult = buildFallbackPre()
+        try {
+          LlmHistoryDao.insertHistory('pre', contextJson, '', {}, fallback.adhocText, null, fallback.stateDescription)
+        } catch (_) {}
+        onReady(fallback)
+      }
+    )
+  } catch (e) {
+    console.warn('[LlmTriggerFlow] pre 异常: ' + JSON.stringify(e))
+    onFail()
+  }
+}
+
+export function evaluatePost(
+  actionId: string,
+  actionName: string,
+  actionCategory: string,
+  durationMs: number,
+  onReady: (result: PostActionResult) => void,
+  onFail: () => void
+): void {
+  if (postContextCache == null) {
+    onFail()
+    return
+  }
+  const ctx = postContextCache!!
+  const enriched: PostActionContext = {
+    actionId: actionId,
+    actionName: actionName,
+    actionCategory: actionCategory,
+    durationMs: durationMs,
+    originalContext: ctx.originalContext,
+    todayCompletedCount: ctx.todayCompletedCount,
+    guardMinutes: ctx.guardMinutes,
+    recentActions: ctx.recentActions,
+    currentRules: ctx.currentRules
+  }
+  const contextJson = JSON.stringify(enriched)
+  try {
+    callLlmEvaluate(
+      'post',
+      contextJson,
+      (raw: string): void => {
+        try {
+          const parsed = parsePostResponse(raw)
+          const rule = parsed.suggestedRule != null ? parsed.suggestedRule : null
+          const reasoning = parsed.reasoning != null ? parsed.reasoning : ''
+          try {
+            LlmHistoryDao.insertHistory('post', contextJson, raw, parsed, null, rule, reasoning)
+          } catch (e) {
+            console.warn('[LlmTriggerFlow] 写 post history 失败: ' + JSON.stringify(e))
+          }
+          const result: PostActionResult = {
+            suggestedRule: rule,
+            reasoning: reasoning,
+            fallback: false
+          }
+          onReady(result)
+        } catch (e) {
+          console.warn('[LlmTriggerFlow] post parse 失败: ' + JSON.stringify(e))
+          try {
+            LlmHistoryDao.insertHistory('post', contextJson, raw, {}, null, null, '')
+          } catch (_) {}
+          const result: PostActionResult = {
+            suggestedRule: null,
+            reasoning: '',
+            fallback: true
+          }
+          onReady(result)
+        }
+      },
+      (): void => {
+        try {
+          LlmHistoryDao.insertHistory('post', contextJson, '', {}, null, null, '')
+        } catch (_) {}
+        const result: PostActionResult = {
+          suggestedRule: null,
+          reasoning: '',
+          fallback: true
+        }
+        onReady(result)
+      }
+    )
+  } catch (e) {
+    console.warn('[LlmTriggerFlow] post 异常: ' + JSON.stringify(e))
+    onFail()
+  }
+}
+
+function buildFallbackPre(): PreTriggerResult {
+  return {
+    adhocText: getFallbackAdhoc(),
+    stateDescription: '检测到需要休息',
+    fallback: true
+  }
+}
+
+function parsePreResponse(raw: string): ParsedLlmResult {
+  const obj = parseJsonThreeLevels(raw)
+  const result: ParsedLlmResult = {}
+  if (obj == null) return result
+  const adhoc = obj['adhocText']
+  if (typeof adhoc === 'string' && (adhoc as string).length > 0) {
+    result.adhocText = adhoc as string
+  }
+  const stateDesc = obj['stateDescription']
+  if (typeof stateDesc === 'string' && (stateDesc as string).length > 0) {
+    result.stateDescription = stateDesc as string
+  }
+  return result
+}
+
+function parsePostResponse(raw: string): ParsedLlmResult {
+  const obj = parseJsonThreeLevels(raw)
+  const result: ParsedLlmResult = {}
+  if (obj == null) return result
+  const reasoning = obj['reasoning']
+  if (typeof reasoning === 'string' && (reasoning as string).length > 0) {
+    result.reasoning = reasoning as string
+  }
+  const rawRule = obj['suggestedRule']
+  if (rawRule != null && typeof rawRule === 'object') {
+    const rule = normalizeRule(rawRule as UTSJSONObject)
+    if (rule != null) {
+      result.suggestedRule = rule
+    }
+  }
+  return result
+}
+
+function normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule | null {
+  const actionId = raw['actionId']
+  if (typeof actionId !== 'string' || (actionId as string).length < 1) return null
+  const actionIdStr = actionId as string
+
+  let timeWindow: TimeWindow | null = null
+  const tw = raw['timeWindow']
+  if (tw != null && typeof tw === 'object') {
+    const twObj = tw as UTSJSONObject
+    const start = twObj['start']
+    const end = twObj['end']
+    if (typeof start === 'string' && typeof end === 'string') {
+      const startStr = start as string
+      const endStr = end as string
+      if (startStr.length > 0 && endStr.length > 0) {
+        const w: TimeWindow = { start: startStr, end: endStr }
+        timeWindow = w
+      }
+    }
+  }
+
+  let screenConditions: ScreenConditions | null = null
+  const sc = raw['screenConditions']
+  if (sc != null && typeof sc === 'object') {
+    const scObj = sc as UTSJSONObject
+    const includeHome = scObj['includeHome'] === true
+    const appPackagesRaw = scObj['appPackages']
+    const pkgs: string[] = []
+    if (appPackagesRaw != null) {
+      try {
+        const arrStr = JSON.stringify(appPackagesRaw)
+        const arr = JSON.parse(arrStr) as Array<any>
+        for (let i = 0; i < arr.length; i++) {
+          const v = arr[i]
+          if (typeof v === 'string') {
+            const vs = v as string
+            if (vs.length > 0) pkgs.push(vs)
+          }
+        }
+      } catch (_) {}
+    }
+    const cond: ScreenConditions = { appPackages: pkgs, includeHome: includeHome }
+    screenConditions = cond
+  }
+
+  let threshold: number = 0
+  const thresholdRaw = raw['timeThresholdMinutes']
+  if (typeof thresholdRaw === 'number') {
+    const t = thresholdRaw as number
+    threshold = t.toInt()
+  }
+
+  const rule: EffectiveTriggerRule = {
+    id: 0,
+    actionId: actionIdStr,
+    timeWindow: timeWindow,
+    screenConditions: screenConditions,
+    timeThresholdMinutes: threshold,
+    source: 'llm',
+    enabled: true,
+    createdAt: Math.floor(Date.now() / 1000)
+  }
+  return rule
+}
+
+function parseJsonThreeLevels(raw: string): UTSJSONObject | null {
+  try {
+    return JSON.parse(raw) as UTSJSONObject
+  } catch (_) {}
+  try {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match != null) {
+      const m = match[0]
+      if (m != null && m.length > 0) {
+        return JSON.parse(m) as UTSJSONObject
+      }
+    }
+  } catch (_) {}
+  return null
+}

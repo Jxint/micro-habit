@@ -17,11 +17,11 @@
           </view>
 
           <view class="chart-container">
-            <text class="chart-label">各时段完成次数</text>
+            <text class="chart-label">各时段完成次数（相对高度）</text>
             <BarChart
               :labels="hourlyLabels"
               :values="hourlyValues"
-              :height="280"
+              :height="300"
               barColor="#4CAF50"
             />
           </view>
@@ -56,8 +56,8 @@
               :series-names="weekTrendNames"
               :series-colors="weekTrendColors"
               :point-labels="weekTrendLabels"
-              :height="280"
-              title="7日完成次数趋势"
+              :height="360"
+              title="本周完成次数趋势（左右可拖动）"
             />
           </view>
         </view>
@@ -72,7 +72,7 @@
             <HeatmapCalendar
               :dates="heatmapDates"
               :counts="heatmapCounts"
-              :height="260"
+              :height="320"
             />
           </view>
           <view class="heatmap-legend">

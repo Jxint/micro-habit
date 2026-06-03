@@ -1,0 +1,25 @@
+// Database row null-safe getters
+// dbManager.queryOne()/query() 实际返回类型是 Map<string, any> | null
+// 直接 row.get(col) 会被 UTS 编译器推断为 String.get(index) 歧义候选
+// 必须用 Map<string, any> 类型 + null 守卫
+
+export function getNum(row: Map<string, any> | null, col: string): number {
+  if (row == null) return 0
+  const v = row.get(col)
+  if (v == null) return 0
+  return v as number
+}
+
+export function getStr(row: Map<string, any> | null, col: string): string {
+  if (row == null) return ''
+  const v = row.get(col)
+  if (v == null) return ''
+  return v as string
+}
+
+export function getStrOrNull(row: Map<string, any> | null, col: string): string | null {
+  if (row == null) return null
+  const v = row.get(col)
+  if (v == null) return null
+  return v as string
+}

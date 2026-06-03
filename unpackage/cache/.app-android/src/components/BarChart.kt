@@ -28,6 +28,7 @@ open class GenComponentsBarChart : VueComponent {
             val props = __props
             val wrapperH = props.height
             val rowW: Number = 600
+            val barAreaH: Number = 180
             fun gen_getMaxVal_fn(): Number {
                 var m: Number = 0
                 run {
@@ -47,7 +48,7 @@ open class GenComponentsBarChart : VueComponent {
             }
             val getMaxVal = ::gen_getMaxVal_fn
             val maxVal = computed<Number>(getMaxVal)
-            fun gen_barHPercent_fn(v: Number): Number {
+            fun gen_barHpx_fn(v: Number): Number {
                 if (v <= 0) {
                     return 0
                 }
@@ -55,14 +56,13 @@ open class GenComponentsBarChart : VueComponent {
                 if (m <= 0) {
                     return 0
                 }
-                val r = (v / m) * 100
-                return if (r < 2) {
-                    2
-                } else {
-                    r
+                val px = Math.round((v / m) * barAreaH)
+                if (px < 4) {
+                    return 4
                 }
+                return px
             }
-            val barHPercent = ::gen_barHPercent_fn
+            val barHpx = ::gen_barHpx_fn
             fun gen_shouldShowLabel_fn(idx: Number): Boolean {
                 val len = props.labels.length
                 if (len <= 24) {
@@ -93,7 +93,7 @@ open class GenComponentsBarChart : VueComponent {
                                         }
                                     )),
                                     _cE("view", _uM("class" to "bar-track"), _uA(
-                                        _cE("view", _uM("class" to "bar-fill", "style" to _nS(_uM("height" to (barHPercent(v) + "%"), "backgroundColor" to if (v < 1) {
+                                        _cE("view", _uM("class" to "bar-fill", "style" to _nS(_uM("height" to (barHpx(v) + "px"), "backgroundColor" to if (v < 1) {
                                             "#E8E8E8"
                                         } else {
                                             _ctx.barColor
@@ -122,7 +122,7 @@ open class GenComponentsBarChart : VueComponent {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("chart-wrapper" to _pS(_uM("flexDirection" to "column", "width" to "100%", "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 10, "borderTopRightRadius" to 10, "borderBottomRightRadius" to 10, "borderBottomLeftRadius" to 10, "paddingTop" to 8, "paddingRight" to 4, "paddingBottom" to 4, "paddingLeft" to 4)), "chart-title" to _pS(_uM("paddingTop" to 0, "paddingRight" to 12, "paddingBottom" to 4, "paddingLeft" to 12)), "chart-title-text" to _pS(_uM("fontSize" to 13, "fontWeight" to "bold", "color" to "#2C3E50")), "chart-scroll" to _pS(_uM("width" to "100%", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "chart-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "flex-end", "height" to "100%")), "bar-col" to _pS(_uM("width" to 24, "flexShrink" to 0, "flexDirection" to "column", "alignItems" to "center", "justifyContent" to "flex-end", "marginTop" to 0, "marginRight" to 1, "marginBottom" to 0, "marginLeft" to 1)), "bar-value-row" to _pS(_uM("height" to 14, "alignItems" to "center", "justifyContent" to "center")), "bar-value-text" to _pS(_uM("fontSize" to 8, "color" to "#7F8C8D")), "bar-track" to _pS(_uM("width" to "100%", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "flexDirection" to "column", "justifyContent" to "flex-end", "alignItems" to "stretch")), "bar-fill" to _pS(_uM("width" to "70%", "alignSelf" to "center", "borderTopLeftRadius" to 2, "borderTopRightRadius" to 2, "minHeight" to 1)), "bar-label-row" to _pS(_uM("height" to 20, "alignItems" to "center", "justifyContent" to "center")), "bar-label-text" to _pS(_uM("fontSize" to 8, "color" to "#95A5A6")))
+                return _uM("chart-wrapper" to _pS(_uM("flexDirection" to "column", "width" to "100%", "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 10, "borderTopRightRadius" to 10, "borderBottomRightRadius" to 10, "borderBottomLeftRadius" to 10, "paddingTop" to 8, "paddingRight" to 4, "paddingBottom" to 4, "paddingLeft" to 4)), "chart-title" to _pS(_uM("paddingTop" to 0, "paddingRight" to 12, "paddingBottom" to 4, "paddingLeft" to 12)), "chart-title-text" to _pS(_uM("fontSize" to 13, "fontWeight" to "bold", "color" to "#2C3E50")), "chart-scroll" to _pS(_uM("width" to "100%", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "chart-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "flex-end", "height" to "100%")), "bar-col" to _pS(_uM("width" to 24, "flexShrink" to 0, "flexDirection" to "column", "alignItems" to "center", "justifyContent" to "flex-end", "marginTop" to 0, "marginRight" to 1, "marginBottom" to 0, "marginLeft" to 1)), "bar-value-row" to _pS(_uM("height" to 14, "alignItems" to "center", "justifyContent" to "center")), "bar-value-text" to _pS(_uM("fontSize" to 8, "color" to "#7F8C8D")), "bar-track" to _pS(_uM("width" to "100%", "height" to 180, "flexDirection" to "column", "justifyContent" to "flex-end", "alignItems" to "stretch")), "bar-fill" to _pS(_uM("width" to "70%", "alignSelf" to "center", "borderTopLeftRadius" to 2, "borderTopRightRadius" to 2, "minHeight" to 1)), "bar-label-row" to _pS(_uM("height" to 20, "alignItems" to "center", "justifyContent" to "center")), "bar-label-text" to _pS(_uM("fontSize" to 8, "color" to "#95A5A6")))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

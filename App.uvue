@@ -1,133 +1,336 @@
 <script setup lang="uts">
-import { sqliteStore } from './uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore'
+import { sqliteStore } from './uni_modules/uts-sqlite-store/utssdk/app-android/index'
 import { onCreate } from './database/DatabaseHelper'
-import { saveTodaySummary } from './services/ScoreCalculator'
-import { shouldTrigger, onActionResolved, onUserAccepted, getCurrentState } from './services/TriggerEngine'
-import { insertActionLog } from './database/ActionLogDao'
+import { saveTodaySummary, getHomepageData } from './services/ScoreCalculator'
+import { shouldTrigger, onActionResolved, onUserAccepted, TriggerDecision, TriggerContext } from './services/TriggerEngine'
+import { insertActionLog, getRecentLogs, getTotalCompletedDurationSec } from './database/ActionLogDao'
 import { insertOrUpdateSnapshot } from './database/AppUsageDao'
-import { getInt } from './database/SettingsDao'
+import { getInt, getBool } from './database/SettingsDao'
 import { getActionById } from './constants/Actions'
 import { getRandomEncourage } from './constants/EncourageTexts'
 import { shortVibrate } from './utils/VibrateUtils'
-import { speakSystemTts } from './uni_modules/uts-audio-player/utssdk/app-android/SystemTts'
-import { startMonitorService, AppForegroundInfo, MonitorCallbacks } from './uni_modules/uts-accessibility-service/utssdk/app-android/AppMonitorService'
-import { showOverlay, dismissOverlay, OverlayConfig, OverlayCallbacks } from './uni_modules/uts-floating-overlay/utssdk/app-android/FloatingOverlay'
+import { speakSystemTts } from './uni_modules/uts-audio-player/utssdk/app-android/index'
+import { startMonitorService, AppForegroundInfo, MonitorCallbacks } from './uni_modules/uts-accessibility-service/utssdk/app-android/index'
+import { showOverlay, dismissOverlay, OverlayConfig, OverlayCallbacks } from './uni_modules/uts-floating-overlay/utssdk/app-android/index'
 import { setActionIdForNextPage } from './utils/NavigationHelper'
+import {
+  evaluatePre,
+  evaluatePost,
+  setPreContext,
+  setPostContext,
+  clearPreContext,
+  clearPostContext,
+  PreTriggerResult,
+  PostActionResult
+} from './services/LlmTriggerFlow'
+import { speakAdhoc } from './services/TtsService'
+import { PreTriggerContext, PostActionContext, getFallbackAdhoc } from './constants/LlmPrompts'
+import { currentHour } from './utils/TimeUtils'
 
 let firstBackTime = 0
-let triggeredActionId: string = ''
+let triggeredActionId = ''
+let pendingDecisionActionId = ''
+let pendingDecisionLevel = ''
+let pendingDecisionTts = ''
+let pendingDecisionDuration = 0
+let pendingAdhocText = ''
+let pendingActionId = ''
+let pendingActionName = ''
+let pendingActionCategory = ''
+
+function safeNowHour(): number {
+  try { return currentHour() } catch (_) { return 12 }
+}
+
+function buildPreContext(info: AppForegroundInfo, actionId: string): PreTriggerContext {
+  const recent = getRecentLogs(5)
+  const names: string[] = []
+  for (let i = 0; i < recent.length; i++) {
+    const r = recent[i]
+    const a = getActionById(r.action_id)
+    if (a != null) names.push(a.name)
+    else names.push(r.action_id)
+  }
+  const homeData = getHomepageData('')
+  const guardMin = Math.floor(getTotalCompletedDurationSec('') / 60)
+  return {
+    appLabel: info.packageName,
+    appPackage: info.packageName,
+    continuousMinutes: Math.floor(info.continuousMs / 60000),
+    hour: safeNowHour(),
+    todayCompletedCount: homeData.todayCompletedCount,
+    guardMinutes: guardMin,
+    recentActions: names
+  }
+}
+
+function buildPostContext(actionName: string, actionCategory: string, durationMs: number): PostActionContext {
+  const recent = getRecentLogs(5)
+  const names: string[] = []
+  for (let i = 0; i < recent.length; i++) {
+    const r = recent[i]
+    const a = getActionById(r.action_id)
+    if (a != null) names.push(a.name)
+    else names.push(r.action_id)
+  }
+  const homeData = getHomepageData('')
+  const guardMin = Math.floor(getTotalCompletedDurationSec('') / 60)
+  const rulesStr = '当前阈值 ' + getInt('app_duration_threshold', 60) + ' 分钟'
+  return {
+    actionId: pendingActionId,
+    actionName: actionName,
+    actionCategory: actionCategory,
+    durationMs: durationMs,
+    originalContext: pendingAdhocText,
+    todayCompletedCount: homeData.todayCompletedCount,
+    guardMinutes: guardMin,
+    recentActions: names,
+    currentRules: rulesStr
+  }
+}
+
+function emitShowRuleDialog(rule: any, reasoning: string): void {
+  try {
+    uni.$emit('showTriggerRuleDialog', { rule: rule, reasoning: reasoning })
+  } catch (_) {}
+}
+
+function onActionResolvedLLM(actionId: string, actionName: string, actionCategory: string, durationMs: number): void {
+  const llmEnabled = getBool('llm_trigger_enabled', true)
+  if (!llmEnabled) {
+    clearPreContext()
+    clearPostContext()
+    return
+  }
+  pendingActionId = actionId
+  pendingActionName = actionName
+  pendingActionCategory = actionCategory
+  const postCtx = buildPostContext(actionName, actionCategory, durationMs)
+  setPostContext(postCtx)
+  try {
+    evaluatePost(
+      actionId,
+      actionName,
+      actionCategory,
+      durationMs,
+      (postResult: PostActionResult): void => {
+        try {
+          if (postResult.suggestedRule != null) {
+            const rule = postResult.suggestedRule!!
+            const askEach = getBool('llm_trigger_ask_each_time', true)
+            if (askEach) {
+              emitShowRuleDialog(rule, postResult.reasoning)
+            } else {
+              console.log('[App.uvue] llm_trigger_ask_each_time=false, 静默保存 suggestedRule')
+            }
+          }
+        } catch (e) {
+          console.warn('[App.uvue] post-result 处理异常: ' + JSON.stringify(e))
+        }
+        clearPreContext()
+        clearPostContext()
+      },
+      (): void => {
+        clearPreContext()
+        clearPostContext()
+      }
+    )
+  } catch (e) {
+    console.warn('[App.uvue] evaluatePost 异常: ' + JSON.stringify(e))
+    clearPreContext()
+    clearPostContext()
+  }
+}
+
+function showOverlayWithAdhoc(decision: TriggerDecision, adhocText: string, fallback: boolean): void {
+  triggeredActionId = decision.actionId
+  pendingDecisionActionId = decision.actionId
+  pendingDecisionLevel = decision.triggerLevel
+  pendingDecisionTts = decision.ttsText
+  pendingDecisionDuration = decision.durationMs
+  pendingAdhocText = adhocText
+  const actionForEncourage = getActionById(decision.actionId)
+  const encourageText = actionForEncourage != null ? getRandomEncourage(actionForEncourage.category) : '又完成一次！'
+  const cfg: OverlayConfig = {
+    level: decision.triggerLevel,
+    actionName: decision.actionName,
+    ttsText: adhocText,
+    durationMs: decision.durationMs,
+    lottieAssetPath: null,
+    encourageText: encourageText
+  }
+  const cbs: OverlayCallbacks = {
+    onAgree: (): void => {
+      onUserAccepted()
+      dismissOverlay()
+      const aid = triggeredActionId
+      setActionIdForNextPage(aid)
+      uni.navigateTo({
+        url: '/pages/action/execute?actionId=' + aid
+      })
+    },
+    onSelfReported: (): void => {
+      const action = getActionById(pendingDecisionActionId)
+      if (action != null) {
+        insertActionLog({
+          id: 0,
+          action_id: action.id,
+          action_type: action.category,
+          result: 'self_reported',
+          skip_reason: null,
+          trigger_type: 'app_duration',
+          trigger_level: pendingDecisionLevel,
+          duration_ms: 0,
+          target_ms: action.defaultDurationMs,
+          triggered_at: Math.floor(Date.now() / 1000),
+          completed_at: Math.floor(Date.now() / 1000),
+          created_at: Math.floor(Date.now() / 1000)
+        })
+      }
+      onActionResolved()
+      onActionResolvedLLM(pendingDecisionActionId, action != null ? action.name : '', action != null ? action.category : '', action != null ? action.defaultDurationMs : 0)
+    },
+    onBusyRemindLater: (): void => {
+      const action = getActionById(pendingDecisionActionId)
+      if (action != null) {
+        insertActionLog({
+          id: 0,
+          action_id: action.id,
+          action_type: action.category,
+          result: 'skipped',
+          skip_reason: 'busy',
+          trigger_type: 'app_duration',
+          trigger_level: pendingDecisionLevel,
+          duration_ms: 0,
+          target_ms: action.defaultDurationMs,
+          triggered_at: Math.floor(Date.now() / 1000),
+          completed_at: Math.floor(Date.now() / 1000),
+          created_at: Math.floor(Date.now() / 1000)
+        })
+      }
+      onActionResolved()
+      onActionResolvedLLM(pendingDecisionActionId, action != null ? action.name : '', action != null ? action.category : '', 0)
+    },
+    onSkipDuringExec: (): void => {
+      onActionResolved()
+      onActionResolvedLLM(pendingDecisionActionId, '', '', 0)
+    },
+    onCountdownTick: (_remaining: number): void => {},
+    onCountdownFinish: (): void => {
+      shortVibrate(2)
+      const encourageTextFinal = encourageText
+      speakSystemTts(encourageTextFinal)
+      const action = getActionById(pendingDecisionActionId)
+      if (action != null) {
+        insertActionLog({
+          id: 0,
+          action_id: action.id,
+          action_type: action.category,
+          result: 'completed',
+          skip_reason: null,
+          trigger_type: 'app_duration',
+          trigger_level: pendingDecisionLevel,
+          duration_ms: action.defaultDurationMs,
+          target_ms: action.defaultDurationMs,
+          triggered_at: Math.floor(Date.now() / 1000),
+          completed_at: Math.floor(Date.now() / 1000),
+          created_at: Math.floor(Date.now() / 1000)
+        })
+      }
+      onActionResolved()
+      onActionResolvedLLM(pendingDecisionActionId, action != null ? action.name : '', action != null ? action.category : '', action != null ? action.defaultDurationMs : 0)
+    },
+    onPartialCompletion: (_completed: number, _total: number): void => {}
+  }
+  try {
+    showOverlay(cfg, cbs)
+  } catch (e) {
+    console.warn('[App.uvue] showOverlay 失败: ' + JSON.stringify(e))
+  }
+  if (!fallback && adhocText.length > 0) {
+    try { speakAdhoc(adhocText) } catch (_) {}
+  }
+}
 
 onLaunch(() => {
+  try {
+    uni.$on('llmActionCompleted', (data: any): void => {
+      try {
+        if (data == null) return
+        const obj = data as UTSJSONObject
+        if (obj == null) return
+        const actionId = obj['actionId'] as string
+        const actionName = obj['actionName'] as string
+        const actionCategory = obj['actionCategory'] as string
+        const durationMs = (obj['durationMs'] as number).toInt()
+        if (actionId == null || actionId.length < 1) return
+        onActionResolvedLLM(actionId, actionName, actionCategory, durationMs)
+      } catch (e) {
+        console.warn('[App.uvue] llmActionCompleted 处理异常: ' + JSON.stringify(e))
+      }
+    })
+  } catch (e) {
+    console.warn('[App.uvue] $on llmActionCompleted 异常: ' + JSON.stringify(e))
+  }
   try {
     sqliteStore.openDatabase('micro_habit_v2.db', 1, (): void => onCreate(), (oldV: number, newV: number): void => {})
     const callbacks: MonitorCallbacks = {
       onAppDurationTrigger: (info: AppForegroundInfo): void => {
-        try { insertOrUpdateSnapshot(info.packageName, info.packageName, 1) } catch (_) {}
+        try {
+          insertOrUpdateSnapshot(info.packageName, info.packageName, 1)
+        } catch (e) {
+          console.warn('[App.uvue] insertOrUpdateSnapshot 失败: ' + JSON.stringify(e))
+        }
         const threshold = getInt('app_duration_threshold', 60) * 1000
         if (info.continuousMs < threshold) return
+        let decision: TriggerDecision | null = null
         try {
-          const decision = shouldTrigger({
+          const ctx: TriggerContext = {
             appPackage: info.packageName,
             appLabel: info.packageName,
             continuousMinutes: Math.floor(info.continuousMs / 60000),
             triggerType: 'app_duration'
-          })
-          if (decision != null) {
-            triggeredActionId = decision.actionId
-            const actionForEncourage = getActionById(triggeredActionId)
-            const encourageText = actionForEncourage != null ? getRandomEncourage(actionForEncourage.category) : '又完成一次！'
-            const cfg: OverlayConfig = {
-              level: decision.triggerLevel as 'gentle' | 'strong',
-              actionName: decision.actionName,
-              ttsText: decision.ttsText,
-              durationMs: decision.durationMs,
-              lottieAssetPath: null,
-              encourageText: encourageText
-            }
-            const cbs: OverlayCallbacks = {
-              onAgree: (): void => {
-                onUserAccepted()
-                dismissOverlay()
-                const aid = triggeredActionId
-                setActionIdForNextPage(aid)
-                uni.navigateTo({
-                  url: '/pages/action/execute?actionId=' + aid
-                })
-              },
-              onSelfReported: (): void => {
-                const action = getActionById(triggeredActionId)
-                if (action != null) {
-                  insertActionLog({
-                    id: 0,
-                    action_id: action.id,
-                    action_type: action.category,
-                    result: 'self_reported',
-                    skip_reason: null,
-                    trigger_type: 'app_duration',
-                    trigger_level: decision.triggerLevel,
-                    duration_ms: 0,
-                    target_ms: action.defaultDurationMs,
-                    triggered_at: Math.floor(Date.now() / 1000),
-                    completed_at: Math.floor(Date.now() / 1000),
-                    created_at: Math.floor(Date.now() / 1000)
-                  })
-                }
-                onActionResolved()
-              },
-              onBusyRemindLater: (): void => {
-                const action = getActionById(triggeredActionId)
-                if (action != null) {
-                  insertActionLog({
-                    id: 0,
-                    action_id: action.id,
-                    action_type: action.category,
-                    result: 'skipped',
-                    skip_reason: 'busy',
-                    trigger_type: 'app_duration',
-                    trigger_level: decision.triggerLevel,
-                    duration_ms: 0,
-                    target_ms: action.defaultDurationMs,
-                    triggered_at: Math.floor(Date.now() / 1000),
-                    completed_at: Math.floor(Date.now() / 1000),
-                    created_at: Math.floor(Date.now() / 1000)
-                  })
-                }
-                onActionResolved()
-              },
-              onSkipDuringExec: (): void => {
-                onActionResolved()
-              },
-              onCountdownTick: (remaining: number): void => {},
-              onCountdownFinish: (): void => {
-                shortVibrate(2)
-                speakSystemTts(encourageText)
-                const action = getActionById(triggeredActionId)
-                if (action != null) {
-                  insertActionLog({
-                    id: 0,
-                    action_id: action.id,
-                    action_type: action.category,
-                    result: 'completed',
-                    skip_reason: null,
-                    trigger_type: 'app_duration',
-                    trigger_level: decision.triggerLevel,
-                    duration_ms: action.defaultDurationMs,
-                    target_ms: action.defaultDurationMs,
-                    triggered_at: Math.floor(Date.now() / 1000),
-                    completed_at: Math.floor(Date.now() / 1000),
-                    created_at: Math.floor(Date.now() / 1000)
-                  })
-                }
-                onActionResolved()
-              },
-              onPartialCompletion: (completed: number, total: number): void => {}
-            }
-            showOverlay(cfg, cbs)
           }
-        } catch (_) {}
+          decision = shouldTrigger(ctx)
+        } catch (e) {
+          console.warn('[App.uvue] shouldTrigger 失败: ' + JSON.stringify(e))
+        }
+        if (decision == null) return
+
+        const llmEnabled = getBool('llm_trigger_enabled', true)
+        if (!llmEnabled) {
+          showOverlayWithAdhoc(decision, decision.ttsText, true)
+          return
+        }
+
+        const preCtx = buildPreContext(info, decision.actionId)
+        setPreContext(preCtx)
+        try {
+          evaluatePre(
+            (preResult: PreTriggerResult): void => {
+              try {
+                showOverlayWithAdhoc(decision, preResult.adhocText, preResult.fallback)
+              } catch (e) {
+                console.warn('[App.uvue] onReady 处理失败: ' + JSON.stringify(e))
+              }
+            },
+            (): void => {
+              try {
+                showOverlayWithAdhoc(decision, getFallbackAdhoc(), true)
+              } catch (e) {
+                console.warn('[App.uvue] onFail 降级失败: ' + JSON.stringify(e))
+              }
+              clearPreContext()
+            }
+          )
+        } catch (e) {
+          console.warn('[App.uvue] evaluatePre 异常: ' + JSON.stringify(e))
+          showOverlayWithAdhoc(decision, getFallbackAdhoc(), true)
+          clearPreContext()
+        }
       },
-      onAppSwitch: (from: string, to: string): void => {},
-      onTimePeriodTrigger: (name: string): void => {}
+      onAppSwitch: (_from: string, _to: string): void => {},
+      onTimePeriodTrigger: (_name: string): void => {}
     }
     startMonitorService(callbacks)
   } catch (e) {
@@ -149,7 +352,7 @@ onLastPageBackPress(() => {
   if (firstBackTime == 0) {
     uni.showToast({ title: '再按一次退出应用', position: 'bottom' })
     firstBackTime = Date.now()
-    setTimeout(() : void => {
+    setTimeout((): void => {
       firstBackTime = 0
     }, 2000)
   } else if (Date.now() - firstBackTime < 2000) {

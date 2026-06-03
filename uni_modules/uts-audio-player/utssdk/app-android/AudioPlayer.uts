@@ -150,7 +150,7 @@ class NativeAudioPlayer {
         cbs.onProgress(mp.getCurrentPosition(), mp.getDuration())
         self.startProgress()
       }
-    }, 100)
+    }, (100).toLong())
   }
 
   private stopProgress(): void {

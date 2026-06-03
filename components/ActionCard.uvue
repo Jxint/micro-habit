@@ -1,7 +1,7 @@
 <template>
   <view class="action-card" :class="cardClass" @tap="onTap">
     <view class="action-icon-wrap" :class="iconWrapClass">
-      <text class="action-icon">{{ iconEmoji }}</text>
+      <text class="action-icon">{{ iconEmoji() }}</text>
     </view>
     <view class="action-info">
       <text class="action-name">{{ props.actionName }}</text>

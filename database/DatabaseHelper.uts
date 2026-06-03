@@ -1,8 +1,8 @@
 import { DEFAULT_SETTINGS } from '../constants/DefaultSettings'
-import { sqliteStore } from '../uni_modules/uts-sqlite-store/utssdk/app-android/SqliteStore'
+import { sqliteStore } from '../uni_modules/uts-sqlite-store/utssdk/app-android/index'
 
 const DB_NAME = 'micro_habit_v2.db'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 export function getDbName(): string {
   return DB_NAME
@@ -27,6 +27,21 @@ export function onUpgrade(db: any, oldVersion: number, newVersion: number): void
   }
   if (oldVersion < 3) {
     runSql("ALTER TABLE daily_summaries ADD COLUMN guard_count INTEGER NOT NULL DEFAULT 0")
+  }
+  if (oldVersion < 4) {
+    runSql(`CREATE TABLE IF NOT EXISTS llm_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      stage TEXT NOT NULL,
+      context_json TEXT NOT NULL,
+      ai_raw_response TEXT NOT NULL,
+      parsed_result_json TEXT DEFAULT '{}',
+      adhoc_text TEXT DEFAULT NULL,
+      suggested_rule_json TEXT DEFAULT NULL,
+      reasoning TEXT DEFAULT NULL,
+      created_at INTEGER NOT NULL
+    )`)
+    runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_date ON llm_history(created_at)")
+    runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_stage ON llm_history(stage)")
   }
 }
 
@@ -134,6 +149,20 @@ function createTables(): void {
     created_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL
   )`)
+
+  runSql(`CREATE TABLE IF NOT EXISTS llm_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stage TEXT NOT NULL,
+    context_json TEXT NOT NULL,
+    ai_raw_response TEXT NOT NULL,
+    parsed_result_json TEXT DEFAULT '{}',
+    adhoc_text TEXT DEFAULT NULL,
+    suggested_rule_json TEXT DEFAULT NULL,
+    reasoning TEXT DEFAULT NULL,
+    created_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_date ON llm_history(created_at)")
+  runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_stage ON llm_history(stage)")
 }
 
 function insertDefaultSettings(): void {

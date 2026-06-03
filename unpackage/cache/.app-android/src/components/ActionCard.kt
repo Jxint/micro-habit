@@ -99,7 +99,7 @@ open class GenComponentsActionCard : VueComponent {
                         "action-icon-wrap",
                         unref(iconWrapClass)
                     ))), _uA(
-                        _cE("text", _uM("class" to "action-icon"), _tD(iconEmoji))
+                        _cE("text", _uM("class" to "action-icon"), _tD(iconEmoji()), 1)
                     ), 2),
                     _cE("view", _uM("class" to "action-info"), _uA(
                         _cE("text", _uM("class" to "action-name"), _tD(props.actionName), 1),

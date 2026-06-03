@@ -144,6 +144,20 @@ function clearCountdown(): void {
   }
 }
 
+function emitLlmActionCompleted(a: MicroAction, durationMs: number, result: string): void {
+  try {
+    uni.$emit('llmActionCompleted', {
+      actionId: a.id,
+      actionName: a.name,
+      actionCategory: a.category,
+      durationMs: durationMs,
+      result: result
+    })
+  } catch (e) {
+    console.warn('[execute] emitLlmActionCompleted 失败: ' + JSON.stringify(e))
+  }
+}
+
 function recordAction(result: string, skipReason: string = ''): void {
   console.log('[execute] recordAction enter, result=' + result)
   const a = action.value
@@ -168,7 +182,8 @@ function recordAction(result: string, skipReason: string = ''): void {
     created_at: Math.floor(nowMs / 1000)
   }
   const insertId = insertActionLog(log)
-  console.log('[execute] insertActionLog returned id=' + insertId)
+  console.log('[execute] insertActionLog 返回 id=' + insertId)
+  emitLlmActionCompleted(a, dur, result)
 }
 
 function onRejectRule(): void {

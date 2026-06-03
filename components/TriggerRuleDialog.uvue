@@ -1,0 +1,180 @@
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <view class="dialog-header">
+        <text class="dialog-title">AI 触发建议</text>
+        <view class="dialog-close" @tap="close">
+          <text class="dialog-close-text">×</text>
+        </view>
+      </view>
+
+      <view class="dialog-body">
+        <text class="rule-section-title">建议动作</text>
+        <text class="rule-value">{{ actionName }}</text>
+
+        <text v-if="timeWindowStart.length > 0" class="rule-section-title">生效时间段</text>
+        <text v-if="timeWindowStart.length > 0" class="rule-value">{{ timeWindowStart }} ~ {{ timeWindowEnd }}</text>
+
+        <text v-if="timeThresholdMinutes > 0" class="rule-section-title">时间阈值</text>
+        <text v-if="timeThresholdMinutes > 0" class="rule-value">连续前台 ≥ {{ timeThresholdMinutes }} 分钟</text>
+
+        <text v-if="screenCondText.length > 0" class="rule-section-title">屏幕状态</text>
+        <text v-if="screenCondText.length > 0" class="rule-value">{{ screenCondText }}</text>
+
+        <text v-if="reasoning.length > 0" class="rule-section-title">建议理由</text>
+        <text v-if="reasoning.length > 0" class="rule-value reasoning">{{ reasoning }}</text>
+      </view>
+
+      <view class="dialog-buttons">
+        <view class="btn btn-secondary" @tap="onDecline">
+          <text class="btn-text">拒绝</text>
+        </view>
+        <view class="btn btn-primary" @tap="onAccept">
+          <text class="btn-text">接受</text>
+        </view>
+      </view>
+
+      <view class="never-ask-row" @tap="onNeverAsk">
+        <text class="never-ask-text">不再询问</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { getActionById } from '../constants/Actions'
+
+const props = withDefaults(defineProps<{
+  visible: boolean
+  actionName: string
+  timeWindowStart: string
+  timeWindowEnd: string
+  timeThresholdMinutes: number
+  screenCondText: string
+  reasoning: string
+}>(), {
+  visible: false,
+  actionName: '',
+  timeWindowStart: '',
+  timeWindowEnd: '',
+  timeThresholdMinutes: 0,
+  screenCondText: '',
+  reasoning: ''
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'accept'): void
+  (e: 'decline'): void
+  (e: 'neverAsk'): void
+}>()
+
+function close(): void { emit('close') }
+function onAccept(): void { emit('accept') }
+function onDecline(): void { emit('decline') }
+function onNeverAsk(): void { emit('neverAsk') }
+function onMaskTap(): void { close() }
+</script>
+
+<style scoped>
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.dialog-card {
+  width: 90%;
+  max-width: 420px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  flex-direction: column;
+}
+.dialog-header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px 12px 4px;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: #F0F3F4;
+  align-items: center;
+  justify-content: center;
+}
+.dialog-close-text {
+  font-size: 18px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.dialog-body {
+  padding: 8px 4px;
+  margin-bottom: 12px;
+}
+.rule-section-title {
+  font-size: 12px;
+  color: #95A5A6;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+.rule-value {
+  font-size: 14px;
+  color: #2C3E50;
+  font-weight: bold;
+  line-height: 1.4;
+}
+.rule-value.reasoning {
+  font-weight: normal;
+  color: #34495E;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.dialog-buttons {
+  flex-direction: row;
+  margin-bottom: 8px;
+}
+.btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.btn-secondary {
+  background-color: #ECF0F1;
+  margin-right: 8px;
+}
+.btn-primary {
+  background-color: #3498DB;
+  margin-left: 8px;
+}
+.btn-text {
+  font-size: 14px;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.btn-secondary .btn-text {
+  color: #2C3E50;
+}
+.never-ask-row {
+  padding: 8px 0 4px 0;
+  align-items: center;
+}
+.never-ask-text {
+  font-size: 12px;
+  color: #95A5A6;
+}
+</style>

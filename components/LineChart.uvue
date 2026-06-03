@@ -15,41 +15,61 @@
     </view>
     <view class="chart-area" :style="{ height: chartAreaH + 'px' }">
       <view class="y-axis">
-        <text class="y-tick">100</text>
-        <text class="y-tick">75</text>
-        <text class="y-tick">50</text>
-        <text class="y-tick">25</text>
+        <text class="y-tick">{{ yMaxLabel }}</text>
+        <text class="y-tick">{{ yMidLabel }}</text>
         <text class="y-tick">0</text>
       </view>
-      <view class="plot-area">
-        <view class="grid-area">
-          <view v-for="g in 4" :key="'g-' + g" class="grid-line"></view>
-        </view>
-        <view
-          v-for="(values, si) in seriesValues"
-          :key="'series-' + si"
-          class="series-layer"
-        >
+      <scroll-view
+        class="plot-scroll"
+        scroll-x="true"
+        :show-scrollbar="false"
+      >
+        <view class="plot-area" :style="{ width: plotW + 'px', height: chartAreaH + 'px' }">
+          <view class="grid-area">
+            <view class="grid-line"></view>
+            <view class="grid-line"></view>
+            <view class="grid-line"></view>
+          </view>
           <view
-            v-for="(v, pi) in values"
-            :key="'pt-' + si + '-' + pi"
-            class="point"
-            :style="{
-              left: pointLeft(pi, values.length) + '%',
-              bottom: pointBottom(v) + '%',
-              backgroundColor: seriesColors[si]
-            }"
-          ></view>
+            v-for="(values, si) in seriesValues"
+            :key="'series-' + si"
+            class="series-layer"
+          >
+            <view
+              v-for="(v, pi) in values"
+              :key="'pt-' + si + '-' + pi"
+              class="point-col"
+              :style="{ left: pointLeft(pi, values.length) + '%', bottom: pointBottom(v) + '%' }"
+            >
+              <text
+                v-if="v > 0"
+                class="point-label"
+                :style="{ color: seriesColors[si] as string }"
+              >{{ v }}</text>
+              <view
+                class="point"
+                :style="{ backgroundColor: seriesColors[si] }"
+              ></view>
+            </view>
+          </view>
         </view>
-      </view>
+      </scroll-view>
     </view>
     <view class="x-axis">
-      <text
-        v-for="(p, pi) in pointLabels"
-        :key="'xl-' + pi"
-        class="x-tick"
-        :style="{ left: xLabelLeft(pi) + '%' }"
-      >{{ p }}</text>
+      <scroll-view
+        class="x-scroll"
+        scroll-x="true"
+        :show-scrollbar="false"
+      >
+        <view class="x-track" :style="{ width: plotW + 'px' }">
+          <text
+            v-for="(p, pi) in pointLabels"
+            :key="'xl-' + pi"
+            class="x-tick"
+            :style="{ left: xLabelLeft(pi) + '%' }"
+          >{{ p }}</text>
+        </view>
+      </scroll-view>
     </view>
   </view>
 </template>
@@ -68,14 +88,53 @@ const props = withDefaults(defineProps<{
   seriesColors: () => [],
   pointLabels: () => [],
   title: '',
-  height: 260
+  height: 320
 })
 
 const titleAreaH = 24
 const legendAreaH = 24
-const xAxisAreaH = 22
+const xAxisAreaH = 26
 const wrapperH = props.height
 const chartAreaH = wrapperH - titleAreaH - legendAreaH - xAxisAreaH
+
+const minPointSpacing = 60
+const minPlotW = 600
+
+function getPointCount(): number {
+  if (props.pointLabels.length > 0) return props.pointLabels.length
+  let max = 0
+  for (let i = 0; i < props.seriesValues.length; i++) {
+    const sv = props.seriesValues[i] as number[]
+    if (sv.length > max) max = sv.length
+  }
+  return max
+}
+
+const pointCount = computed<number>(getPointCount)
+const plotW = computed<number>(() => {
+  const n = pointCount.value
+  if (n < 1) return minPlotW
+  const w = n * minPointSpacing
+  if (w > minPlotW) return w
+  return minPlotW
+})
+
+function getMaxValue(): number {
+  let m = 0
+  for (let i = 0; i < props.seriesValues.length; i++) {
+    const sv = props.seriesValues[i] as number[]
+    for (let j = 0; j < sv.length; j++) {
+      const v = sv[j] as number
+      if (v > m) m = v
+    }
+  }
+  if (m < 1) return 1
+  return m
+}
+
+const maxVal = computed<number>(getMaxValue)
+const yMaxLabel = computed<string>(() : string => '' + maxVal.value)
+const yMidLabel = computed<string>(() : string => '' + Math.round(maxVal.value / 2))
 
 function pointLeft(pi: number, total: number): number {
   if (total <= 1) return 0
@@ -83,8 +142,12 @@ function pointLeft(pi: number, total: number): number {
 }
 
 function pointBottom(value: number): number {
-  const v = value < 0 ? 0 : (value > 100 ? 100 : value)
-  return v
+  const m = maxVal.value
+  if (m < 1) return 0
+  const pct = (value / m) * 88
+  if (pct < 1) return 1
+  if (pct > 88) return 88
+  return pct
 }
 
 function xLabelLeft(pi: number): number {
@@ -134,7 +197,7 @@ function xLabelLeft(pi: number): number {
   width: 100%;
 }
 .y-axis {
-  width: 30px;
+  width: 32px;
   flex-direction: column;
   justify-content: space-between;
   align-items: flex-end;
@@ -144,9 +207,11 @@ function xLabelLeft(pi: number): number {
   font-size: 9px;
   color: #95A5A6;
 }
-.plot-area {
+.plot-scroll {
   flex: 1;
-  flex-direction: column;
+  flex-direction: row;
+}
+.plot-area {
   position: relative;
 }
 .grid-area {
@@ -170,27 +235,47 @@ function xLabelLeft(pi: number): number {
   right: 0;
   bottom: 0;
 }
-.point {
+.point-col {
   position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 4px;
-  margin-left: -4px;
-  margin-bottom: -4px;
+  width: 40px;
+  align-items: center;
+  flex-direction: column;
+  margin-left: -20px;
+}
+.point-label {
+  font-size: 10px;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+.point {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  border-width: 2px;
+  border-color: #FFFFFF;
+  border-style: solid;
 }
 .x-axis {
-  height: 22px;
+  height: 26px;
   width: 100%;
   flex-direction: row;
+  margin-left: 36px;
+  overflow: hidden;
+}
+.x-scroll {
+  width: 100%;
+  flex-direction: row;
+}
+.x-track {
+  height: 26px;
   position: relative;
-  margin-left: 30px;
 }
 .x-tick {
   position: absolute;
   font-size: 9px;
   color: #95A5A6;
-  width: 30px;
+  width: 40px;
   text-align: center;
-  margin-left: -15px;
+  margin-left: -20px;
 }
 </style>

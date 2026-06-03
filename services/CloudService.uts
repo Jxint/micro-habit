@@ -13,6 +13,30 @@ export type DailyData = {
 
 import { WeeklyReportStats } from '../models/WeeklyReport'
 import { TriggerRule } from '../models/TriggerRule'
+import { SYSTEM_PROMPT_EVALUATE, buildPreTriggerPrompt, buildPostActionPrompt, PreTriggerContext, PostActionContext } from '../constants/LlmPrompts'
+
+const MINIMAX_BASE_URL = 'https://api.minimax.chat/v1'
+const MINIMAX_CHAT_PATH = 'text/chatcompletion_v2'
+const MINIMAX_CHAT_MODEL = 'MiniMax-M2.7'
+const MINIMAX_API_KEY = 'sk-cp-Dd2_yFv0hINLsc2fnuWrrde0agYZQCzaRzW0DaK64CAl7Y-plAqRd7R2jSxQTSgSEWbl6teJc2oFL90HPMgyqLXel67OJhufLeLeVauln93DyXmA1277iQw'
+
+type MinimaxBaseResp = {
+  status_code?: number
+  status_msg?: string
+}
+
+type MinimaxMessage = {
+  content?: string
+}
+
+type MinimaxChoice = {
+  message?: MinimaxMessage
+}
+
+type MinimaxChatResp = {
+  base_resp?: MinimaxBaseResp
+  choices?: MinimaxChoice[]
+}
 
 type CloudResponse = {
   code: number
@@ -119,4 +143,91 @@ function callCloudFn(name: string, payload: any, onOK: (result: any) => void, on
   } catch (_) {
     onFail()
   }
+}
+
+export function callLlmEvaluate(
+  stage: 'pre' | 'post',
+  contextJson: string,
+  onOK: (raw: string) => void,
+  onFail: () => void
+): void {
+  if (MINIMAX_API_KEY === 'PLACEHOLDER_KEY') {
+    console.warn('[CloudService] MiniMax API key 未配置（仍为 PLACEHOLDER_KEY），走降级路径')
+    onFail()
+    return
+  }
+
+  let userPrompt = ''
+  try {
+    if (stage === 'pre') {
+      const ctx = JSON.parse(contextJson) as PreTriggerContext
+      userPrompt = buildPreTriggerPrompt(ctx)
+    } else {
+      const ctx = JSON.parse(contextJson) as PostActionContext
+      userPrompt = buildPostActionPrompt(ctx)
+    }
+  } catch (_) {
+    onFail()
+    return
+  }
+
+  const reqBody = {
+    model: MINIMAX_CHAT_MODEL,
+    messages: [
+      { role: 'system' as const, content: SYSTEM_PROMPT_EVALUATE, name: 'MiniMax AI' },
+      { role: 'user' as const, content: userPrompt, name: '用户' }
+    ],
+    temperature: 0.7,
+    max_completion_tokens: 400
+  }
+
+  try {
+    uni.request({
+      url: MINIMAX_BASE_URL + '/' + MINIMAX_CHAT_PATH,
+      method: 'POST',
+      header: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + MINIMAX_API_KEY
+      },
+      data: JSON.stringify(reqBody),
+      timeout: 8000,
+      success(res) {
+        try {
+          const data = res.data
+          const content = extractChatContent(data != null ? data : '')
+          if (content.length > 0) {
+            onOK(content)
+          } else {
+            onFail()
+          }
+        } catch (_) {
+          onFail()
+        }
+      },
+      fail(_err) {
+        onFail()
+      }
+    })
+  } catch (_) {
+    onFail()
+  }
+}
+
+function extractChatContent(data: any): string {
+  try {
+    const dataStr = JSON.stringify(data)
+    const obj = JSON.parse(dataStr) as MinimaxChatResp
+    if (obj.base_resp != null && obj.base_resp.status_code != null && obj.base_resp.status_code != 0) {
+      console.warn('[CloudService] MiniMax 返回非 0 状态: ' + (obj.base_resp.status_msg ?? ''))
+      return ''
+    }
+    if (obj.choices != null && obj.choices.length > 0) {
+      const first = obj.choices[0]
+      if (first != null && first.message != null && first.message.content != null) {
+        const c = first.message.content
+        return typeof c === 'string' ? c : ''
+      }
+    }
+  } catch (_) {}
+  return ''
 }

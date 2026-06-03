@@ -1,0 +1,93 @@
+import { dbManager, type SqlRow } from './DatabaseManager'
+import { LlmHistoryEntry, LlmHistoryStage, ParsedLlmResult } from '../models/LlmHistoryEntry'
+import { EffectiveTriggerRule } from '../models/EffectiveTriggerRule'
+import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
+
+export function insertHistory(
+  stage: LlmHistoryStage,
+  contextJson: string,
+  aiRawResponse: string,
+  parsedResult: ParsedLlmResult,
+  adhocText: string | null,
+  suggestedRule: EffectiveTriggerRule | null,
+  reasoning: string | null
+): number {
+  const createdAt = Math.floor(Date.now() / 1000)
+  const parsedJson = JSON.stringify(parsedResult)
+  const ruleJson = suggestedRule == null ? null : JSON.stringify(suggestedRule)
+  const row: SqlRow = {
+    columns: [
+      'stage', 'context_json', 'ai_raw_response', 'parsed_result_json',
+      'adhoc_text', 'suggested_rule_json', 'reasoning', 'created_at'
+    ],
+    values: [
+      stage, contextJson, aiRawResponse, parsedJson,
+      adhocText, ruleJson, reasoning, createdAt
+    ]
+  }
+  return dbManager.insert('llm_history', row)
+}
+
+export function getAllHistory(limit: number): LlmHistoryEntry[] {
+  const rows = dbManager.query(
+    'SELECT * FROM llm_history ORDER BY created_at DESC LIMIT ?',
+    [limit]
+  )
+  return mapRows(rows)
+}
+
+export function getHistoryByStage(stage: LlmHistoryStage, limit: number): LlmHistoryEntry[] {
+  const rows = dbManager.query(
+    'SELECT * FROM llm_history WHERE stage = ? ORDER BY created_at DESC LIMIT ?',
+    [stage, limit]
+  )
+  return mapRows(rows)
+}
+
+export function cleanOldHistory(daysKeep: number): void {
+  const cutoff = Math.floor(Date.now() / 1000) - daysKeep * 86400
+  dbManager.delete('llm_history', 'created_at < ?', [cutoff])
+}
+
+function mapRows(rows: Map<string, any>[]): LlmHistoryEntry[] {
+  const result: LlmHistoryEntry[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r != null) {
+      result.push(mapRow(r))
+    }
+  }
+  return result
+}
+
+function mapRow(row: Map<string, any>): LlmHistoryEntry {
+  const parsedJson = getStr(row, 'parsed_result_json')
+  const ruleJson = getStrOrNull(row, 'suggested_rule_json')
+  let parsed: ParsedLlmResult = {}
+  if (parsedJson.length > 0) {
+    try {
+      parsed = JSON.parse(parsedJson) as ParsedLlmResult
+    } catch (_) {
+      parsed = {}
+    }
+  }
+  let rule: EffectiveTriggerRule | null = null
+  if (ruleJson != null && ruleJson.length > 0) {
+    try {
+      rule = JSON.parse(ruleJson) as EffectiveTriggerRule
+    } catch (_) {
+      rule = null
+    }
+  }
+  return {
+    id: getNum(row, 'id'),
+    stage: getStr(row, 'stage') as LlmHistoryStage,
+    contextJson: getStr(row, 'context_json'),
+    aiRawResponse: getStr(row, 'ai_raw_response'),
+    parsedResult: parsed,
+    adhocText: getStrOrNull(row, 'adhoc_text'),
+    suggestedRule: rule,
+    reasoning: getStrOrNull(row, 'reasoning'),
+    createdAt: getNum(row, 'created_at')
+  }
+}

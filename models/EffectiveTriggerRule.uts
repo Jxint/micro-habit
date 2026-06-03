@@ -1,0 +1,20 @@
+export type TimeWindow = {
+  start: string
+  end: string
+}
+
+export type ScreenConditions = {
+  appPackages: string[]
+  includeHome: boolean
+}
+
+export type EffectiveTriggerRule = {
+  id: number
+  actionId: string
+  timeWindow: TimeWindow | null
+  screenConditions: ScreenConditions | null
+  timeThresholdMinutes: number
+  source: 'local' | 'llm' | 'user'
+  enabled: boolean
+  createdAt: number
+}

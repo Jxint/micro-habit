@@ -47,6 +47,8 @@ open class GenPagesSettingsIndex : BasePage {
             val durationPref = ref<Number>(getInt("action_duration_pref", 15))
             val targetCount = ref<Number>(getInt("category_target_count", 3))
             val rules = ref(_uA<TriggerRule>())
+            val llmEnabled = ref<Boolean>(getBool("llm_trigger_enabled", true))
+            val askEachTime = ref<Boolean>(getBool("llm_trigger_ask_each_time", true))
             val dndStart = computed<String>(fun(): String {
                 return pad2(dndStartHour.value) + ":00"
             }
@@ -107,7 +109,7 @@ open class GenPagesSettingsIndex : BasePage {
                     return "无条件"
                 }
                 try {
-                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:204") as UTSJSONObject
+                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:220") as UTSJSONObject
                     if (obj == null) {
                         return json.substring(0, 20)
                     }
@@ -200,6 +202,60 @@ open class GenPagesSettingsIndex : BasePage {
                 }
             }
             val handleDebugTap = ::gen_handleDebugTap_fn
+            fun gen_onLlmEnabledChange_fn(e: Any): Unit {
+                try {
+                    val obj = e as UTSJSONObject
+                    if (obj == null) {
+                        return
+                    }
+                    val v = obj["detail"]
+                    if (v == null) {
+                        return
+                    }
+                    val detail = v as UTSJSONObject
+                    if (detail == null) {
+                        return
+                    }
+                    val valRaw = detail["value"]
+                    if (valRaw == null) {
+                        return
+                    }
+                    val enabled = valRaw as Boolean
+                    llmEnabled.value = enabled === true
+                    putBool("llm_trigger_enabled", enabled === true)
+                }
+                 catch (err: Throwable) {
+                    console.warn("[settings] onLlmEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:310")
+                }
+            }
+            val onLlmEnabledChange = ::gen_onLlmEnabledChange_fn
+            fun gen_onAskEachTimeChange_fn(e: Any): Unit {
+                try {
+                    val obj = e as UTSJSONObject
+                    if (obj == null) {
+                        return
+                    }
+                    val v = obj["detail"]
+                    if (v == null) {
+                        return
+                    }
+                    val detail = v as UTSJSONObject
+                    if (detail == null) {
+                        return
+                    }
+                    val valRaw = detail["value"]
+                    if (valRaw == null) {
+                        return
+                    }
+                    val v2 = valRaw as Boolean
+                    askEachTime.value = v2 === true
+                    putBool("llm_trigger_ask_each_time", v2 === true)
+                }
+                 catch (err: Throwable) {
+                    console.warn("[settings] onAskEachTimeChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:328")
+                }
+            }
+            val onAskEachTimeChange = ::gen_onAskEachTimeChange_fn
             onPageShow(fun(){
                 try {
                     rules.value = getAllEnabledRules()
@@ -212,9 +268,12 @@ open class GenPagesSettingsIndex : BasePage {
                 targetCount.value = getInt("category_target_count", 3)
                 dndStartHour.value = parseHourFromSetting(getSetting("dnd_start", "22:00"), 22)
                 dndEndHour.value = parseHourFromSetting(getSetting("dnd_end", "07:00"), 7)
+                llmEnabled.value = getBool("llm_trigger_enabled", true)
+                askEachTime.value = getBool("llm_trigger_ask_each_time", true)
             }
             )
             return fun(): Any? {
+                val _component_switch = resolveComponent("switch")
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("scroll-view", _uM("class" to "scroll-area", "scroll-y" to "true"), _uA(
                         _cE("view", _uM("class" to "settings-section"), _uA(
@@ -232,6 +291,25 @@ open class GenPagesSettingsIndex : BasePage {
                                     _cE("text", _uM("class" to "setting-hint"), "该时段不触发提醒")
                                 )),
                                 _cE("text", _uM("class" to "setting-value"), _tD(unref(dndStart)) + " - " + _tD(unref(dndEnd)) + " ›", 1)
+                            )),
+                            _cE("view", _uM("class" to "setting-item"), _uA(
+                                _cE("view", _uM("class" to "setting-left"), _uA(
+                                    _cE("text", _uM("class" to "setting-label"), "启用 LLM 实时建议"),
+                                    _cE("text", _uM("class" to "setting-hint"), "触发时调用 LLM 生成即兴文案 + 复评触发规则")
+                                )),
+                                _cV(_component_switch, _uM("checked" to unref(llmEnabled), "onChange" to onLlmEnabledChange), null, 8, _uA(
+                                    "checked"
+                                ))
+                            )),
+                            _cE("view", _uM("class" to "setting-item"), _uA(
+                                _cE("view", _uM("class" to "setting-left"), _uA(
+                                    _cE("text", _uM("class" to "setting-label"), "每次微动作后询问 AI 触发建议"),
+                                    _cE("text", _uM("class" to "setting-hint"), "关闭后静默接受 LLM 建议（不开每次问询）")
+                                )),
+                                _cV(_component_switch, _uM("checked" to unref(askEachTime), "disabled" to !unref(llmEnabled), "onChange" to onAskEachTimeChange), null, 8, _uA(
+                                    "checked",
+                                    "disabled"
+                                ))
                             ))
                         )),
                         _cE("view", _uM("class" to "settings-section"), _uA(

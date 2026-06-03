@@ -1,0 +1,165 @@
+<template>
+  <view class="history-card">
+    <view class="history-header" @tap="toggle">
+      <text class="history-title">🤖 AI 历次判断</text>
+      <text class="history-count">{{ entries.length }} 条</text>
+      <text class="history-arrow">{{ expanded ? '▼' : '▶' }}</text>
+    </view>
+    <view v-if="expanded" class="history-list">
+      <view v-if="entries.length < 1" class="history-empty">
+        <text class="history-empty-text">暂无记录</text>
+      </view>
+      <view
+        v-for="(entry, idx) in entries"
+        :key="'h-' + idx"
+        class="history-item"
+      >
+        <view class="history-item-header">
+          <text class="history-stage" :class="entry.stage === 'pre' ? 'stage-pre' : 'stage-post'">
+            {{ entry.stage === 'pre' ? '触发时' : '复评时' }}
+          </text>
+          <text class="history-time">{{ formatTime(entry.createdAt) }}</text>
+        </view>
+        <text v-if="entry.adhocText != null && entry.adhocText.length > 0" class="history-adhoc">
+          💬 {{ entry.adhocText }}
+        </text>
+        <text v-if="entry.reasoning != null && entry.reasoning.length > 0" class="history-reasoning">
+          🤔 {{ entry.reasoning }}
+        </text>
+        <view v-if="entry.suggestedRule != null" class="history-rule">
+          <text class="history-rule-label">建议规则</text>
+          <text class="history-rule-content">{{ formatRule(entry.suggestedRule) }}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { LlmHistoryEntry } from '../models/LlmHistoryEntry'
+import { EffectiveTriggerRule } from '../models/EffectiveTriggerRule'
+import { getActionById } from '../constants/Actions'
+
+const props = withDefaults(defineProps<{
+  entries: LlmHistoryEntry[]
+}>(), { entries: () => [] })
+
+const expanded = ref<boolean>(false)
+
+function toggle(): void { expanded.value = !expanded.value }
+
+function formatTime(timestamp: number): string {
+  const d = new Date(timestamp * 1000)
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  const h = d.getHours().toString().padStart(2, '0')
+  const min = d.getMinutes().toString().padStart(2, '0')
+  return m + '/' + day + ' ' + h + ':' + min
+}
+
+function formatRule(r: EffectiveTriggerRule): string {
+  const parts: string[] = []
+  const a = getActionById(r.actionId)
+  parts.push(a != null ? a.name : r.actionId)
+  if (r.timeWindow != null) parts.push(r.timeWindow.start + '~' + r.timeWindow.end)
+  if (r.timeThresholdMinutes > 0) parts.push('≥' + r.timeThresholdMinutes + 'min')
+  return parts.join(' · ')
+}
+</script>
+
+<style scoped>
+.history-card {
+  background-color: #FFFFFF;
+  margin: 8px 16px;
+  border-radius: 12px;
+  padding: 12px;
+}
+.history-header {
+  flex-direction: row;
+  align-items: center;
+  padding: 4px;
+}
+.history-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.history-count {
+  font-size: 12px;
+  color: #95A5A6;
+  margin-right: 8px;
+}
+.history-arrow {
+  font-size: 12px;
+  color: #95A5A6;
+}
+.history-list {
+  margin-top: 8px;
+}
+.history-empty {
+  padding: 16px;
+  align-items: center;
+}
+.history-empty-text {
+  font-size: 12px;
+  color: #95A5A6;
+}
+.history-item {
+  padding: 8px 4px;
+  border-bottom-width: 1px;
+  border-bottom-color: #ECF0F1;
+  border-bottom-style: solid;
+  flex-direction: column;
+}
+.history-item:last-child {
+  border-bottom-width: 0;
+}
+.history-item-header {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.history-stage {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-right: 6px;
+}
+.stage-pre {
+  background-color: #E8F5E9;
+  color: #2E7D32;
+}
+.stage-post {
+  background-color: #E3F2FD;
+  color: #1565C0;
+}
+.history-time {
+  font-size: 11px;
+  color: #95A5A6;
+}
+.history-adhoc,
+.history-reasoning {
+  font-size: 12px;
+  color: #34495E;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+.history-rule {
+  background-color: #F8F9FA;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-top: 4px;
+}
+.history-rule-label {
+  font-size: 10px;
+  color: #95A5A6;
+  margin-bottom: 2px;
+}
+.history-rule-content {
+  font-size: 12px;
+  color: #2C3E50;
+  font-weight: bold;
+}
+</style>

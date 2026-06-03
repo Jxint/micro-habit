@@ -12,6 +12,7 @@ import io.dcloud.uts.Map
 import io.dcloud.uts.Set
 import io.dcloud.uts.UTSAndroid
 import kotlin.properties.Delegates
+import io.dcloud.uniapp.extapi.`$emit` as uni__emit
 import io.dcloud.uniapp.extapi.navigateBack as uni_navigateBack
 import io.dcloud.uniapp.extapi.showToast as uni_showToast
 import io.dcloud.uniapp.extapi.vibrateShort as uni_vibrateShort
@@ -143,11 +144,20 @@ open class GenPagesActionExecute : BasePage {
                 }
             }
             val clearCountdown = ::gen_clearCountdown_fn
+            fun gen_emitLlmActionCompleted_fn(a: MicroAction, durationMs: Number, result: String): Unit {
+                try {
+                    uni__emit("llmActionCompleted", _uO("actionId" to a.id, "actionName" to a.name, "actionCategory" to a.category, "durationMs" to durationMs, "result" to result))
+                }
+                 catch (e: Throwable) {
+                    console.warn("[execute] emitLlmActionCompleted 失败: " + JSON.stringify(e), " at pages/action/execute.uvue:157")
+                }
+            }
+            val emitLlmActionCompleted = ::gen_emitLlmActionCompleted_fn
             fun recordAction(result: String, skipReason: String = ""): Unit {
-                console.log("[execute] recordAction enter, result=" + result, " at pages/action/execute.uvue:148")
+                console.log("[execute] recordAction enter, result=" + result, " at pages/action/execute.uvue:162")
                 val a = action.value
                 if (a == null) {
-                    console.log("[execute] recordAction SKIP: action.value is null", " at pages/action/execute.uvue:151")
+                    console.log("[execute] recordAction SKIP: action.value is null", " at pages/action/execute.uvue:165")
                     return
                 }
                 val nowMs = Date.now()
@@ -163,7 +173,8 @@ open class GenPagesActionExecute : BasePage {
                 }
                 , trigger_type = "manual", trigger_level = "gentle", duration_ms = dur, target_ms = a.defaultDurationMs, triggered_at = nowMs - 30000, completed_at = nowMs, created_at = Math.floor(nowMs / 1000))
                 val insertId = insertActionLog(log)
-                console.log("[execute] insertActionLog returned id=" + insertId, " at pages/action/execute.uvue:171")
+                console.log("[execute] insertActionLog 返回 id=" + insertId, " at pages/action/execute.uvue:185")
+                emitLlmActionCompleted(a, dur, result)
             }
             fun gen_onRejectRule_fn(): Unit {
                 showRuleSuggest.value = false
@@ -216,7 +227,7 @@ open class GenPagesActionExecute : BasePage {
                 callRuleSuggest(_uO("completionRateByCategory" to _uO(), "completionRateByHour" to _uO(), "avgContinuousMinutesByCategory" to _uO(), "recentTriggers" to emptyArr), fun(result: Any){
                     try {
                         val s = JSON.stringify(result)
-                        val obj = UTSAndroid.consoleDebugError(JSON.parse(s), " at pages/action/execute.uvue:215") as UTSJSONObject
+                        val obj = UTSAndroid.consoleDebugError(JSON.parse(s), " at pages/action/execute.uvue:230") as UTSJSONObject
                         if (obj == null) {
                             return
                         }
@@ -259,7 +270,7 @@ open class GenPagesActionExecute : BasePage {
             val showEncourageNow = ::gen_showEncourageNow_fn
             fun gen_startCountdown_fn(): Unit {
                 val interval: Number = 100
-                console.log("[execute] startCountdown total=" + remainingMs.value + "ms", " at pages/action/execute.uvue:245")
+                console.log("[execute] startCountdown total=" + remainingMs.value + "ms", " at pages/action/execute.uvue:260")
                 countdownTimerId = setInterval(fun(): Unit {
                     remainingMs.value -= interval
                     if (remainingMs.value <= 0) {
@@ -280,7 +291,7 @@ open class GenPagesActionExecute : BasePage {
             }
             val startCountdown = ::gen_startCountdown_fn
             fun gen_handleAgree_fn(): Unit {
-                console.log("[execute] handleAgree", " at pages/action/execute.uvue:260")
+                console.log("[execute] handleAgree", " at pages/action/execute.uvue:275")
                 val a = action.value
                 if (a == null) {
                     uni_showToast(ShowToastOptions(title = "未找到动作", icon = "none"))
@@ -288,7 +299,7 @@ open class GenPagesActionExecute : BasePage {
                 }
                 isExecuting.value = true
                 remainingMs.value = a.defaultDurationMs
-                console.log("[execute] countdown start, ms=" + a.defaultDurationMs, " at pages/action/execute.uvue:268")
+                console.log("[execute] countdown start, ms=" + a.defaultDurationMs, " at pages/action/execute.uvue:283")
                 startCountdown()
                 try {
                     uni_vibrateShort(VibrateShortOptions(type = "light"))
@@ -334,12 +345,12 @@ open class GenPagesActionExecute : BasePage {
             }
             val onFeedbackCancel = ::gen_onFeedbackCancel_fn
             onLoad(fun(option){
-                console.log("[execute] onLoad begin", " at pages/action/execute.uvue:305")
+                console.log("[execute] onLoad begin", " at pages/action/execute.uvue:320")
                 var aid = takeActionId()
-                console.log("[execute] from helper aid=" + aid, " at pages/action/execute.uvue:307")
+                console.log("[execute] from helper aid=" + aid, " at pages/action/execute.uvue:322")
                 if (aid.length === 0) {
                     aid = getActionIdFromOption(option)
-                    console.log("[execute] from option aid=" + aid, " at pages/action/execute.uvue:310")
+                    console.log("[execute] from option aid=" + aid, " at pages/action/execute.uvue:325")
                 }
                 actionId.value = aid
                 if (aid.length > 0) {
@@ -349,9 +360,9 @@ open class GenPagesActionExecute : BasePage {
                         found.name
                     } else {
                         "null"
-                    }), " at pages/action/execute.uvue:316")
+                    }), " at pages/action/execute.uvue:331")
                 } else {
-                    console.log("[execute] no actionId", " at pages/action/execute.uvue:318")
+                    console.log("[execute] no actionId", " at pages/action/execute.uvue:333")
                 }
             }
             )

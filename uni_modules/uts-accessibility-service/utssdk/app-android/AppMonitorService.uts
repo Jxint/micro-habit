@@ -65,7 +65,7 @@ export function openAccessibilitySettings(): void {
   } catch (_) {}
 }
 
-class AppMonitorService extends AccessibilityService {
+export class AppMonitorService extends AccessibilityService {
   private pkg: string = ''
   private startTime: number = 0
   private callbacks: MonitorCallbacks | null = null
@@ -121,7 +121,7 @@ class AppMonitorService extends AccessibilityService {
     info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
     info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
     info.flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS | AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-    info.notificationTimeout = 100
+    info.notificationTimeout = (100).toLong()
     this.setServiceInfo(info)
     service = this
     if (cachedCallbacks != null) {
@@ -157,7 +157,7 @@ class AppMonitorService extends AccessibilityService {
         cbs.onAppDurationTrigger(info)
       }
       self.startCheck()
-    }, 1000)
+    }, (1000).toLong())
   }
 
   private stopCheck(): void {

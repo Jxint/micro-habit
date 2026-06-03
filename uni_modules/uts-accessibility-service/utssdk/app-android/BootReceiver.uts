@@ -2,7 +2,7 @@ import BroadcastReceiver from 'android.content.BroadcastReceiver'
 import Context from 'android.content.Context'
 import Intent from 'android.content.Intent'
 
-class BootReceiver extends BroadcastReceiver {
+export class BootReceiver extends BroadcastReceiver {
   constructor() {
     super()
   }

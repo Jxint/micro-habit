@@ -1,8 +1,10 @@
 import { dbManager, type SqlRow } from './DatabaseManager'
+import { getStr } from '../utils/DbRowUtils'
 
 export function getSetting(key: string, defaultValue: string = ''): string {
   const row = dbManager.queryOne('SELECT value FROM user_settings WHERE key = ?', [key])
-  return row != null ? (row.get("value") as string) : defaultValue
+  const v = getStr(row, 'value')
+  return v.length > 0 ? v : defaultValue
 }
 
 export function getInt(key: string, defaultVal: number = 0): number {
@@ -46,4 +48,8 @@ export function putSetting(key: string, value: string): void {
 
 export function putInt(key: string, value: number): void {
   putSetting(key, '' + value)
+}
+
+export function putBool(key: string, value: boolean): void {
+  putSetting(key, value ? '1' : '0')
 }

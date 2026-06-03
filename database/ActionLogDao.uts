@@ -1,5 +1,6 @@
 import { dbManager, type SqlRow } from './DatabaseManager'
 import { ActionLog, ActionResult } from '../models/ActionLog'
+import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
 
 export function insertActionLog(log: ActionLog): number {
   const row: SqlRow = {
@@ -68,8 +69,7 @@ export function countCompletedByDateAndActions(date: string, actionIds: string[]
     'SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?) AND action_id IN (' + ids + ')',
     [start, end, 'completed', 'self_reported']
   )
-  const rawCnt = row != null ? row.get("cnt") : null
-  return rawCnt != null ? parseFloat('' + rawCnt) : 0
+  return getNum(row, 'cnt')
 }
 
 export function getTotalCompletedDurationSec(date: string): number {
@@ -79,8 +79,7 @@ export function getTotalCompletedDurationSec(date: string): number {
     'SELECT COALESCE(SUM(duration_ms), 0) as total FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)',
     [start, end, 'completed', 'self_reported']
   )
-  const rawTotal = row != null ? row.get("total") : null
-  return rawTotal != null ? Math.floor(parseFloat('' + rawTotal) / 1000) : 0
+  return Math.floor(getNum(row, 'total') / 1000)
 }
 
 export function countCompletedToday(): number {
@@ -90,8 +89,7 @@ export function countCompletedToday(): number {
     'SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)',
     [start, end, 'completed', 'self_reported']
   )
-  const rawCnt = row != null ? row.get("cnt") : null
-  return rawCnt != null ? parseFloat('' + rawCnt) : 0
+  return getNum(row, 'cnt')
 }
 
 export function countSkippedToday(): number {
@@ -101,8 +99,7 @@ export function countSkippedToday(): number {
     'SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result = ?',
     [start, end, 'skipped']
   )
-  const rawCnt = row != null ? row.get("cnt") : null
-  return rawCnt != null ? parseFloat('' + rawCnt) : 0
+  return getNum(row, 'cnt')
 }
 
 export function getRecentLogs(count: number): ActionLog[] {
@@ -132,7 +129,7 @@ export function getHourlyCompletionData(date: string): BarItem[] {
   )
 
   for (const row of rows) {
-    const created = row.get("created_at") as number
+    const created = getNum(row, 'created_at')
     const d = new Date(created)
     const hour = d.getHours()
     result[hour].value = result[hour].value + 1
@@ -148,18 +145,18 @@ export function cleanOldData(): void {
 
 function mapRow(row: Map<string, any>): ActionLog {
   return {
-    id: row.get("id") as number,
-    action_id: row.get("action_id") as string,
-    action_type: row.get("action_type") as string,
-    result: row.get("result") as ActionResult,
-    skip_reason: row.get("skip_reason") as string | null,
-    trigger_type: row.get("trigger_type") as string,
-    trigger_level: row.get("trigger_level") as string,
-    duration_ms: row.get("duration_ms") as number,
-    target_ms: row.get("target_ms") as number,
-    triggered_at: row.get("triggered_at") as number,
-    completed_at: row.get("completed_at") as number,
-    created_at: row.get("created_at") as number
+    id: getNum(row, 'id'),
+    action_id: getStr(row, 'action_id'),
+    action_type: getStr(row, 'action_type'),
+    result: getStr(row, 'result') as ActionResult,
+    skip_reason: getStrOrNull(row, 'skip_reason'),
+    trigger_type: getStr(row, 'trigger_type'),
+    trigger_level: getStr(row, 'trigger_level'),
+    duration_ms: getNum(row, 'duration_ms'),
+    target_ms: getNum(row, 'target_ms'),
+    triggered_at: getNum(row, 'triggered_at'),
+    completed_at: getNum(row, 'completed_at'),
+    created_at: getNum(row, 'created_at')
   }
 }
 

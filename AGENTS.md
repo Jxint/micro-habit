@@ -1598,3 +1598,1023 @@ Get-ChildItem -Recurse -Filter "*.uvue" |
 
 **关联规则**：
 - §33(B) lambda 类型注解（多行 block body 不要 `:T`，单行表达式要 `:T`）
+
+---
+
+### 36. UVUE **不支持** `<svg>`/`<circle>`/`<path>`/`<text>` 标签
+
+**【最高优先级】** 实际测试证实 §31 中"图表组件 100% 改用 view + SVG"在 UVUE 中**不可用**。HBuilderX 5.x 的 UVUE 编译器：
+
+- **不识别** `<svg>`、`<circle>`、`<path>`、`<text>` 等 SVG 标签
+- 编译期不报错，**运行时**在控制台打印 `Failed to resolve component: svg/path/circle/text. Unrecognized components will be treated as "view"`
+- 静默降级为 `<view>` → 任何依赖 SVG 渲染的特性（viewBox、stroke、fill、path d=）**全部失效**
+- **即使 v-if="false"（不可见），只要该 .uvue 文件被 import，模板就参与编译**，警告就会刷屏
+
+**实测场景**：`PhoneUsageDialog.uvue` 用 `<svg viewBox="0 0 100 100"><circle/><path/></svg>` 画饼图。打开对话框时，控制台秒刷 7-10 条警告 + 饼图完全不可见（圈变成空 view）。
+
+**修复**（已采用）：**所有图表 100% 改用 view 写**：
+| 图表 | 实现 | 备注 |
+|------|------|------|
+| 柱状图 | 每列 `<view>` 高度 `style="height: (val/maxVal)*180px"` | 见 `BarChart.uvue` |
+| 折线图 | 散点 `<view>` + 数值 `<text>` 标签 | 见 `LineChart.uvue`（UVUE 无 transform） |
+| 热力图 | 7×N `<view>` 网格，按 count 着色 | 见 `HeatmapCalendar.uvue` |
+| 饼图/环形图 | **横向堆叠条**（一行多个 view，flexGrow 比例分配）+ 图例 | 见 `PhoneUsageDialog.uvue`（替代 SVG 饼图） |
+
+**PhoneUsageDialog 重写后的饼图方案**（`stacked-bar` 横向堆叠条）：
+```vue
+<view class="stacked-bar">
+  <view
+    v-for="(seg, si) in segments"
+    :key="'sg-' + si"
+    class="stacked-seg"
+    :style="{ flexGrow: seg.minutes > 0 ? seg.minutes : 0, backgroundColor: seg.color }"
+  ></view>
+</view>
+```
+```css
+.stacked-bar { width: 100%; height: 16px; flex-direction: row; border-radius: 4px; overflow: hidden; background-color: #F0F3F4; }
+.stacked-seg { height: 100%; }
+```
+每段 app 占的宽度比例 = `flexGrow: 它的 minutes 值`，flex 容器自动按比例分配。配合右侧图例（每行 `<view dot><text label><text percent><text minutes>`），效果类似饼图但纯 view。
+
+**自查**：
+```powershell
+Get-ChildItem -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "<svg|<circle|<path[^/]|<text " |
+  Where-Object { $_.Line -notmatch "text class" } |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中 = 必须改写为 view-based
+```
+
+**关联规则**：
+- §30 UVUE CSS 子集限制（同类"UVUE 标签子集 vs web 标"问题）
+- §31 §31 设计原则需要修正：图表组件 100% 改用 **view only**，不再依赖 SVG
+
+---
+
+### 37. `Map.get()` 返回 `any | null`：`as number` / `as string` 不会去掉 null，Android Int 形参会 NPE
+
+**【最高优先级】** Java/Kotlin 平台类型的 `Map<K, V>` 在 UTS 中映射为 KMM `MutableMap`。`row.get(col)` 返回 `any | null`（KMM `Any?`）。**`as number` / `as string` 是类型断言，不会真的把 null 转成 number/string**。直接传给 Android Int 形参 API 时，Kotlin 自动拆箱 `Number?` → 遇到 null 抛 `NullPointerException`。
+
+**根因时序**：
+```kotlin
+// Java 侧期望
+fun setTextColor(@ColorInt color: Int)   // primitive int，unbox 时 null 会 NPE
+
+// UTS 侧传的
+val textColor: Any? = map.get("text_color")  // 可能 null
+view.setTextColor(textColor as Int)          // ❌ unbox null → NullPointerException
+```
+
+**统一修复模式**：**所有 DAO 函数通过 `utils/DbRowUtils.uts` 提供的 null-safe getter 取值**：
+
+```uts
+// utils/DbRowUtils.uts
+export function getNum(row: any, col: string): number {
+  if (row == null) return 0
+  const v = row.get(col)
+  if (v == null) return 0
+  return v as number
+}
+
+export function getStr(row: any, col: string): string {
+  if (row == null) return ''
+  const v = row.get(col)
+  if (v == null) return ''
+  return v as string
+}
+
+export function getStrOrNull(row: any, col: string): string | null {
+  if (row == null) return null
+  const v = row.get(col)
+  if (v == null) return null
+  return v as string
+}
+```
+
+**所有 DAO 必须用这些 getter**，禁止直接 `row.get(col) as number`：
+
+```uts
+// ❌ 反模式（运行时 NPE 风险）
+const sec = r.get("total_foreground_sec") as number
+const pkg = r.get("package_name") as string
+
+// ✅ 正确
+const sec = getNum(r, 'total_foreground_sec')
+const pkg = getStr(r, 'package_name')
+```
+
+**本项目已修复的 DAO**（全部 9 个）：
+- `database/AppUsageDao.uts` — 新增本地 `getNum/getStr` 辅助函数（与 utils 版本重复但保留作为 DAO 局部 fallback）
+- `database/ActionLogDao.uts` — 所有 `row.get(...) as T` → `getNum(row, '...')` / `getStr(row, '...')` / `getStrOrNull(row, '...')`
+- `database/DailySummaryDao.uts` — mapRow 全部 getter 化
+- `database/HeartbeatDao.uts` — mapRow getter 化
+- `database/LlmCacheDao.uts` — mapRow getter 化
+- `database/SettingsDao.uts` — getSetting 加默认值兜底
+- `database/RuleDao.uts` — mapRow getter 化（含 expires_at nullable）
+- `database/TriggerLogDao.uts` — 所有 count 函数 + mapRow getter 化
+- `database/TtsCacheDao.uts` — mapRow getter 化
+
+**自查**：
+```powershell
+# 找出 .get("...") 直接 as number/string 的反模式
+Get-ChildItem "database" -Recurse -Filter "*.uts" |
+  Select-String -Pattern '\.get\("[^"]+"\)\s+as\s+(number|string|number\s*\|\s*null)' |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中必须改为 getNum(row, '...') / getStr(row, '...') / getStrOrNull(row, '...')
+```
+
+**关联规则**：
+- §25 `number` 字段传给 Android Int 形参 — 同一类问题，§25 解决类型声明，§37 解决运行时 null
+- §18 函数返回类型 + 对象字面量 — 都涉及"UTS 强类型 vs Kotlin 平台类型"的边界处理
+
+---
+
+### 38. `ref<T | null>` 重要 ref 必须有非 null 初始值，模板首次渲染即用
+
+**【最高优先级】** Dialog/弹窗组件的 `ref<T>` 如果初值是 `null` 或 `undefined`，模板首次渲染时**直接 NPE**（即使 `v-if="visible"` 隐藏，模板编译期就会尝试读取 ref.value 的字段类型）。
+
+**反模式**：
+```uts
+const summary = ref<PhoneUsageSummary | null>(null)  // 初始 null
+const segments = ref<PieSegment[]>([])
+// 模板中：{{ summary.hourText }}  ← summary.value 是 null，访问 .hourText NPE
+```
+
+**修复**：
+```uts
+const summary = ref<PhoneUsageSummary>({
+  totalMinutes: 0, totalSeconds: 0,
+  hourText: '0 小时', minuteText: '0 分钟', appCount: 0
+})
+const segments = ref<PieSegment[]>([])  // 数组可以空但不能 null
+```
+
+**规则**：
+- 任何"模板里要读取字段"的 ref 必须有**完整结构初始值**（即使字段都是 0/''）
+- 数组 ref 用 `ref<T[]>([])` 即可（`v-for` 能正确处理空数组）
+- 真正可空的数据用 `ref<T | null>(null)` + 模板 `v-if="xxx != null"` 显式守卫
+
+**自查**：
+```powershell
+# 找"ref<X | null>(null)" 后模板未加 v-if 守卫的位置（需要逐文件判断）
+Get-ChildItem -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "ref<\w+\s*\|\s*null>\(null\)"
+```
+
+**关联规则**：
+- §18 函数返回类型 + 对象字面量 — 都涉及"严格非空"的兜底
+- §37 Map.get() null 安全 — 同一类"边界处必须显式守卫"思想
+
+---
+
+### 39. `setTimeout` / `Handler.postDelayed` / `uni.request` 异步回调必须 try-catch，否则 NPE 触发 "Possible Unhandled Promise Rejection"
+
+**【最高优先级】** UTS 异步回调（包括 `setTimeout` lambda、`Handler.postDelayed` lambda、uniCloud/uni.request 回调、watch callback）抛出异常时：
+
+- 外层的 `try-catch` **捕获不到**（因为回调在不同调用栈）
+- UTS 运行时打印 `java.lang.NullPointerException` + `at io.dcloud.uts.UTSPromiseKt.callFunction` + `at io.dcloud.uts.UTSTimerKt$setTimeout$runnable$1.doSth`
+- 标记为 `Possible Unhandled Promise Rejection`，虽然不闪退但控制台刷屏 + 部分后续逻辑中断
+
+**实测案例**（本项目）：`App.uvue` 的 `onAppDurationTrigger` 回调中 `insertOrUpdateSnapshot` 访问 SQLite 行 Map 字段时遇到 null（见 §37），异步回调 NPE → 控制台 50+ 行堆栈。用户看到的现象是"过几秒闪一下错误"。
+
+**修复模式**：**所有异步 callback 函数体必须有 try-catch**：
+
+```uts
+// ❌ 反模式
+onAppDurationTrigger: (info: AppForegroundInfo): void => {
+  insertOrUpdateSnapshot(info.packageName, info.packageName, 1)  // 抛 NPE 时外层 try-catch 抓不到
+  ...
+}
+
+// ✅ 正确：每个易错调用都包 try-catch
+onAppDurationTrigger: (info: AppForegroundInfo): void => {
+  try { insertOrUpdateSnapshot(info.packageName, info.packageName, 1) } catch (e) {
+    console.error('snapshot error: ' + JSON.stringify(e))
+  }
+  try {
+    const decision = shouldTrigger({...})
+    if (decision != null) { ... }
+  } catch (e) {
+    console.error('trigger error: ' + JSON.stringify(e))
+  }
+}
+```
+
+**PhoneUsageDialog.refresh()**（重写时已加）：
+```uts
+function refresh(): void {
+  try {
+    summary.value = getTodayPhoneUsageSummary()
+  } catch (e) {
+    console.error('PhoneUsageDialog refresh summary: ' + JSON.stringify(e))
+  }
+  try {
+    const segs = getTodayPieSegments()
+    segments.value = segs != null ? segs : []
+  } catch (e) {
+    console.error('PhoneUsageDialog refresh segments: ' + JSON.stringify(e))
+    segments.value = []
+  }
+}
+```
+
+**自查**：
+```powershell
+# 找出 setTimeout/uni.request/Handler 回调中无 try-catch 的 lambda
+Get-ChildItem -Recurse -Include "*.uts","*.uvue" |
+  Select-String -Pattern "setTimeout\(\(|postDelayed\(|\.request\(" |
+  Where-Object { $_.Line -notmatch "try \{" }   # 简化：紧邻行无 try
+```
+
+**关联规则**：
+- §37 Map.get() null 安全 — 同一类"边界处必须显式守卫"
+- §17 模块级 let smart cast 失效 — 异步回调中 this.field 也需 !! 守卫
+
+---
+
+### 40. null-safe getter 工具函数参数必须用 `Map<string, any> | null`，**禁止**用 `any` 形参
+
+**【最高优先级】** 上一节（§37）的 `getNum/getStr` 工具函数如果用 `row: any` 形参，**编译失败**：
+
+```
+error: Unresolved reference. None of the following candidates is applicable 
+because of a receiver type mismatch:
+fun String.get(index: Number): Char
+at utils/DbRowUtils.uts:8:16
+  const v = row.get(col)
+                 ^
+```
+
+**根因**：UTS 编译器对 `any` 类型的 `.get(...)` 方法调用做候选匹配时，找到了**两个候选**：
+1. `Map<string, any>.get(key: string): any` ← 期望匹配
+2. `String.get(index: Number): Char` ← 字符串索引扩展（**优先级意外高于 Map.get**）
+
+由于 `col: string` 可以同时匹配 `key: string`（需转 Number）和 `index: Number`（直接匹配），编译器把 `String.get` 当主候选，**抛 receiver type mismatch**。**`as number` / `as string` 等类型断言不会改变 receiver type**，所以这个错误无法通过 `as` 修复。
+
+**修复**（已采用）：**`row` 形参必须声明为 `Map<string, any> | null`**：
+```uts
+// ❌ 反模式（receiver 类型歧义，编译失败）
+export function getNum(row: any, col: string): number {
+  const v = row.get(col)  // 编译器不知 row 是 Map，误判为 String.get
+  ...
+}
+
+// ✅ 正确
+export function getNum(row: Map<string, any> | null, col: string): number {
+  if (row == null) return 0
+  const v = row.get(col)  // row 类型明确，调用 Map.get
+  if (v == null) return 0
+  return v as number
+}
+```
+
+**为什么 dao 函数需要这种 helper**：`dbManager.queryOne()` 实际返回类型就是 `Map<string, any> | null`，但**直接 `row.get('col') as number` 不安全**（见 §37）。所以中间必须经工具函数处理 null。**helper 形参类型用 `Map<string, any> | null` 是连接 §37 修复模式与 dao 代码的桥梁**。
+
+**错误传播链**（一处形参错，调用方全挂）：
+```
+utils/DbRowUtils.uts: getNum(row: any, ...)  ❌ 编译失败
+  ↓ 被 dao 调用
+database/SettingsDao.uts: getStr(row, 'value')  ❌ "实际 Map<String, Any>? 预期 Any"
+database/AppUsageDao.uts: 同上
+database/ActionLogDao.uts: 同上
+... (其他 8 个 dao)
+```
+
+**自查**：
+```powershell
+# 找错误的 any 形参 helper
+Get-ChildItem -Recurse -Filter "*.uts" |
+  Select-String -Pattern "function\s+(getNum|getStr|getStrOrNull)\s*\(\s*row:\s*any" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中必须改为 row: Map<string, any> | null
+```
+
+**关联规则**：
+- §37 Map.get() 的 null 安全 — 同一组修复模式，§40 修正 §37 实现细节
+- §18 函数返回类型 + 对象字面量 — UTS 强类型 vs Kotlin 平台类型的边界处理思路一致
+
+---
+
+### 41. `llm_history` 持久化表 vs `llm_cache` 临时缓存：用途/数据结构/清理策略不同
+
+**【最高优先级】** 两个表都和"LLM 输出"相关，但**不是同一概念**：
+
+| 表 | 用途 | 数据结构 | 清理策略 | 典型大小 |
+|----|------|---------|---------|---------|
+| `llm_cache` | LLM 响应**临时缓存**（避免重复请求） | `cache_key + cache_type + response + expires_at` | 过期自动清理（24h/7d） | 几十条 |
+| `llm_history` | LLM 评估**完整历史**（审计+回显+给用户看） | `stage + context_json + ai_raw_response + parsed_result_json + adhoc_text + suggested_rule_json + reasoning + created_at` | **手动清理**（30 天滚动），**可保留更久** | 几百条 |
+
+**关键差异**：
+- `llm_cache` 是"为了快"（避免重复调 LLM）
+- `llm_history` 是"为了看"（用户/调试/AI 反馈训练）
+- 混用会导致：要么 history 表被过期清理搞丢（用户看不到上周 LLM 怎么说），要么 cache 表无限增长（占空间）
+
+**强制规则**：
+- 任何"展示给用户的历史 LLM 输出"（如主页"AI 历次判断"卡片）→ 写 `llm_history`
+- 任何"避免重复 LLM 请求的 key-value 缓存"（如同一天同种小节的每日小结）→ 写 `llm_cache`
+- 阶段 1 评估结果（adhocText）→ 写 `llm_history.stage='pre'`
+- 阶段 3 评估结果（suggestedRule）→ 写 `llm_history.stage='post'`
+- `cleanOldHistory(30)` 在每次 App.uvue onAppShow 时调用（**不**走 expires_at 过期机制）
+- `cleanExpired()` 清理 `llm_cache` 的过期记录
+
+**参考 `database/LlmHistoryDao.uts`** 实现。
+
+**自查**：
+```powershell
+# 找 LLM 输出是否写到 llm_cache（应该是缓存的 key-value）
+Get-ChildItem -Recurse -Filter "*.uts" |
+  Select-String -Pattern "llm_cache.*insert|llm_cache.*save" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 写入 llm_cache 的只能是 daily_summary / weekly_report / rule_suggest / one_liner 这类"避免重复请求"的内容
+# pre_trigger / post_action 必须写到 llm_history
+```
+
+**关联规则**：
+- §32(B) 弹窗组件标准结构 — 主页的 LlmHistoryCard 用同样的 v-if + dialog-mask 模式
+- §29 SqlRow 数据 API — LlmHistoryDao.insert 全部用 SqlRow + getNum/getStr/getStrOrNull
+
+---
+
+### 42. 全局事件总线（`uni.$emit` / `uni.$on`）用于跨页面/原生层通信
+
+**【最高优先级】** 跨页面/跨层通信三种方式：
+
+| 场景 | 推荐方式 |
+|------|---------|
+| 父子页面 props/emit | `defineProps` + `defineEmits` |
+| 页面间互不相关 | `uni.$emit` / `uni.$on`（全局事件总线） |
+| App.uvue ↔ 任意页面 | `uni.$emit` / `uni.$on`（App.uvue 在 onLaunch 注册，任意页面 $emit） |
+
+**典型场景**（本项目 Day 4 实战）：
+- `App.uvue` 的 `onAppDurationTrigger` 回调（无障碍服务触发）→ 计算 LLM 建议触发规则 → 需要弹窗给用户 → 但**当前用户可能在任意页面**
+- **解法**：`App.uvue` `uni.$emit('showTriggerRuleDialog', {rule, reasoning})`，**所有页面**的 `onLoad` 都 `uni.$on('showTriggerRuleDialog', ...)` 监听
+- 当前在哪个页面就哪个页面的监听器处理（其他页面的监听器被挂起不响应）
+- 用户点"接受"后 emit 一条 close 事件 / 直接更新 store
+
+**关键规则**：
+- `uni.$emit` 参数**必须能 JSON 序列化**（string / number / boolean / object / array），不能传 UTS 内部类型
+- `uni.$on` 回调参数类型用 `any`（UTS 编译器会推断为 `any`，但实际传入的是反序列化的 object），访问字段前**必须**做 null 检查
+- 监听器**必须在 `onLoad` 中注册**，不能放 `onShow`（否则会重复注册）
+- 多个 `onLoad` 注册可以用相同的事件名（不冲突），但**不**会自动反注册，需要在 `onUnload` 中 `uni.$off`
+
+**反模式**：
+```ts
+// ❌ 在 onShow 注册 → 每次进入页面都注册一次，泄漏
+onShow((): void => {
+  uni.$on('foo', () => { ... })
+})
+
+// ❌ 监听回调不做 null 守卫
+uni.$on('foo', (data: any) => { data.rule.actionId })  // data 可能 null
+
+// ❌ 监听回调里 throw 异常 → 整个页面 crash
+uni.$on('foo', (data: any) => {
+  const x = data.field  // 没有 null 守卫
+  if (x == null) throw new Error('x is null')  // 异步回调里 throw 外层 try-catch 接不到
+})
+```
+
+**正确示例**（主页 home/index.uvue）：
+```ts
+onLoad((): void => {
+  try {
+    uni.$on('showTriggerRuleDialog', (data: any): void => {
+      try {
+        if (data == null) return
+        const obj = data as UTSJSONObject
+        if (obj == null) return
+        const ruleRaw = obj['rule']
+        if (ruleRaw == null) return
+        const ruleStr = JSON.stringify(ruleRaw)
+        const rule = JSON.parse(ruleStr) as EffectiveTriggerRule
+        pendingRule.value = rule
+        showRuleDialog.value = true
+      } catch (e) {
+        console.warn('[home] showTriggerRuleDialog 异常: ' + JSON.stringify(e))
+      }
+    })
+  } catch (e) {
+    console.warn('[home] $on 异常: ' + JSON.stringify(e))
+  }
+})
+```
+
+**MiniMax / LLM 跨层通信特殊场景**：
+- `App.uvue` 触发 LLM 评估（无障碍服务回调）→ LLM 返回 `suggestedRule` → 需要显示在主页弹窗
+- `execute.uvue` 完成微动作 → emit `llmActionCompleted` → App.uvue 监听 → 调 `evaluatePost`
+- **两个 emit 方向都通过 `uni.$emit` 完成**，避免传参/全局 store 在 App 层和 Page 层之间复制
+
+**自查**：
+```powershell
+# 找所有 uni.$emit / uni.$on 用法，确认 onLoad/onUnload 配对
+Get-ChildItem -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "uni.\$(emit|on|off)\("
+```
+
+**关联规则**：
+- §39 异步回调必须 try-catch — `uni.$on` 回调也是异步的，必须 try-catch
+- §35 watch/onXxx lambda 显式返回类型 — `uni.$on` 回调参数无类型标注（`any`），但内部访问字段需断言
+
+---
+
+### 43. LLM JSON 输出三级容错解析
+
+**【最高优先级】** LLM 经常返回非标准 JSON（多余文字、格式错误、Markdown 包裹）。所有 LLM 解析必须经过容错：
+
+**三级策略**：
+1. **Level 1（直 parse）**：直接 `JSON.parse(raw)` 解析完整字符串
+2. **Level 2（正则提取）**：失败则用正则 `/\{[\s\S]*\}/` 提取第一个 `{...}` 块再 parse
+3. **Level 3（fallback 字段）**：仍失败则返回空对象，由调用方决定 fallback
+
+**为什么是这三层**：
+- Level 1 处理 80% 正常情况
+- Level 2 处理 15% LLM 偶尔加的解释性文字（"好的，以下是您要的 JSON：" 前缀）
+- Level 3 处理 5% 完全乱码情况
+
+**典型 LLM 输出模式**（实测）：
+```
+✅ {"adhocText": "眼睛累了，眨一眨吧", "stateDescription": "检测到久坐"}
+⚠️ 好的，以下是您要的 JSON：
+    {"adhocText": "眼睛累了", "stateDescription": "检测到久坐"}
+⚠️ ```json
+    {"adhocText": "眼睛累了", "stateDescription": "检测到久坐"}
+    ```
+⚠️ {"adhocText": "眼睛累了"}（字段缺失）
+```
+
+**正确模板**（见 `services/LlmTriggerFlow.uts:parseJsonThreeLevels`）：
+```ts
+function parseJsonThreeLevels(raw: string): UTSJSONObject | null {
+  // Level 1: 直接 parse
+  try {
+    return JSON.parse(raw) as UTSJSONObject
+  } catch (_) {}
+  // Level 2: 正则提取 {...}
+  try {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match != null) {
+      const m = match[0]
+      if (m != null && m.length > 0) {
+        return JSON.parse(m) as UTSJSONObject
+      }
+    }
+  } catch (_) {}
+  // Level 3: 完全失败
+  return null
+}
+```
+
+**字段兜底**（即使 parse 成功，也要逐字段 null 检查）：
+```ts
+function parsePreResponse(raw: string): ParsedLlmResult {
+  const obj = parseJsonThreeLevels(raw)
+  const result: ParsedLlmResult = {}
+  if (obj == null) return result
+  const adhoc = obj['adhocText']
+  if (typeof adhoc === 'string' && (adhoc as string).length > 0) {
+    result.adhocText = adhoc as string
+  }
+  const stateDesc = obj['stateDescription']
+  if (typeof stateDesc === 'string' && (stateDesc as string).length > 0) {
+    result.stateDescription = stateDesc as string
+  }
+  return result
+}
+```
+
+**调用方处理 fallback**：
+```ts
+const adhoc = parsed.adhocText != null ? parsed.adhocText : getFallbackAdhoc()
+const stateDesc = parsed.stateDescription != null ? parsed.stateDescription : '检测到需要休息'
+```
+
+**反模式**：
+```ts
+// ❌ 直接 JSON.parse 一次就完事
+const obj = JSON.parse(raw) as ParsedLlmResult  // LLM 输出稍不规范就崩
+
+// ❌ 字段直接用，不 null 检查
+result.adhocText = obj['adhocText'] as string  // obj['adhocText'] 是 any | undefined
+
+// ❌ 解析失败抛异常让调用方处理
+try { ... } catch (e) { throw e }  // 异步回调 throw 接不到
+```
+
+**自查**：
+```powershell
+# 找 LLM 解析点，确认三级容错
+Get-ChildItem -Recurse -Include "*.uts","*.uvue" |
+  Select-String -Pattern "JSON\.parse" |
+  Where-Object { $_.Line -notmatch "import|localStorage|getStorage" }
+# 命中如果不是 llm 解析，可以保留 1 级；如果是 llm 解析，必须 3 级
+```
+
+**关联规则**：
+- §18 函数返回类型 + 对象字面量 — `const result: ParsedLlmResult = {}; return result` 模式
+- §39 异步回调必须 try-catch — LLM 解析在异步回调中，三级容错避免外层 try-catch 抓不到
+
+---
+
+### 44. `getHomepageData` 等"无参版本调用"在 App.uvue 异步回调中使用会触发"必须有 1 个参数"错误
+
+**【最高优先级】** `getHomepageData(date: string)` 签名要求传 date 参数，但某些场景（如 LLM 触发流中只需要"今日概览数据"）调用方没有可用的 date 变量。
+
+**反模式**：
+```ts
+// ❌ 没有 date 变量，硬传空串 → 编译可能通过但运行时可能拿到昨天数据
+const homeData = getHomepageData('')
+```
+
+**正确做法**：调用方提前计算并缓存 date：
+```ts
+// ✅ 异步回调开头先取一次 today date，缓存复用
+function safeToday(): string {
+  try {
+    const d = new Date()
+    return d.getFullYear() + '-' +
+      ('' + (d.getMonth() + 1)).padStart(2, '0') + '-' +
+      ('' + d.getDate()).padStart(2, '0')
+  } catch (_) {
+    return ''
+  }
+}
+```
+
+或直接 import 已有 `today()` from TimeUtils：
+```ts
+import { today } from '../utils/TimeUtils'
+const homeData = getHomepageData(today())
+```
+
+**为什么**：
+- LLM 触发流（`App.uvue onAppDurationTrigger` 回调）在异步上下文，date 不能假设是"今天"
+- 即使逻辑上应该是"今天"，也建议显式 `today()` 调用，保证时间窗对齐
+- `getHomepageData('')` 这种"传空串"是反模式，调用方应该承担计算责任
+
+**关联规则**：
+- §39 异步回调 try-catch — LLM 触发流的"安全默认值"必须 try-catch
+- §25 number/Int 边界 — `getHomepageData` 返回的 todayCompletedCount 等字段都是 number，传给其他 API 时要 .toInt()
+
+
+---
+
+### 45. UTS import 相对路径级别：`components/` → `models/` 是 `../`，**不是** `../../`
+
+**【最高优先级】** HBuilderX 5.x 编译 `Could not resolve` 错误的常见原因 — 相对路径级别数错了。
+
+**关键规则**：
+
+| 文件所在 | 目标位置 | 相对路径 |
+|---------|---------|---------|
+| `components/X.uvue` | `models/Y.uts` / `services/Z.uts` / `constants/W.uts` | `../`（一级） |
+| `pages/X.uvue` | 同上 | `../../`（两级） |
+| `pages/X/Y.uvue` | 同上 | `../../../`（三级） |
+| `App.uvue` | 同上 | `./`（同级） |
+
+**反模式**（本项目已犯过一次）：
+```ts
+// ❌ components/LlmHistoryCard.uvue 错误写成：
+import { LlmHistoryEntry } from '../../models/LlmHistoryEntry'  // 编译失败
+
+// ✅ 正确：
+import { LlmHistoryEntry } from '../models/LlmHistoryEntry'
+```
+
+**为什么容易错**：
+- `pages/home/index.uvue`（3 层）从 `../../models/` 找 → 正确
+- `components/StatusIndicator.uvue`（1 层）从 `../../models/` 找 → **错误**（多了一级）
+- 思维惯性：写 `pages` 的 import 习惯了 `../../`，搬到 `components` 忘了减少一级
+
+**参考**：
+- `PhoneUsageDialog.uvue:76` 的正确写法是 `from '../services/PhoneUsageService'`（用 `../`）
+- 这是项目里**唯一**一个 components 层 import 范例，必须照抄
+
+**自查**：
+```powershell
+# 找出 components/ 里所有相对路径，确认都是 ../ 开头
+Get-ChildItem "components" -Recurse -Filter "*.uvue" | ForEach-Object {
+  Select-String -Path $_.FullName -Pattern "from '(\.\./|/)" |
+    Where-Object { $_.Matches[0].Groups[1].Value -eq "../../" }
+}
+# 命中 = 路径级别错误，立即改
+```
+
+**修复模式**：
+1. 找到错文件
+2. 改 `../../models/` → `../models/`（去掉一级）
+3. 改 `../../services/` → `../services/`
+4. 改 `../../constants/` → `../constants/`
+5. 重新打包
+
+**关联规则**：
+- §13 子组件 prop 必须基础类型 — `components/` 是 UI 组件层，主要用 props 不需要 import models 太多
+- §9 script setup 函数不提升 — 即使路径对了，类型 import 还要配合 `import type`（UTS 自动推断）
+
+
+---
+
+### 46. 函数**参数**类型也禁用内联对象字面量（UTS110111101 错误码）
+
+**【最高优先级】** §34(B) 提到"函数返回类型禁用内联 Object Literal"（错误码 UTS110111101），**但同样适用于函数参数类型**。
+
+**反模式**：
+```ts
+// ❌ UTS110111101: Direct declaration of Object Literal Type is not supported
+function formatScreenConditions(c: { appPackages: string[], includeHome: boolean }): string {
+  ...
+}
+
+// ❌ 同理回调参数
+function onChange(cbs: { onAgree: () => void, onSkip: () => void }): void {
+  ...
+}
+
+// ❌ 数组元素类型
+function getItems(): { name: string, count: number }[] { ... }
+```
+
+**正确做法**：**抽到独立 `type` 定义**：
+```ts
+// models/EffectiveTriggerRule.uts
+export type ScreenConditions = {
+  appPackages: string[]
+  includeHome: boolean
+}
+
+// components/TriggerRuleDialog.uvue
+import { EffectiveTriggerRule, ScreenConditions } from '../models/EffectiveTriggerRule'
+function formatScreenConditions(c: ScreenConditions): string { ... }
+```
+
+**关键差异**（与 §34(B) 互补）：
+- §34(B)：函数**返回**类型不能用内联
+- §46：函数**参数**类型也不能用内联
+- 共同点：凡是"类型注解位置的对象字面量 `{ a: 1 }`"都不允许
+- 合法：函数**体内部** `const x: NamedType = { a: 1 }; x.method()`（`as NamedType` 类型的字面量是 OK 的）
+
+**与 §18 / §19 配合**：
+- §18：`return { ... }` 字面量需要 `const x: T = {...}; return x` 模式
+- §19：对象类型用 `type` 而非 `interface`
+- §46：参数类型用 `type` 而非内联 `{ }`
+
+**自查命令**（项目级扫描）：
+```powershell
+# 找所有"函数参数/返回用内联对象字面量"
+Get-ChildItem -Recurse -Include "*.uvue","*.uts" |
+  Select-String -Pattern "function\s+\w+\([^)]*\{[a-zA-Z_]+\s*:|:\s*\{[a-zA-Z_]+\s*[,\}]" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中必须抽到独立 type 定义
+```
+
+**类型定义文件组织**：
+- 跨文件用 → 放到 `models/Xxx.uts` 并 `export`
+- 单文件内部用 → 放到同文件顶部
+
+**关联规则**：
+- §34(B) 函数返回内联 Object Literal
+- §18 函数返回类型 + 对象字面量
+- §19 type vs interface
+- §45 import 相对路径级别（修了 import 路径后又遇到内联类型问题，**两类问题经常连发**）
+
+
+---
+
+### 47. 服务层本地空函数覆盖 plugin 导入 = 死代码陷阱
+
+**【最高优先级】** UTS 模块级**函数名解析**遵循"先 import → 再本地声明"的查找顺序。如果 `services/X.uts` 里有：
+
+```ts
+import { speakSystemTts } from '../uni_modules/uts-audio-player/utssdk/app-android/index'  // 导入
+
+function speakSystemTts(text: string, volume: number): void {  // 本地空函数
+  // ❌ 空实现，覆盖了上面的 import！
+}
+```
+
+**陷阱**：
+- 编译**不报错**（UTS 允许"先 import 再声明同名函数"——后者覆盖前者）
+- 同模块内所有 `speakSystemTts(...)` 调用**都走空函数**（无声播放）
+- 但 `App.uvue` 直接 `import { speakSystemTts } from '...plugin/...'` 不受此覆盖影响（独立 import 路径），所以主流程 TTS 看似正常
+- **结果**：测试时主流程 TTS 正常（App.uvue 自己 import），但 `TtsService.speakAdhoc / speakFixedGuide` 等内部函数永远静默，调试半天不知道哪里坏了
+
+**正确模式**：
+
+```ts
+// 1. 导入并改名为 pluginSpeakSystemTts（防止和本地函数名冲突）
+import { speakSystemTts as pluginSpeakSystemTts } from '../uni_modules/uts-audio-player/utssdk/app-android/index'
+
+// 2. 内部所有调用都走 pluginSpeakSystemTts(...) —— 永远是插件真实实现
+export function speakAdhoc(text: string): void {
+  try { pluginSpeakSystemTts(text, volume) } catch (e) {
+    console.warn('plugin 调用失败: ' + JSON.stringify(e))
+  }
+}
+
+// 3. 不要在本模块内再次声明 speakSystemTts（即使是空函数）
+```
+
+**自查命令**：
+```powershell
+# 扫描 services/ 和 database/ 里所有"先 import 再同名声明"的反模式
+Get-ChildItem "services","database" -Recurse -Filter "*.uts" | ForEach-Object {
+  $imports = (Get-Content $_.FullName) | Select-String -Pattern "import\s*\{[^}]*(\w+)\s*\}\s*from" |
+    ForEach-Object { $_.Matches[0].Groups[1].Value }
+  $fns = (Get-Content $_.FullName) | Select-String -Pattern "^function\s+(\w+)" |
+    ForEach-Object { $_.Matches[0].Groups[1].Value }
+  $dupes = $imports | Where-Object { $fns -contains $_ }
+  if ($dupes) { Write-Host "$($_.Path): 本地函数覆盖了 plugin import: $($dupes -join ', ')" }
+}
+# 命中必须改名为 xxx + as pluginXxx 模式
+```
+
+**本项目已修复**：
+- `services/TtsService.uts:43` — 原 `function speakSystemTts(text, volume): void {}` 是空 stub
+- 修复后 import 别名 `pluginSpeakSystemTts`，所有调用走插件真实实现
+
+**正确模板**（调用插件 API 的 service 文件）：
+```ts
+import { somePluginApi as pluginSomeApi } from '../uni_modules/xxx/utssdk/yyy'
+
+export function publicApi(arg: string): void {
+  try {
+    pluginSomeApi(arg)  // ← 永远走插件
+  } catch (e) {
+    console.warn('plugin 调用失败: ' + JSON.stringify(e))
+  }
+}
+```
+
+**关联规则**：
+- §17 模块级 let smart cast 失效 — 函数查找遵循类似的"先到先得"规则
+- §39 异步回调 try-catch — plugin 调用必须 try-catch 包裹
+
+---
+
+### 48. 重复导出函数导致 UTS bundler 内部 panic（Rust thread panic）
+
+**【最高优先级】** 同一 `.uts` 文件中如果存在两个同名 `export function`（例如合并代码时遗留），UTS bundler 的 Rust 层会直接 panic，错误信息极其不直观：
+
+```
+thread '<unnamed>' panicked at crates/uts_bundler/src/inline.rs:47:13:
+internal error: entered unreachable code: Multiple identifiers equivalent up to span hygiene found: getRecentLogs#674
+First = getRecentLogs#673
+Second = getRecentLogs#673
+note: run with RUST_BACKTRACE=1 environment variable to display a backtrace.
+```
+
+**症状**：
+- 不是"编译错误"而是 **Rust panic**（thread panicked / aborting）
+- 错误信息中只出现函数名和 hygiene 编号（`#673`/`#674`），**不提示文件名和行号**
+- Bundler panic 后可能导致 `unpackage/dist/dev/.uvue/app-android/main.uts` 生成失败 → 后续编译也报 "系统找不到指定的文件 (os error 2)"
+
+**案例**（本项目）：
+```ts
+// database/ActionLogDao.uts — 两处同名导出函数
+
+// 第 105 行
+export function getRecentLogs(count: number): ActionLog[] {
+  const rows = dbManager.query('SELECT * FROM action_logs ORDER BY created_at DESC LIMIT ?', [count])
+  // ...
+}
+
+// 第 146 行（合并代码时遗留的重复）
+export function getRecentLogs(limit: number): ActionLog[] {
+  const rows = dbManager.query(
+    'SELECT * FROM action_logs ORDER BY created_at DESC LIMIT ?',
+    [limit]
+  )
+  // ...
+}
+```
+
+**根因**：
+- UTS 不允许同名函数重复声明（§33(A) 已记录）
+- 但 bundler Rust 层对此场景的处理是 panic 而非友好的编译错误
+- **panic 位置在 bundler inline 阶段**（`crates/uts_bundler/src/inline.rs`），远在语义分析之前，所以没有行号信息
+
+**修复**：删除重复定义，保留其中一个即可。
+
+**与 §33(A) 的区别**：
+- §33(A) 记录的是"本地 `function` 重复"（编译器报错位置错乱，但至少有报错）
+- §48 记录的是"**导出** `function` 重复"（bundler Rust 层直接 panic，无行号信息）
+- 两者根因相同（§33(A)），但错误表现更严重（§48），必须额外警惕
+
+**自查命令**（与 §33(A) 共用）：
+```powershell
+Get-ChildItem -Recurse -Include "*.uts","*.uvue" | ForEach-Object {
+  $funcs = (Get-Content $_.FullName) | Select-String -Pattern "^\s*(export\s+)?function\s+(\w+)" |
+    ForEach-Object { $_.Matches[0].Groups[2].Value }
+  $dupes = $funcs | Group-Object | Where-Object { $_.Count -gt 1 }
+  if ($dupes) { Write-Host "$($_.Name): duplicate: $($dupes.Name -join ', ')" }
+}
+```
+
+**关联规则**：
+- §33(A) 模块内函数不能重复声明 — §48 是 §33(A) 的"bundler panic"极端表现
+- §47 服务层本地空函数覆盖 plugin 导入 — 同类"函数名冲突"问题
+
+---
+
+### 49. 子组件对象 prop 在模板中直接访问字段 → 编译失败 error18
+
+**【最高优先级】** 即使 §13 已经强调了运行时 ClassCastException 风险，**编译期也会报错**。当子组件 prop 是对象类型（如 `EffectiveTriggerRule | null`），模板中直接 `{{ props.obj.field }}` 或 `{{ obj.field }}` 会触发：
+
+```
+error: 找不到名称"field"。参考: error18
+at components/TriggerRuleDialog.uvue:13:64
+{{ suggestedRule.actionId }}
+                    ^
+```
+
+**编译期 vs 运行期双重风险**：
+- **编译期**：UTS 编译器对模板中对象 prop 的嵌套字段访问报 error18（"找不到名称"）
+- **运行期**：即使编译通过（如用 computed 中转），reactive proxy 包装导致 ClassCastException（§13）
+
+**双重安全方案 = 拆为扁平基础类型 props**：
+
+```vue
+<!-- ❌ 对象 prop → 编译期 error18 + 运行期 ClassCastException -->
+<script setup lang="uts">
+const props = defineProps<{
+  suggestedRule: EffectiveTriggerRule | null
+}>()
+</script>
+<template>
+  <text>{{ suggestedRule.actionId }}</text>
+</template>
+
+<!-- ✅ 扁平基础类型 props → 编译通过 + 运行安全 -->
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  actionName: string
+  timeWindowStart: string
+  timeWindowEnd: string
+  timeThresholdMinutes: number
+  screenCondText: string
+  reasoning: string
+}>(), {
+  actionName: '',
+  timeWindowStart: '',
+  timeWindowEnd: '',
+  timeThresholdMinutes: 0,
+  screenCondText: '',
+  reasoning: ''
+})
+</script>
+<template>
+  <text>{{ actionName }}</text>
+</template>
+```
+
+**父组件配合修改**：
+- 父组件用 `computed` 从对象中提取扁平字段传给子组件
+- computed 内部对 `ref<T | null>` 做 null 守卫
+
+```ts
+// 父组件
+const pendingRule = ref<EffectiveTriggerRule | null>(null)
+
+const ruleActionName = computed<string>(() : string => {
+  const r = pendingRule.value
+  if (r == null) return ''
+  const a = getActionById(r.actionId)
+  return a != null ? a.name : r.actionId
+})
+const ruleTimeThresholdMinutes = computed<number>(() : number => {
+  const r = pendingRule.value
+  if (r == null) return 0
+  return r.timeThresholdMinutes
+})
+```
+
+```vue
+<!-- 父组件模板 -->
+<TriggerRuleDialog
+  :visible="showRuleDialog"
+  :action-name="ruleActionName"
+  :time-threshold-minutes="ruleTimeThresholdMinutes"
+  :reasoning="pendingReasoning"
+/>
+```
+
+**自查**：
+```powershell
+Get-ChildItem -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "\{\{.*\.\w+\.\w+.*\}\}" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中 = 模板中嵌套属性访问，必须拆为扁平 props 或 computed 中转
+```
+
+**关联规则**：
+- §13 子组件 prop 必须用基础类型 — §49 补充了编译期 error18 的问题
+- §6 模板访问嵌套属性需通过 computed 中转 — §49 强调子组件场景必须用扁平 props 而非 computed 中转
+- §32(B) 弹窗组件标准结构 — 对话框组件所有数据通过扁平 props 传入
+
+---
+
+### 50. 函数参数 `any` 类型上访问 `.field` → 编译失败 error18（§1 强化）
+
+**【最高优先级】** AGENTS.md §1 已记录"`any` 不可方括号访问/点号访问"，但本条强调一个**极高频犯错场景**：函数参数声明为 `any`，函数体内访问 `.field`。
+
+**案例 1**（函数参数 `any` + `.field` 访问）：
+```ts
+// ❌ App.uvue:146 — decision: any 上访问 .actionId / .triggerLevel / .ttsText / .durationMs
+function showOverlayWithAdhoc(decision: any, adhocText: string, fallback: boolean): void {
+  triggeredActionId = decision.actionId        // error18: 找不到名称"actionId"
+  pendingDecisionLevel = decision.triggerLevel  // error18: 找不到名称"triggerLevel"
+}
+
+// ✅ 正确：用具体类型 TriggerDecision
+import { TriggerDecision } from './services/TriggerEngine'
+function showOverlayWithAdhoc(decision: TriggerDecision, adhocText: string, fallback: boolean): void {
+  triggeredActionId = decision.actionId        // ✅ TriggerDecision.actionId 存在
+}
+```
+
+**案例 2**（`let x: any = null` 后赋具体类型值）：
+```ts
+// ❌
+let decision: any = null
+decision = shouldTrigger(ctx)  // shouldTrigger 返回 TriggerDecision | null
+if (decision == null) return
+decision.actionId  // error18: any 上访问字段
+
+// ✅
+let decision: TriggerDecision | null = null
+decision = shouldTrigger(ctx)
+if (decision == null) return
+decision.actionId  // ✅ smart cast 到非空 TriggerDecision
+```
+
+**根因**：UTS 编译器对 `any` 类型**完全禁止** `.field` 和 `["key"]` 访问（§1）。这与 TypeScript 的 `any` 行为完全不同（TS 允许 `any.field`）。
+
+**修复模式**：
+1. **函数参数**：用具体类型（`TriggerDecision`、`Map<string, any>` 等），不用 `any`
+2. **局部变量**：声明为 `具体类型 | null`，不用 `any`
+3. **确实需要 any 的场景**（如 `uni.$on` 回调参数、`uni.request` 回调）：先用 `as UTSJSONObject` 转换，再用 `obj['key']` 访问
+
+**例外**（允许 `any` 但不访问字段）：
+- `uni.$emit` 的 data 参数 → 只传不读
+- `db: any` 只透传给 `execSql` → 不访问字段
+- `data: any` 只 `JSON.stringify(data)` → 不访问字段
+
+**自查**：
+```powershell
+# 找"函数参数 any" 后函数体内有 .field 访问
+Get-ChildItem -Recurse -Include "*.uts","*.uvue" |
+  Select-String -Pattern "function\s+\w+\([^)]*:\s*any[^]]" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中后检查函数体内是否有 .field 访问 → 必须改为具体类型
+```
+
+**关联规则**：
+- §1 `any` 不可方括号/点号访问 — §50 是 §1 在函数参数场景的强化
+- §17 模块级 let smart cast 失效 — `let x: Type | null = null` 赋值后仍需 `!!`
+- §18 函数返回类型 + 对象字面量 — `const ctx: Type = {...}; shouldTrigger(ctx)` 模式
+
+---
+
+### 51. 对象字面量中函数属性简写（shorthand）在 UTS 中不合法
+
+**【最高优先级】** UTS 对象字面量中，**不允许用函数名简写**（`refreshLlmHistory,`），必须显式写成方法形式（`refreshLlmHistory(): void { ... }`）。
+
+**案例**（本项目 `stores/appStore.uts`）：
+```ts
+// ❌ 错误：函数名简写 → 实际类型为 'Unit'，预期 'Function0<Unit>'
+const store: AppStore = {
+  llmHistory,
+  refreshLlmHistory,    // ❌ 简写，UTS 推断为 Unit（函数调用返回值）
+  refreshHomeData(): void { ... }
+}
+
+// ✅ 正确：显式方法定义
+const store: AppStore = {
+  llmHistory,
+  refreshLlmHistory(): void {  // ✅ 显式方法签名
+    refreshLlmHistory()         // 调用模块级函数
+  },
+  refreshHomeData(): void { ... }
+}
+```
+
+**根因**：UTS 对象字面量中 `fnName,` 等同于 `fnName: fnName`，编译器尝试将**函数本身**（`Function0<Unit>`）赋值给接口属性。但 UTS 不支持这种 JavaScript 风格的对象属性简写用于函数。
+
+**规则**：
+- 对象字面量中**引用 ref/computed** 可以用简写（`eyeScore,` → `eyeScore: eyeScore`），因为它们是值类型
+- 对象字面量中**引用函数** 必须写成显式方法（`fn(): void { ... }`），不能用简写
+- 箭头函数属性也不支持简写：`myFn,` ❌ → `myFn: () => { ... }` 或 `myFn(): void { ... }` ✅
+
+**自查**：
+```powershell
+# 找对象字面量中的函数简写（模块级函数名后跟逗号，非 ref/computed）
+Get-ChildItem -Recurse -Include "*.uts" |
+  Select-String -Pattern "^\s{4}\w+,$" |
+  ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber) : $($_.Line.Trim())" }
+# 命中后判断该标识符是否是函数 → 必须改为显式方法
+```
+
+**关联规则**：
+- §9 script setup 函数不提升 — 同类"UTS 限制 vs JS 灵活性"问题
+- §33(A) 模块内函数不能重复 — `refreshLlmHistory` 在模块级和对象方法中同名是合法的（不同作用域）
+

@@ -110,7 +110,7 @@ function cellStyle(count: number): UTSJSONObject {
   if (count >= 5) return { backgroundColor: '#2ECC71' }
   if (count >= 3) return { backgroundColor: '#82E0AA' }
   if (count >= 1) return { backgroundColor: '#F9E79F' }
-  return { backgroundColor: '#ECF0F1' }
+  return { backgroundColor: '#D5D8DC' }
 }
 </script>
 
@@ -152,10 +152,13 @@ function cellStyle(count: number): UTSJSONObject {
 .cells-col {
   flex: 1;
   flex-direction: column;
+  padding-left: 4px;
+  min-height: 200px;
 }
 .cell-row {
   flex-direction: row;
   margin-bottom: 4px;
+  height: 32px;
 }
 .cell {
   width: 32px;

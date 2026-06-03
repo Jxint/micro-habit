@@ -8,7 +8,7 @@ import Notification from 'android.app.Notification'
 import Build from 'android.os.Build'
 import PowerManager from 'android.os.PowerManager'
 
-class MonitorForegroundService extends Service {
+export class MonitorForegroundService extends Service {
   private wakeLock: PowerManager.WakeLock | null = null
 
   constructor() {
@@ -69,7 +69,7 @@ class MonitorForegroundService extends Service {
       if (pm != null) {
         this.wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, 'MicroHabit:KeepAlive')
         if (this.wakeLock != null) {
-          this.wakeLock!!.acquire(30 * 60 * 1000)
+          this.wakeLock!!.acquire((30 * 60 * 1000).toLong())
         }
       }
     } catch (_) {}

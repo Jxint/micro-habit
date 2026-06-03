@@ -1,0 +1,22 @@
+import { EffectiveTriggerRule } from './EffectiveTriggerRule'
+
+export type LlmHistoryStage = 'pre' | 'post'
+
+export type ParsedLlmResult = {
+  adhocText?: string
+  stateDescription?: string
+  suggestedRule?: EffectiveTriggerRule
+  reasoning?: string
+}
+
+export type LlmHistoryEntry = {
+  id: number
+  stage: LlmHistoryStage
+  contextJson: string
+  aiRawResponse: string
+  parsedResult: ParsedLlmResult
+  adhocText: string | null
+  suggestedRule: EffectiveTriggerRule | null
+  reasoning: string | null
+  createdAt: number
+}

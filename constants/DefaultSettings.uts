@@ -22,5 +22,7 @@ export const DEFAULT_SETTINGS: DefaultSetting[] = [
   { key: 'newbie_mode', value: '1' },
   { key: 'guide_completed', value: '0' },
   { key: 'health_preference', value: 'balanced' },
-  { key: 'body_limit', value: 'none' }
+  { key: 'body_limit', value: 'none' },
+  { key: 'llm_trigger_enabled', value: '1' },
+  { key: 'llm_trigger_ask_each_time', value: '1' }
 ]

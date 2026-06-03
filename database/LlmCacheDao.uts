@@ -1,5 +1,6 @@
 import { dbManager } from './DatabaseManager'
 import { LlmCache } from '../models/LlmCache'
+import { getNum, getStr } from '../utils/DbRowUtils'
 
 export function getByKey(key: string): LlmCache | null {
   const row = dbManager.queryOne('SELECT * FROM llm_cache WHERE cache_key = ?', [key])
@@ -20,11 +21,11 @@ export function cleanExpired(): void {
 
 function mapRow(row: Map<string, any>): LlmCache {
   return {
-    cache_key: row.get("cache_key") as string,
-    cache_type: row.get("cache_type") as string,
-    response: row.get("response") as string,
-    model: row.get("model") as string,
-    created_at: row.get("created_at") as number,
-    expires_at: row.get("expires_at") as number
+    cache_key: getStr(row, 'cache_key'),
+    cache_type: getStr(row, 'cache_type'),
+    response: getStr(row, 'response'),
+    model: getStr(row, 'model'),
+    created_at: getNum(row, 'created_at'),
+    expires_at: getNum(row, 'expires_at')
   }
 }
