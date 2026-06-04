@@ -1,4 +1,5 @@
 import { getTodayAppBreakdown, getTop5Apps, getTodayTotalUsageSeconds, type AppUsageItem } from '../database/AppUsageDao'
+import { queryUsageStatsOnce } from '../uni_modules/uts-usage-stats/utssdk/app-android/index'
 import { today } from '../utils/TimeUtils'
 
 export type PhoneUsageSummary = {
@@ -102,5 +103,139 @@ const LLM_RESERVED_NOTE = 'LLM 接口待配置'
 
 export function aiEvaluateTodayUsage(onComplete: (text: string) => void): void {
   onComplete(LLM_RESERVED_NOTE)
+}
+
+export type PhoneUsageFromSystem = {
+  summary: PhoneUsageSummary
+  segments: PieSegment[]
+}
+
+function startOfTodayMs(): number {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+type SystemUsageEntry = {
+  packageName: string
+  totalTimeInForeground: number
+  lastTimeUsed: number
+}
+
+// 从系统 UsageStatsManager.queryUsageStats(todayStart, now) 直接读
+// 用于本地 app_usage_snapshots 为空时的兜底显示
+export function getPhoneUsageFromSystem(): PhoneUsageFromSystem {
+  const emptySummary: PhoneUsageSummary = {
+    totalMinutes: 0,
+    totalSeconds: 0,
+    hourText: '0 小时',
+    minuteText: '0 分钟',
+    appCount: 0
+  }
+  const startMs = startOfTodayMs()
+  const endMs = Date.now()
+  let entries: SystemUsageEntry[] = []
+  try {
+    const raw = queryUsageStatsOnce(startMs, endMs)
+    if (raw != null) {
+      for (let i = 0; i < raw.length; i++) {
+        const e = raw[i]
+        if (e == null) continue
+        const item: SystemUsageEntry = {
+          packageName: e.packageName,
+          totalTimeInForeground: e.totalTimeInForeground as number,
+          lastTimeUsed: e.lastTimeUsed as number
+        }
+        entries.push(item)
+      }
+    }
+  } catch (e) {
+    console.error('[PhoneUsageService] queryUsageStatsOnce 失败: ' + JSON.stringify(e))
+    const emptyResult: PhoneUsageFromSystem = { summary: emptySummary, segments: [] }
+    return emptyResult
+  }
+  if (entries.length < 1) {
+    const emptyResult: PhoneUsageFromSystem = { summary: emptySummary, segments: [] }
+    return emptyResult
+  }
+
+  // 转 AppUsageItem 列表
+  const items: AppUsageItem[] = []
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i]
+    if (e == null) continue
+    const sec = Math.floor((e.totalTimeInForeground as number) / 1000)
+    const label = e.packageName != null ? e.packageName : ''
+    items.push({
+      packageName: e.packageName,
+      appLabel: label,
+      foregroundSec: sec,
+      minutes: Math.floor(sec / 60)
+    })
+  }
+  // 按 desc 排序
+  items.sort((a: AppUsageItem, b: AppUsageItem): number => b.foregroundSec - a.foregroundSec)
+
+  // 汇总秒数
+  let totalSeconds = 0
+  for (let i = 0; i < items.length; i++) {
+    totalSeconds += items[i].foregroundSec
+  }
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const remainMin = totalMinutes % 60
+  const summary: PhoneUsageSummary = {
+    totalMinutes: totalMinutes,
+    totalSeconds: totalSeconds,
+    hourText: hours + ' 小时',
+    minuteText: remainMin + ' 分钟',
+    appCount: items.length
+  }
+
+  if (totalSeconds < 1) {
+    const noSegResult: PhoneUsageFromSystem = { summary, segments: [] }
+    return noSegResult
+  }
+
+  // 构造 segments（与 getTodayPieSegments 同样的逻辑）
+  const segments: PieSegment[] = []
+  let start = 0
+  const cap = items.length > 10 ? 10 : items.length
+  for (let i = 0; i < cap; i++) {
+    const item = items[i]
+    const pct = (item.foregroundSec / totalSeconds) * 100
+    const end = start + pct
+    const color: string = i < PALETTE.length ? (PALETTE[i] as string) : '#BDC3C7'
+    const seg: PieSegment = {
+      pkg: item.packageName,
+      label: item.appLabel.length > 0 ? item.appLabel : item.packageName,
+      minutes: item.minutes,
+      percent: Math.round(pct * 10) / 10,
+      color: color,
+      startAngle: start,
+      endAngle: end
+    }
+    segments.push(seg)
+    start = end
+  }
+  if (items.length > cap) {
+    let othersMin = 0
+    for (let i = cap; i < items.length; i++) {
+      othersMin += items[i].minutes
+    }
+    const pct = 100 - start
+    const seg: PieSegment = {
+      pkg: '__others__',
+      label: '其他',
+      minutes: othersMin,
+      percent: Math.round(pct * 10) / 10,
+      color: '#BDC3C7',
+      startAngle: start,
+      endAngle: 100
+    }
+    segments.push(seg)
+  }
+  const finalResult: PhoneUsageFromSystem = { summary, segments }
+  return finalResult
 }
 

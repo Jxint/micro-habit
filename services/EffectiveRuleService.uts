@@ -1,0 +1,36 @@
+import { getActiveRules, getRulesByApp, isRuleActive as daoIsRuleActive } from '../database/EffectiveRuleDao'
+import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
+import { TimeWindow } from '../models/EffectiveTriggerRule'
+import { isInTimeRange } from '../utils/TimeUtils'
+
+export function getActiveRuleList(): PersistedEffectiveRule[] {
+  return getActiveRules()
+}
+
+export function getRulesForApp(pkg: string): PersistedEffectiveRule[] {
+  return getRulesByApp(pkg)
+}
+
+export function isRuleActive(rule: PersistedEffectiveRule, pkg: string, nowSec: number): boolean {
+  if (!rule.enabled) return false
+  if (rule.expiresAt != null && rule.expiresAt > 0 && nowSec > rule.expiresAt) return false
+  if (rule.appPackages.length > 0 && rule.appPackages.indexOf(pkg) < 0) return false
+  if (rule.timeWindow != null) {
+    if (!isInTimeRange(rule.timeWindow.start, rule.timeWindow.end)) return false
+  }
+  return true
+}
+
+export function parseTimeWindow(json: string | null): TimeWindow | null {
+  if (json == null || json.length < 1) return null
+  try {
+    const obj = JSON.parse(json) as UTSJSONObject
+    if (obj == null) return null
+    const start = obj['start'] as string
+    const end = obj['end'] as string
+    if (start != null && end != null && start.length > 0 && end.length > 0) {
+      return { start: start, end: end }
+    }
+  } catch (_) {}
+  return null
+}

@@ -1,17 +1,78 @@
-import { EffectiveTriggerRule, TimeWindow, ScreenConditions } from '../models/EffectiveTriggerRule'
+import { EffectiveTriggerRule, TimeWindow, ScreenConditions, TriggerLevel } from '../models/EffectiveTriggerRule'
 import { DailyData } from '../models/DailySummary'
 import { WeeklyReportStats } from '../models/WeeklyReport'
 
+// 子类型：Pre 阶段的 App 7 天表现
+export type PreAppHistory = {
+  totalTriggers: number
+  totalCompletes: number
+  totalSkips: number
+  acceptRate: number
+  typicalContinuousMin: number
+  lastTriggerAt: number
+}
+
+// 子类型：Post 阶段的 App 7 天表现（含周趋势）
+export type PostAppHistory = {
+  packageName: string
+  totalTriggers: number
+  totalCompletes: number
+  totalSkips: number
+  acceptRate: number
+  typicalContinuousMin: number
+  lastWeekTrend: 'improving' | 'declining' | 'stable'
+}
+
+// 子类型：命中的触发规则
+export type MatchedRuleInfo = {
+  actionId: string
+  source: 'user' | 'llm' | 'system'
+  timeWindow: TimeWindow | null
+  thresholdMinutes: number
+  triggerLevel: TriggerLevel
+}
+
+// 子类型：用户健康偏好
+export type UserPreferenceInfo = {
+  healthFocus: 'eye' | 'posture' | 'vitality' | 'balanced'
+  bodyLimit: 'none' | 'neck' | 'waist' | 'knee'
+}
+
+// 子类型：Post 上下文中的当前规则条目
+export type PostContextRuleItem = {
+  id: number
+  actionId: string
+  appPackages: string[]
+  timeWindow: TimeWindow | null
+  thresholdMinutes: number
+  triggerLevel: TriggerLevel
+  source: 'user' | 'llm' | 'system'
+  createdAt: number
+}
+
+// 子类型：上周同时段数据
+export type LastWeekSameTime = {
+  avgContinuousMin: number
+  triggerCount: number
+}
+
+// 扩展后的 Pre-Trigger 上下文：含 App 历史、命中规则、用户偏好
 export type PreTriggerContext = {
   appLabel: string
   appPackage: string
+  appCategory: string
   continuousMinutes: number
   hour: number
   todayCompletedCount: number
   guardMinutes: number
+  todaySkipCount: number
   recentActions: string[]
+  appHistory: PreAppHistory | null
+  matchedRule: MatchedRuleInfo | null
+  userPreference: UserPreferenceInfo
 }
 
+// 扩展后的 Post-Action 上下文：含结构化当前规则
 export type PostActionContext = {
   actionId: string
   actionName: string
@@ -20,42 +81,128 @@ export type PostActionContext = {
   originalContext: string
   todayCompletedCount: number
   guardMinutes: number
+  todaySkipCount: number
   recentActions: string[]
-  currentRules: string
+  appHistory: PostAppHistory | null
+  currentRules: PostContextRuleItem[]
+  userPreference: UserPreferenceInfo
+  lastWeekSameTime: LastWeekSameTime | null
 }
 
-export const SYSTEM_PROMPT_EVALUATE = '你是一个微习惯健康助手，正在帮用户做碎片化健康动作。\n你的回答必须是一个**裸的 JSON 对象**（直接以 { 开头，以 } 结尾），不要有额外文字、不要 Markdown 包裹、不要把 JSON 包在字符串里。\n调用温柔+轻度幽默+不油腻的中文风格。避免医学恐吓和引发焦虑的表述。\n绝对禁止读取用户隐私内容，只能使用提供的脱敏聚合数据。'
+export const SYSTEM_PROMPT_EVALUATE = '【角色】你是一个微习惯健康助手，名字叫“小球球”，目标是帮助用户做碎片化健康动作，养成健康微动作习惯。【性格】调皮，但是实际上很关心用户；友好，但是有自己的主见，个性强，对事物有好奇，喜欢问问题。【语言风格】日常，对话，短句，非常喜欢用比喻（但是不冒犯），有些时候会小顶嘴。【注意】不主动讨论隐私，不讨论敏感话题'
 
 export function buildPreTriggerPrompt(context: PreTriggerContext): string {
-  const recentStr = context.recentActions.length > 0 ? context.recentActions.join('、') : '无'
+  if (context == null) {
+    return '用户当前状态：未知。请直接输出 {"adhocText": "该动动了", "stateDescription": "需要休息"}'
+  }
+  const recentArr = context.recentActions != null ? context.recentActions : []
+  const recentStr = recentArr.length > 0 ? recentArr.join('、') : '无'
+  const histLines: string[] = []
+  if (context.appHistory != null) {
+    const h = context.appHistory
+    const triggers = h.totalTriggers != null ? h.totalTriggers : 0
+    const accept = h.acceptRate != null ? h.acceptRate : 0
+    const typical = h.typicalContinuousMin != null ? h.typicalContinuousMin : 0
+    histLines.push('- 该 App 过去 7 天被触发 ' + triggers + ' 次')
+    histLines.push('- 接受率 ' + (accept * 100).toFixed(0) + '%')
+    histLines.push('- 平均连续使用 ' + typical + ' 分钟')
+  } else {
+    histLines.push('- 该 App 历史数据不足（首次见到）')
+  }
+  const ruleLines: string[] = []
+  if (context.matchedRule != null) {
+    const r = context.matchedRule
+    const thr = r.thresholdMinutes != null ? r.thresholdMinutes : 0
+    const lvl = r.triggerLevel != null ? r.triggerLevel : 'gentle'
+    ruleLines.push('- 命中规则：阈值 ' + thr + ' 分钟, 级别 ' + lvl)
+    if (r.timeWindow != null) {
+      ruleLines.push('- 时段：' + r.timeWindow.start + '-' + r.timeWindow.end)
+    }
+  }
+  const up = context.userPreference
+  const focus = up != null && up.healthFocus != null ? up.healthFocus : 'balanced'
+  const limit = up != null && up.bodyLimit != null ? up.bodyLimit : 'none'
+  const appLabel = context.appLabel != null ? context.appLabel : '某应用'
+  const appCat = context.appCategory != null ? context.appCategory : 'other'
+  const contMin = context.continuousMinutes != null ? context.continuousMinutes : 0
+  const hour = context.hour != null ? context.hour : 0
+  const todayCount = context.todayCompletedCount != null ? context.todayCompletedCount : 0
+  const guard = context.guardMinutes != null ? context.guardMinutes : 0
+  const skipCount = context.todaySkipCount != null ? context.todaySkipCount : 0
   return '用户当前状态：\n' +
-    '- 正在使用：' + context.appLabel + '\n' +
-    '- 已连续前台：' + context.continuousMinutes + ' 分钟\n' +
-    '- 当前时间：' + context.hour + ':00\n' +
-    '- 今日已完成微动作：' + context.todayCompletedCount + ' 次\n' +
-    '- 今日已守护：' + context.guardMinutes + ' 分钟\n' +
-    '- 最近 5 次动作：' + recentStr + '\n\n' +
-    '请基于以上状态生成：\n' +
+    '- 正在使用：' + appLabel + '（' + appCat + '）\n' +
+    '- 已连续前台：' + contMin + ' 分钟\n' +
+    '- 当前时间：' + hour + ':00\n' +
+    '- 今日已完成微动作：' + todayCount + ' 次\n' +
+    '- 今日已守护：' + guard + ' 分钟\n' +
+    '- 今日已跳过：' + skipCount + ' 次\n' +
+    '- 最近 5 次动作：' + recentStr + '\n' +
+    '- 用户偏好：' + focus + ' / 限制部位 ' + limit + '\n' +
+    histLines.join('\n') + '\n' +
+    (ruleLines.length > 0 ? ruleLines.join('\n') + '\n' : '') +
+    '\n请基于以上状态生成：\n' +
     '1. adhocText：一句 10-30 字的 TTS 即兴文案，温暖+轻度幽默，要提到当前 app 和时长\n' +
     '2. stateDescription：用 5-15 字概括当前状态（用于"为什么提醒我"展示）\n\n' +
     '严格按 JSON 格式输出：{"adhocText": "...", "stateDescription": "..."}'
 }
 
 export function buildPostActionPrompt(context: PostActionContext): string {
-  const recentStr = context.recentActions.length > 0 ? context.recentActions.join('、') : '无'
-  return '用户刚完成微动作：' + context.actionName + '（' + context.actionCategory + '，' +
-    Math.round(context.durationMs / 1000) + '秒）\n' +
-    '原触发上下文：' + context.originalContext + '\n' +
-    '今日累计：' + context.todayCompletedCount + ' 次，' + context.guardMinutes + ' 分钟\n' +
+  const recentArr = context.recentActions != null ? context.recentActions : []
+  const recentStr = recentArr.length > 0 ? recentArr.join('、') : '无'
+  const rulesArr = context.currentRules != null ? context.currentRules : []
+  const rulesStrParts: string[] = []
+  for (let i = 0; i < rulesArr.length; i++) {
+    const r = rulesArr[i]
+    const tw = r.timeWindow != null ? ('[' + r.timeWindow.start + '-' + r.timeWindow.end + ']') : '[全天]'
+    rulesStrParts.push('  ' + r.actionId + ' ' + tw + ' ≥' + r.thresholdMinutes + 'min ' + r.triggerLevel + ' [' + r.source + ']')
+  }
+  const rulesStr = rulesStrParts.length > 0 ? rulesStrParts.join('\n') : '  暂无规则'
+  const histLines: string[] = []
+  if (context.appHistory != null) {
+    const h = context.appHistory
+    const accept = h.acceptRate != null ? h.acceptRate : 0
+    const typical = h.typicalContinuousMin != null ? h.typicalContinuousMin : 0
+    const trend = h.lastWeekTrend != null ? h.lastWeekTrend : 'stable'
+    histLines.push('- 该 App 接受率 ' + (accept * 100).toFixed(0) + '%，趋势 ' + trend)
+    histLines.push('- 该 App 平均连续使用 ' + typical + ' 分钟')
+  }
+  const pref: UserPreferenceInfo = context.userPreference != null
+    ? context.userPreference
+    : { healthFocus: 'balanced' as const, bodyLimit: 'none' as const }
+  if (context == null) {
+    return '用户刚完成微动作。请直接输出 {"decision": "no_change", "targetRuleId": 0, "suggestedRule": null, "reasoning": "数据缺失", "confidence": 0.5, "alternatives": []}'
+  }
+  const aName = context.actionName != null ? context.actionName : '未知动作'
+  const aCat = context.actionCategory != null ? context.actionCategory : 'other'
+  const durMs = context.durationMs != null ? context.durationMs : 0
+  const origCtx = context.originalContext != null ? context.originalContext : ''
+  const tc = context.todayCompletedCount != null ? context.todayCompletedCount : 0
+  const ts = context.todaySkipCount != null ? context.todaySkipCount : 0
+  const gm = context.guardMinutes != null ? context.guardMinutes : 0
+  return '用户刚完成微动作：' + aName + '（' + aCat + '，' +
+    Math.round(durMs / 1000) + '秒）\n' +
+    '原触发上下文：' + origCtx + '\n' +
+    '今日累计：' + tc + ' 次完成 / ' + ts + ' 次跳过 / ' + gm + ' 分钟守护\n' +
     '最近 5 次：' + recentStr + '\n' +
-    '当前生效的触发规则：' + context.currentRules + '\n\n' +
-    '请评估：\n' +
+    '用户偏好：' + pref.healthFocus + ' / 限制部位 ' + pref.bodyLimit + '\n' +
+    '当前生效的触发规则：\n' + rulesStr + '\n' +
+    (histLines.length > 0 ? histLines.join('\n') + '\n' : '') +
+    '\n请评估：\n' +
     '1. 用户的健康习惯是否稳定？是否需要调整触发频率或类型？\n' +
-    '2. 是否需要新增一条更个性化的触发规则？\n\n' +
-    '如果要新增规则，输出 JSON：\n' +
-    '{"suggestedRule": {"actionId": "eye_blink", "timeWindow": {"start": "22:00", "end": "07:00"}, "screenConditions": {"appPackages": [], "includeHome": true}, "timeThresholdMinutes": 60}, "reasoning": "..."}\n\n' +
-    '如果不需要新规则，输出：\n' +
-    '{"suggestedRule": null, "reasoning": "当前规则合理，继续观察"}'
+    '2. 是否需要新增/修改/删除某条触发规则？\n\n' +
+    '严格按以下 JSON 格式输出：\n' +
+    '{"decision": "create_rule" | "modify_rule" | "delete_rule" | "no_change", "targetRuleId": 0, "suggestedRule": {"actionId": "eye_blink", "appPackages": ["com.zhihu.android"], "timeWindow": {"start": "22:00", "end": "07:00"}, "timeThresholdMinutes": 60, "triggerLevel": "gentle", "categoryFilter": null}, "reasoning": "...", "confidence": 0.85, "alternatives": []}\n\n' +
+    '如果不调整，输出：\n' +
+    '{"decision": "no_change", "targetRuleId": 0, "suggestedRule": null, "reasoning": "当前规则合理，继续观察", "confidence": 0.7, "alternatives": []}\n\n' +
+    '说明：\n' +
+    '- decision: no_change（不动）/ create_rule（新增）/ modify_rule（修改 targetRuleId）/ delete_rule（删除 targetRuleId）\n' +
+    '- targetRuleId: 仅 modify/delete 时填对应 rule id\n' +
+    '- suggestedRule.appPackages: 命中的应用包名列表\n' +
+    '- suggestedRule.timeWindow: {start, end} 格式 "HH:MM"；不需要时填 null\n' +
+    '- suggestedRule.triggerLevel: gentle（温和）/ strong（强提醒）/ forced（强打断）\n' +
+    '- suggestedRule.categoryFilter: 仅在指定分类触发时填，如 "social"；不需要时填 null\n' +
+    '- confidence: 0~1，你对这个建议的把握度\n' +
+    '- alternatives: 备选方案数组（可为空）'
 }
 
 export const FALLBACK_ADHOC_TEXTS: string[] = [

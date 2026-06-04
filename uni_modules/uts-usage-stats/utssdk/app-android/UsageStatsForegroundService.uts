@@ -1,0 +1,490 @@
+// 使用情况监听：前台 Service
+// 5 秒轮询 queryUsageStats(INTERVAL_DAILY, now-24h, now) 找 lastTimeUsed 最大的非自家包
+// 作为"当前前台 App"，持续时长 = now - currentStartTime（=lastTimeUsed）
+// 每 30 分钟调 maybeReconcile 跑一次诊断 log（仅 debug 用）
+// 维护 currentPkg / currentStartTime / lastTickTime / lastReconcileTime / todayDate
+
+import Service from 'android.app.Service'
+import Context from 'android.content.Context'
+import Intent from 'android.content.Intent'
+import Handler from 'android.os.Handler'
+import Looper from 'android.os.Looper'
+import NotificationManager from 'android.app.NotificationManager'
+import NotificationChannel from 'android.app.NotificationChannel'
+import Notification from 'android.app.Notification'
+import Build from 'android.os.Build'
+import PowerManager from 'android.os.PowerManager'
+import AppOpsManager from 'android.app.AppOpsManager'
+import UsageStatsManager from 'android.app.usage.UsageStatsManager'
+import UsageStats from 'android.app.usage.UsageStats'
+import System from 'java.lang.System'
+import ServiceInfo from 'android.content.pm.ServiceInfo'
+import Process from 'android.os.Process'
+
+import { type AppForegroundInfo, type UsageStatEntry, type UsageMonitorCallbacks } from './UsageTypes'
+
+const NOTIFICATION_ID: Int = 2
+const CHANNEL_ID: string = 'micro_habit_usage_stats'
+const FOREGROUND_TYPE_SPECIAL_USE: Int = 108
+const WAKE_LOCK_TAG: string = 'MicroHabit:UsageStats'
+const SERVICE_CLASS_NAME: string = 'uts.sdk.modules.utsUsageStats.UsageStatsForegroundService'
+
+// 模块级共享状态
+let cachedCbs: UsageMonitorCallbacks | null = null
+let thresholdMs: number = 60 * 60 * 1000
+let pollIntervalMs: number = 5 * 60 * 1000
+let serviceInstance: UsageStatsForegroundService | null = null
+let monitoring: boolean = false
+let lastReconcileTime: Long = 0
+let triggerEnabled: boolean = false
+let monitoring: boolean = false
+
+function getSelfPackageNameInternal(): string {
+  try {
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return ''
+    const name = ctx.getPackageName() as string
+    if (name == null) return ''
+    return name
+  } catch (_) {
+    return ''
+  }
+}
+
+function currentDateString(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = ('' + (d.getMonth() + 1)).padStart(2, '0')
+  const day = ('' + d.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + day
+}
+
+function startOfTodayMsLong(): Long {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.getTime().toLong()
+}
+
+function isInBlacklist(pkg: string, selfPkg: string): boolean {
+  if (pkg.length < 1) return true
+  if (pkg == 'android') return true
+  if (selfPkg.length > 0 && pkg == selfPkg) return true
+  return false
+}
+
+function isUsagePermissionGrantedByContext(ctx: Context): boolean {
+  try {
+    const appOps = ctx.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    if (appOps == null) return false
+    const mode = appOps.checkOpNoThrow(
+      AppOpsManager.OPSTR_GET_USAGE_STATS,
+      Process.myUid(),
+      ctx.getPackageName() as string
+    )
+    return mode == AppOpsManager.MODE_ALLOWED
+  } catch (_) {
+    return false
+  }
+}
+
+// 通过包名+类名字符串构造 Intent，避开 UTS 无法使用类引用作 Class 参数的限制
+function makeServiceIntent(ctx: Context): Intent {
+  const intent: Intent = Intent()
+  intent.setClassName(ctx, SERVICE_CLASS_NAME)
+  return intent
+}
+
+export class UsageStatsForegroundService extends Service {
+  private handler: Handler | null = null
+  private wakeLock: PowerManager.WakeLock | null = null
+  private lastTickTime: Long = 0
+  private todayDate: string = ''
+  private lastPeriod: string = ''
+  private started: boolean = false
+  private usm: UsageStatsManager | null = null
+  private selfPkgCache: string = ''
+
+  constructor() {
+    super()
+  }
+
+  override onCreate(): void {
+    try {
+      super.onCreate()
+      serviceInstance = this
+      this.selfPkgCache = getSelfPackageNameInternal()
+      this.todayDate = currentDateString()
+      this.tryRefreshUsm()
+      this.createChannel()
+      this.startForegroundCompat()
+      this.acquireWakeLock()
+      this.startPolling()
+    } catch (e) {
+      console.error('[UsageStats] onCreate THREW: ' + JSON.stringify(e))
+    }
+  }
+
+  override onStartCommand(intent: Intent | null, flags: Int, startId: Int): Int {
+    if (this.started) {
+      this.scheduleNextTick()
+    }
+    return Service.START_STICKY
+  }
+
+  override onDestroy(): void {
+    this.stopPolling()
+    this.releaseWakeLock()
+    serviceInstance = null
+    monitoring = false
+    super.onDestroy()
+  }
+
+  override onBind(intent: Intent | null): android.os.IBinder | null {
+    return null
+  }
+
+  // 公开 stopPolling，让模块级 stopUsageMonitor 能调用
+  public stopPolling(): void {
+    this.started = false
+    if (this.handler != null) {
+      this.handler!!.removeCallbacksAndMessages(null)
+      this.handler = null
+    }
+  }
+
+  // 公开 runImmediatePoll，让模块级 setTriggerEnabled 在用户开启总开关时立即触发一次
+  public runImmediatePoll(): void {
+    if (!this.started) return
+    try {
+      this.doPoll()
+    } catch (e) {
+      console.warn('[UsageStats] immediate poll error: ' + JSON.stringify(e))
+    }
+  }
+
+  private createChannel(): void {
+    if (Build.VERSION.SDK_INT < 26) return
+    try {
+      const mgr = this.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      if (mgr == null) return
+      const ch = NotificationChannel(CHANNEL_ID, '微习惯健康守护', NotificationManager.IMPORTANCE_LOW)
+      ch.setDescription('前台使用情况监听')
+      mgr.createNotificationChannel(ch)
+    } catch (_) {}
+  }
+
+  private startForegroundCompat(): void {
+    const notif = this.buildNotification()
+    if (Build.VERSION.SDK_INT >= 30) {
+      this.startForeground(NOTIFICATION_ID, notif, FOREGROUND_TYPE_SPECIAL_USE)
+    } else {
+      this.startForeground(NOTIFICATION_ID, notif)
+    }
+  }
+
+  private buildNotification(): Notification {
+    return Notification.Builder(this, CHANNEL_ID)
+      .setContentTitle('微习惯健康伴侣')
+      .setContentText('正在守护你的健康')
+      .setSmallIcon(android.R.drawable.ic_popup_reminder)
+      .setOngoing(true)
+      .build()
+  }
+
+  private acquireWakeLock(): void {
+    try {
+      const pm = this.getSystemService(Context.POWER_SERVICE) as PowerManager
+      if (pm == null) return
+      this.wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG)
+      if (this.wakeLock != null) {
+        this.wakeLock!!.acquire((30 * 60 * 1000).toLong())
+      }
+    } catch (_) {}
+  }
+
+  private releaseWakeLock(): void {
+    if (this.wakeLock != null) {
+      try { this.wakeLock!!.release() } catch (_) {}
+      this.wakeLock = null
+    }
+  }
+
+  private startPolling(): void {
+    if (this.started) return
+    this.handler = Handler(Looper.getMainLooper())
+    this.lastTickTime = System.currentTimeMillis()
+    this.started = true
+    monitoring = true
+    this.doPoll()  // 立即跑一次，不等首次 5 分钟（提升测试体验 + 启动即可拿数据）
+    this.scheduleNextTick()
+  }
+
+  private scheduleNextTick(): void {
+    if (this.handler == null) return
+    const self = this
+    this.handler!!.postDelayed(function(): void {
+      self.tick()
+    }, pollIntervalMs.toLong())
+  }
+
+  private tick(): void {
+    if (!this.started) return
+    try {
+      this.doPoll()
+    } catch (e) {
+      console.warn('[UsageStats] poll error: ' + JSON.stringify(e))
+    }
+    this.acquireWakeLock()
+    this.scheduleNextTick()
+  }
+
+  private doPoll(): void {
+    const nowMs: Long = System.currentTimeMillis()
+    // 触发总开关关闭：立即 return，不读 UsageStats、不写表、不触发
+    if (!triggerEnabled) {
+      return
+    }
+    if (this.usm == null) {
+      this.tryRefreshUsm()
+      if (this.usm == null) return
+    }
+    const ctx: Context = this
+    if (!isUsagePermissionGrantedByContext(ctx)) {
+      const cbs = cachedCbs
+      if (cbs != null) {
+        try { cbs.onPermissionMissing() } catch (_) {}
+      }
+      return
+    }
+
+    // ========== 核心：queryUsageStats 今日聚合数据遍历 ==========
+    try {
+      const todayStart: Long = startOfTodayMsLong()
+      const stats = this.usm!!.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, todayStart, nowMs)
+      const sz: Int = stats.size
+      if (sz > 0) {
+        const cbs = cachedCbs
+        for (let i: Int = 0; i < sz; i++) {
+          const s: UsageStats = stats.get(i)
+          if (s == null) continue
+          const pkg: string = s.getPackageName() as string
+          if (isInBlacklist(pkg, this.selfPkgCache)) continue
+          const totalMs: Long = s.getTotalTimeInForeground() as number as Long
+          if (totalMs < 1) continue
+
+          // 写表：绝对值覆盖（与新聚合数据同步）
+          if (cbs != null) {
+            const totalSec: number = Math.floor(totalMs / 1000)
+            try { cbs.onUsageTick(pkg, totalSec) } catch (_) {}
+          }
+
+          // 触发判定：今日累计 >= 阈值（频率由 TriggerEngine 冷却期控制）
+          if (totalMs >= thresholdMs) {
+            if (cbs != null) {
+              const info: AppForegroundInfo = {
+                packageName: pkg,
+                startTime: nowMs,
+                continuousMs: totalMs
+              }
+              try { cbs.onAppDurationTrigger(info) } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[UsageStats] queryUsageStats 失败: ' + JSON.stringify(e))
+    }
+
+    this.checkTimePeriod(nowMs)
+    const rolled: boolean = this.checkDayRollover()
+    this.maybeReconcile(nowMs)
+    this.lastTickTime = nowMs
+  }
+
+  // 每 30 分钟跑一次诊断 log（仅 debug 用，不写库）
+  private maybeReconcile(now: Long): void {
+    if (lastReconcileTime < 1) {
+      lastReconcileTime = now
+      return
+    }
+    const interval: Long = 30 * 60 * 1000
+    if (now - lastReconcileTime < interval) return
+    lastReconcileTime = now
+    try {
+      const todayStart: Long = startOfTodayMsLong()
+      const usm = this.usm
+      if (usm == null) return
+      const stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, todayStart, now)
+      const sz: Int = stats.size
+      if (sz < 1) {
+        console.log('[UsageStats] reconcile: no system stats')
+        return
+      }
+      console.log('[UsageStats] reconcile: system has ' + sz + ' apps, top 3:')
+      let n: Int = 0
+      for (let i: Int = 0; i < sz && n < 3; i++) {
+        const s: UsageStats = stats.get(i)
+        if (s == null) continue
+        const pkg: string = s.getPackageName() as string
+        if (isInBlacklist(pkg, this.selfPkgCache)) continue
+        const totalMs: Long = s.getTotalTimeInForeground() as number as Long
+        console.log('[UsageStats]   ' + pkg + ' totalMs=' + totalMs)
+        n++
+      }
+    } catch (e) {
+      console.warn('[UsageStats] reconcile failed: ' + JSON.stringify(e))
+    }
+  }
+
+  private tryRefreshUsm(): void {
+    try {
+      this.usm = this.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    } catch (_) {
+      this.usm = null
+    }
+  }
+
+  private checkTimePeriod(now: Long): void {
+    const d = new Date(now as number)
+    const h = d.getHours()
+    let period: string = ''
+    if (h == 9) period = 'morning'
+    else if (h == 12) period = 'noon'
+    else if (h == 15) period = 'afternoon'
+    else if (h == 18) period = 'evening'
+    else if (h == 22) period = 'night'
+    if (period.length > 0 && period != this.lastPeriod) {
+      this.lastPeriod = period
+      const cbs = cachedCbs
+      if (cbs != null) {
+        try { cbs.onTimePeriodTrigger(period) } catch (_) {}
+      }
+    } else if (period.length < 1) {
+      this.lastPeriod = ''
+    }
+  }
+
+  private checkDayRollover(): boolean {
+    const today = currentDateString()
+    if (today != this.todayDate) {
+      const old = this.todayDate
+      this.todayDate = today
+      const cbs = cachedCbs
+      if (cbs != null) {
+        try { cbs.onDayRollover(old, today) } catch (_) {}
+      }
+      return true
+    }
+    return false
+  }
+
+}
+
+// ============================================================
+// 公共 API
+// ============================================================
+
+export function startUsageMonitor(
+  cbs: UsageMonitorCallbacks,
+  thresholdMsIn: number,
+  pollIntervalMsIn: number,
+  triggerEnabledIn: boolean
+): void {
+  cachedCbs = cbs
+  if (thresholdMsIn > 0) {
+    thresholdMs = thresholdMsIn
+  }
+  if (pollIntervalMsIn > 0) {
+    pollIntervalMs = pollIntervalMsIn
+  }
+  triggerEnabled = triggerEnabledIn
+  monitoring = true
+  try {
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return
+    ctx.startForegroundService(makeServiceIntent(ctx))
+  } catch (e) {
+    console.warn('[UsageStats] startForegroundService 失败: ' + JSON.stringify(e))
+  }
+}
+
+// 运行时切换触发总开关（settings 页 toggle 立即生效，无需等下次启动）
+export function setTriggerEnabled(enabled: boolean): void {
+  triggerEnabled = enabled
+  // 开启时立即跑一次 doPoll，让用户快速看到效果
+  if (enabled) {
+    const svc = serviceInstance
+    if (svc != null) {
+      try { svc.runImmediatePoll() } catch (_) {}
+    }
+  }
+}
+
+export function stopUsageMonitor(): void {
+  monitoring = false
+  cachedCbs = null
+  const svc = serviceInstance
+  if (svc != null) {
+    try { svc.stopPolling() } catch (_) {}
+  }
+  try {
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx != null) {
+      ctx.stopService(makeServiceIntent(ctx))
+    }
+  } catch (_) {}
+}
+
+export function isMonitoring(): boolean {
+  return monitoring
+}
+
+export function isUsagePermissionGranted(): boolean {
+  try {
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return false
+    return isUsagePermissionGrantedByContext(ctx)
+  } catch (_) {
+    return false
+  }
+}
+
+export function getSelfPackageName(): string {
+  return getSelfPackageNameInternal()
+}
+
+// 已删除：getCurrentForeground — 不再维护"当前前台"概念
+// dashboard 改用 PhoneUsageDialog 读今日聚合数据展示
+
+export function queryUsageStatsOnce(beginMs: number, endMs: number): UsageStatEntry[] {
+  const result: UsageStatEntry[] = []
+  try {
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return result
+    if (!isUsagePermissionGrantedByContext(ctx)) return result
+    const usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+    if (usm == null) return result
+    const begin: Long = beginMs.toLong()
+    const end: Long = endMs.toLong()
+    const stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_BEST, begin, end)
+    const selfPkg = getSelfPackageNameInternal()
+    const n: Int = stats.size
+    for (let i: Int = 0; i < n; i++) {
+      const s = stats.get(i)
+      if (s == null) continue
+      const pkg = s.getPackageName() as string
+      if (pkg == null || pkg.length < 1) continue
+      if (pkg == 'android') continue
+      if (selfPkg.length > 0 && pkg == selfPkg) continue
+      const entry: UsageStatEntry = {
+        packageName: pkg,
+        totalTimeInForeground: s.getTotalTimeInForeground() as number,
+        lastTimeUsed: s.getLastTimeUsed() as number
+      }
+      result.push(entry)
+    }
+  } catch (e) {
+    console.warn('[UsageStats] queryUsageStatsOnce 失败: ' + JSON.stringify(e))
+  }
+  return result
+}

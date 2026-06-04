@@ -15,13 +15,13 @@
             <text class="step-num">1</text>
           </view>
           <view class="step-content">
-            <text class="step-title">开启无障碍服务</text>
-            <text class="step-desc">检测你正在使用的应用，在恰当时提醒休息</text>
+            <text class="step-title">开启使用情况访问权限</text>
+            <text class="step-desc">用于检测你正在使用的应用，在恰当时提醒休息</text>
             <view class="step-status-row">
-              <text class="step-status" :class="accEnabled ? 'step-status-on' : 'step-status-off'">
-                {{ accEnabled ? '✅ 已开启' : '⚪ 未开启' }}
+              <text class="step-status" :class="usageEnabled ? 'step-status-on' : 'step-status-off'">
+                {{ usageEnabled ? '✅ 已开启' : '⚪ 未开启' }}
               </text>
-              <view v-if="!accEnabled" class="step-action-btn" @tap="openAccessibility">
+              <view v-if="!usageEnabled" class="step-action-btn" @tap="openUsageAccess">
                 <text class="step-action-btn-text">立即开启</text>
               </view>
             </view>
@@ -75,17 +75,17 @@
 
 <script setup lang="uts">
 import { putInt } from '../../database/SettingsDao'
-import { isAccessibilityServiceEnabled, openAccessibilitySettings } from '../../uni_modules/uts-accessibility-service/utssdk/app-android/index'
+import { isUsagePermissionGranted, openUsageAccessSettings } from '../../uni_modules/uts-usage-stats/utssdk/app-android/index'
 import { hasOverlayPermission, requestOverlayPermission } from '../../uni_modules/uts-floating-overlay/utssdk/app-android/index'
 
-const accEnabled = ref<boolean>(isAccessibilityServiceEnabled())
+const usageEnabled = ref<boolean>(isUsagePermissionGranted())
 const overlayEnabled = ref<boolean>(hasOverlayPermission())
 
-function openAccessibility(): void {
-  openAccessibilitySettings()
+function openUsageAccess(): void {
+  openUsageAccessSettings()
   setTimeout(() : void => {
-    accEnabled.value = isAccessibilityServiceEnabled()
-  }, 800)
+    usageEnabled.value = isUsagePermissionGranted()
+  }, 1500)
 }
 
 function openOverlay(): void {

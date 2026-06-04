@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="uts">
-import { getTodayPhoneUsageSummary, getTodayPieSegments, aiEvaluateTodayUsage, type PhoneUsageSummary, type PieSegment } from '../services/PhoneUsageService'
+import { getTodayPhoneUsageSummary, getTodayPieSegments, getPhoneUsageFromSystem, aiEvaluateTodayUsage, type PhoneUsageSummary, type PieSegment } from '../services/PhoneUsageService'
 
 const props = withDefaults(defineProps<{
   visible: boolean
@@ -109,6 +109,19 @@ function refresh(): void {
   } catch (e) {
     console.error('PhoneUsageDialog refresh segments: ' + JSON.stringify(e))
     segments.value = []
+  }
+  // 本地无数据时，兜底读系统数据（直接调 UsageStatsManager）
+  if (summary.value.totalSeconds < 1) {
+    try {
+      const fromSystem = getPhoneUsageFromSystem()
+      if (fromSystem != null && fromSystem.summary.totalSeconds > 0) {
+        summary.value = fromSystem.summary
+        segments.value = fromSystem.segments != null ? fromSystem.segments : []
+        console.log('[PhoneUsageDialog] fallback to system data, totalSec=' + fromSystem.summary.totalSeconds)
+      }
+    } catch (e) {
+      console.error('PhoneUsageDialog system fallback: ' + JSON.stringify(e))
+    }
   }
 }
 

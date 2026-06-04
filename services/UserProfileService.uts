@@ -1,0 +1,69 @@
+import { dbManager } from '../database/DatabaseManager'
+import { getInt, getBool, getSetting } from '../database/SettingsDao'
+import { countCompletedToday, getTotalCompletedDurationSec } from '../database/ActionLogDao'
+import { countTriggersToday } from '../database/TriggerLogDao'
+import { getNum, getStr } from '../utils/DbRowUtils'
+import { today } from '../utils/TimeUtils'
+
+export type UserProfile = {
+  healthFocus: 'eye' | 'posture' | 'vitality' | 'balanced'
+  bodyLimit: 'none' | 'neck' | 'waist' | 'knee'
+  newbieMode: boolean
+  preferredHours: number[]
+  totalActiveDays: number
+  avgDailyCompletes: number
+  daysSinceFirstUse: number
+}
+
+function safeHealthFocus(v: string): 'eye' | 'posture' | 'vitality' | 'balanced' {
+  if (v == 'eye' || v == 'posture' || v == 'vitality') return v
+  return 'balanced'
+}
+
+function safeBodyLimit(v: string): 'none' | 'neck' | 'waist' | 'knee' {
+  if (v == 'neck' || v == 'waist' || v == 'knee') return v
+  return 'none'
+}
+
+export function getUserProfile(): UserProfile {
+  const focus = safeHealthFocus(getSetting('health_preference', 'balanced'))
+  const limit = safeBodyLimit(getSetting('body_limit', 'none'))
+  const newbie = getBool('newbie_mode', true)
+  const preferred: number[] = []
+  try {
+    const rows = dbManager.query(
+      "SELECT strftime('%H', created_at, 'unixepoch') as hr, COUNT(*) as cnt FROM action_logs WHERE result IN ('completed','self_reported') GROUP BY hr ORDER BY cnt DESC LIMIT 3"
+    )
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      if (r == null) continue
+      const hrStr = getNum(r, 'hr') as number
+      preferred.push(hrStr)
+    }
+  } catch (_) {}
+  const totalDaysRow = dbManager.queryOne('SELECT COUNT(DISTINCT date) as cnt FROM daily_summaries')
+  const totalDays = getNum(totalDaysRow, 'cnt')
+  const sumRow = dbManager.queryOne('SELECT COALESCE(SUM(total_completed),0) as total FROM daily_summaries')
+  const totalCompletes = getNum(sumRow, 'total')
+  const avg = totalDays > 0 ? totalCompletes / totalDays : 0
+  let daysSinceFirst = 0
+  const firstRow = dbManager.queryOne('SELECT value FROM user_settings WHERE key = ?', ['newbie_start_date'])
+  if (firstRow != null) {
+    const startStr = getStr(firstRow, 'value')
+    const startTs = parseInt(startStr)
+    if (startTs > 0) {
+      const now = Math.floor(Date.now() / 1000)
+      daysSinceFirst = Math.floor((now - startTs) / 86400)
+      if (daysSinceFirst < 0) daysSinceFirst = 0
+    }
+  }
+  return {
+    healthFocus: focus,
+    bodyLimit: limit,
+    newbieMode: newbie,
+    preferredHours: preferred,
+    totalActiveDays: totalDays,
+    avgDailyCompletes: Math.round(avg * 10) / 10,
+    daysSinceFirstUse: daysSinceFirst
+  }
+}

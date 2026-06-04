@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="accessibility_service_label">微习惯守护服务</string>
-    <string name="accessibility_service_description">监测前台应用连续使用时长，适时提醒微动作（眨眼、转颈、远眺）</string>
-</resources>

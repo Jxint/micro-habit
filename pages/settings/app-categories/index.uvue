@@ -1,0 +1,289 @@
+<template>
+  <view class="page">
+    <scroll-view class="scroll-area" scroll-y="true">
+      <view class="header-block">
+        <text class="header-title">App 分类管理</text>
+        <text class="header-desc">首次见到的 App 会由系统自动归类，你可在此手动调整。已锁定的分类 LLM 不会覆盖。</text>
+      </view>
+
+      <view class="filter-row">
+        <view
+          v-for="(cat, ci) in categories"
+          :key="'cat-' + ci"
+          class="filter-chip"
+          :class="filterIdx === ci ? 'filter-chip-active' : ''"
+          @tap="setFilter(ci)">
+          <text class="filter-chip-text">{{ cat }}</text>
+        </view>
+      </view>
+
+      <view v-if="visibleTags.length < 1" class="empty-block">
+        <text class="empty-text">暂无数据</text>
+        <text class="empty-hint">开启使用情况权限后，系统会自动记录你常用的 App</text>
+      </view>
+
+      <view v-else class="tag-list">
+        <view v-for="(tag, ti) in visibleTags" :key="'t-' + ti" class="tag-card">
+          <view class="tag-card-left">
+            <text class="tag-label">{{ tag.appLabel }}</text>
+            <text class="tag-pkg">{{ tag.packageName }}</text>
+            <view class="tag-source-row">
+              <text class="tag-source" :class="getSourceClass(tag.tagSource)">{{ getSourceText(tag.tagSource) }}</text>
+              <text v-if="tag.totalUses > 0" class="tag-uses">使用 {{ tag.totalUses }} 次</text>
+            </view>
+          </view>
+          <view class="tag-card-right">
+              <picker mode="selector" :range="categories" :value="getCategoryIdx(tag.category)" @change="(e: UTSJSONObject) => onCategoryChange(tag.packageName, e)">
+              <view class="cat-picker">
+                <text class="cat-picker-text">{{ tag.category }}</text>
+                <text class="cat-picker-arrow">▾</text>
+              </view>
+            </picker>
+            <view class="lock-row" @tap="toggleLock(tag.packageName, !tag.isUserLocked)">
+              <text class="lock-text" :class="tag.isUserLocked ? 'lock-text-on' : ''">{{ tag.isUserLocked ? '🔒 已锁定' : '🔓 未锁' }}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import * as AppTagsDao from '../../../database/AppTagsDao'
+import { AppTag, AppCategory } from '../../../models/AppTag'
+import { manualSetCategory } from '../../../services/AppCategoryService'
+
+const categories: string[] = ['social', 'video', 'game', 'work', 'study', 'reading', 'other']
+const filterIdx = ref<number>(-1)
+const allTags = ref<AppTag[]>([])
+
+const visibleTags = computed<AppTag[]>(() : AppTag[] => {
+  const list = allTags.value
+  if (filterIdx.value < 0 || filterIdx.value >= categories.length) return list
+  const targetCat = categories[filterIdx.value] as string
+  const result: AppTag[] = []
+  for (let i = 0; i < list.length; i++) {
+    const t = list[i]
+    if (t.category == targetCat) result.push(t)
+  }
+  return result
+})
+
+function setFilter(idx: number): void {
+  filterIdx.value = idx
+}
+
+function getCategoryIdx(cat: string): number {
+  for (let i = 0; i < categories.length; i++) {
+    if (categories[i] == cat) return i
+  }
+  return categories.length - 1
+}
+
+function getSourceText(s: string): string {
+  if (s == 'llm') return 'LLM 分类'
+  if (s == 'user') return '手动设置'
+  return '待分类'
+}
+
+function getSourceClass(s: string): string {
+  if (s == 'llm') return 'tag-source-llm'
+  if (s == 'user') return 'tag-source-user'
+  return 'tag-source-pending'
+}
+
+function refresh(): void {
+  try {
+    allTags.value = AppTagsDao.listAll()
+  } catch (err) {
+    console.warn('[app-categories] refresh 异常: ' + JSON.stringify(err))
+    allTags.value = []
+  }
+}
+
+function onCategoryChange(pkg: string, e: UTSJSONObject): void {
+  try {
+    if (e == null) return
+    const detail = e['detail']
+    if (detail == null) return
+    const detailObj = detail as UTSJSONObject
+    if (detailObj == null) return
+    const val = detailObj['value']
+    if (typeof val !== 'number') return
+    const idx: number = (val as number).toInt()
+    if (idx < 0 || idx >= categories.length) return
+    const cat = categories[idx] as AppCategory
+    manualSetCategory(pkg, cat)
+    refresh()
+    uni.showToast({ title: '已更新', icon: 'none' })
+  } catch (err) {
+    console.warn('[app-categories] onCategoryChange 异常: ' + JSON.stringify(err))
+  }
+}
+
+function toggleLock(pkg: string, locked: boolean): void {
+  try {
+    AppTagsDao.setUserLocked(pkg, locked)
+    refresh()
+  } catch (err) {
+    console.warn('[app-categories] toggleLock 异常: ' + JSON.stringify(err))
+  }
+}
+
+onPageShow(() => {
+  refresh()
+})
+
+function onBack(): void {
+  uni.navigateBack()
+}
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: #F5F6FA;
+}
+.scroll-area {
+  flex: 1;
+}
+.header-block {
+  padding: 20px 16px 12px 16px;
+  background-color: #2C3E50;
+  flex-direction: column;
+}
+.header-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-bottom: 6px;
+}
+.header-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+}
+.filter-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  padding: 12px 12px 0 12px;
+  background-color: #FFFFFF;
+}
+.filter-chip {
+  padding: 6px 12px;
+  background-color: #ECF0F1;
+  border-radius: 14px;
+  margin-right: 6px;
+  margin-bottom: 8px;
+}
+.filter-chip-active {
+  background-color: #3498DB;
+}
+.filter-chip-text {
+  font-size: 12px;
+  color: #34495E;
+}
+.filter-chip-active .filter-chip-text {
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.empty-block {
+  padding: 60px 20px;
+  align-items: center;
+}
+.empty-text {
+  font-size: 14px;
+  color: #7F8C8D;
+  margin-bottom: 6px;
+}
+.empty-hint {
+  font-size: 12px;
+  color: #95A5A6;
+  text-align: center;
+}
+.tag-list {
+  padding: 12px 12px;
+}
+.tag-card {
+  background-color: #FFFFFF;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 8px;
+  flex-direction: row;
+}
+.tag-card-left {
+  flex: 1;
+  flex-direction: column;
+}
+.tag-card-right {
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 10px;
+}
+.tag-label {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 2px;
+}
+.tag-pkg {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-bottom: 6px;
+}
+.tag-source-row {
+  flex-direction: row;
+  align-items: center;
+}
+.tag-source {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+.tag-source-llm {
+  background-color: rgba(52, 152, 219, 0.15);
+  color: #3498DB;
+}
+.tag-source-user {
+  background-color: rgba(46, 204, 113, 0.15);
+  color: #27AE60;
+}
+.tag-source-pending {
+  background-color: rgba(243, 156, 18, 0.15);
+  color: #E67E22;
+}
+.tag-uses {
+  font-size: 10px;
+  color: #95A5A6;
+}
+.cat-picker {
+  flex-direction: row;
+  align-items: center;
+  background-color: #ECF0F1;
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+.cat-picker-text {
+  font-size: 12px;
+  color: #2C3E50;
+  margin-right: 4px;
+}
+.cat-picker-arrow {
+  font-size: 10px;
+  color: #95A5A6;
+}
+.lock-row {
+  padding: 2px 0;
+}
+.lock-text {
+  font-size: 10px;
+  color: #95A5A6;
+}
+.lock-text-on {
+  color: #E74C3C;
+  font-weight: bold;
+}
+</style>

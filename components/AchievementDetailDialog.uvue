@@ -1,0 +1,217 @@
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <view class="dialog-header">
+        <view class="dialog-icon-wrap" :class="isUnlocked ? 'icon-unlocked' : 'icon-locked'">
+          <text class="dialog-icon">{{ achievementIcon }}</text>
+        </view>
+        <view class="dialog-title-wrap">
+          <text class="dialog-title">{{ achievementName }}</text>
+          <text class="dialog-cat">{{ achievementCategory }}</text>
+        </view>
+        <view class="dialog-close" @tap="close">
+          <text class="dialog-close-text">×</text>
+        </view>
+      </view>
+
+      <view class="dialog-body">
+        <text class="achv-desc">{{ achievementDescription }}</text>
+
+        <view v-if="isUnlocked" class="achv-status-row">
+          <text class="achv-status-on">✓ 已达成</text>
+          <text class="achv-date">  ·  {{ unlockedDate }}</text>
+        </view>
+        <view v-else class="achv-status-row">
+          <text class="achv-status-off">🔒 未达成</text>
+        </view>
+
+        <text class="achv-section-title">奖励</text>
+        <text class="achv-reward">{{ rewardText }}</text>
+
+        <text class="achv-section-title">当前进度</text>
+        <view class="achv-progress-wrap">
+          <view class="achv-progress-track">
+            <view class="achv-progress-fill" :style="{ width: (progressPercent * 100) + '%' }"></view>
+          </view>
+          <text class="achv-progress-text">{{ progressText }}</text>
+        </view>
+
+        <text class="achv-section-title">解锁历程</text>
+        <text class="achv-history">{{ historyText }}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  visible: boolean
+  achievementIcon: string
+  achievementName: string
+  achievementCategory: string
+  achievementDescription: string
+  isUnlocked: boolean
+  unlockedDate: string
+  rewardText: string
+  progressText: string
+  progressPercent: number
+  historyText: string
+}>(), {
+  visible: false,
+  achievementIcon: '🏅',
+  achievementName: '',
+  achievementCategory: '',
+  achievementDescription: '',
+  isUnlocked: false,
+  unlockedDate: '',
+  rewardText: '',
+  progressText: '',
+  progressPercent: 0,
+  historyText: ''
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
+
+function close(): void { emit('close') }
+function onMaskTap(): void { close() }
+</script>
+
+<style scoped>
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.dialog-card {
+  width: 90%;
+  max-width: 420px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  flex-direction: column;
+}
+.dialog-header {
+  flex-direction: row;
+  align-items: center;
+  padding: 4px 4px 12px 4px;
+}
+.dialog-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 28px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+.icon-unlocked {
+  background-color: #FEF5E7;
+}
+.icon-locked {
+  background-color: #F0F3F4;
+}
+.dialog-icon {
+  font-size: 32px;
+}
+.dialog-title-wrap {
+  flex: 1;
+  flex-direction: column;
+}
+.dialog-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 2px;
+}
+.dialog-cat {
+  font-size: 11px;
+  color: #95A5A6;
+}
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: #F0F3F4;
+  align-items: center;
+  justify-content: center;
+}
+.dialog-close-text {
+  font-size: 18px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.dialog-body {
+  padding: 4px 4px 0 4px;
+}
+.achv-desc {
+  font-size: 14px;
+  color: #34495E;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.achv-status-row {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.achv-status-on {
+  font-size: 13px;
+  font-weight: bold;
+  color: #27AE60;
+}
+.achv-status-off {
+  font-size: 13px;
+  font-weight: bold;
+  color: #95A5A6;
+}
+.achv-date {
+  font-size: 12px;
+  color: #7F8C8D;
+}
+.achv-section-title {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+.achv-reward {
+  font-size: 14px;
+  color: #2C3E50;
+  font-weight: bold;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+.achv-progress-wrap {
+  flex-direction: column;
+  margin-bottom: 4px;
+}
+.achv-progress-track {
+  height: 8px;
+  background-color: #ECF0F1;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.achv-progress-fill {
+  height: 8px;
+  background-color: #3498DB;
+  border-radius: 4px;
+}
+.achv-progress-text {
+  font-size: 12px;
+  color: #7F8C8D;
+}
+.achv-history {
+  font-size: 13px;
+  color: #34495E;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+</style>

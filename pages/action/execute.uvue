@@ -43,6 +43,8 @@ import { MicroAction } from '../../models/MicroAction'
 import { getActionById } from '../../constants/Actions'
 import { getRandomEncourage } from '../../constants/EncourageTexts'
 import { insertActionLog } from '../../database/ActionLogDao'
+import { speakAdhoc as speakAdhocTts, speakFixedGuide as speakFixedGuideTts } from '../../services/TtsService'
+import { getAdhocFromNextPage, takeAdhocText } from '../../utils/NavigationHelper'
 import { onCompleted, onConsecutiveSkip } from '../../services/RuleEngine'
 import { takeActionId } from '../../utils/NavigationHelper'
 
@@ -55,6 +57,7 @@ const encourageText = ref<string>('')
 const showFeedback = ref<boolean>(false)
 const remainingMs = ref<number>(0)
 let countdownTimerId: number | null = null
+let encourageTimerId: number | null = null
 
 const showButtons = computed<boolean>((): boolean => {
   const a = action.value
@@ -176,9 +179,14 @@ function showEncourageNow(): void {
   encourageText.value = getRandomEncourage(cat)
   showEncourage.value = true
   isCompleted.value = true
-  setTimeout((): void => {
-    showEncourage.value = false
-    uni.navigateBack({})
+  encourageTimerId = setTimeout((): void => {
+    try {
+      if (isCompleted.value !== true) return
+      showEncourage.value = false
+      uni.navigateBack({})
+    } catch (e) {
+      console.warn('[execute] showEncourageNow 回调异常: ' + JSON.stringify(e))
+    }
   }, 1500)
 }
 
@@ -259,10 +267,26 @@ onLoad((option) => {
   } else {
     console.log('[execute] no actionId')
   }
+  // 取出 ad-hoc 文本并播报
+  const adhoc = takeAdhocText()
+  console.log('[execute] adhoc len=' + adhoc.length)
+  if (adhoc.length > 0) {
+    try { speakAdhocTts(adhoc) } catch (e) { console.warn('[execute] TTS 失败: ' + ('' + e)) }
+  } else {
+    const tts = actionTtsText.value
+    if (tts.length > 0) {
+      try { speakFixedGuideTts(tts) } catch (e) { console.warn('[execute] TTS 失败: ' + ('' + e)) }
+    }
+  }
 })
 
 onUnload((): void => {
   clearCountdown()
+  const eid = encourageTimerId
+  if (eid != null) {
+    clearTimeout(eid)
+    encourageTimerId = null
+  }
 })
 </script>
 

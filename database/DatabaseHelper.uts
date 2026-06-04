@@ -2,7 +2,7 @@ import { DEFAULT_SETTINGS } from '../constants/DefaultSettings'
 import { sqliteStore } from '../uni_modules/uts-sqlite-store/utssdk/app-android/index'
 
 const DB_NAME = 'micro_habit_v2.db'
-const DB_VERSION = 4
+const DB_VERSION = 9
 
 export function getDbName(): string {
   return DB_NAME
@@ -19,9 +19,12 @@ function runSql(sql: string, params: any[] = []): void {
 export function onCreate(): void {
   createTables()
   insertDefaultSettings()
+  insertDefaultSystemRule()
+  const nowSec = Math.floor(Date.now() / 1000)
+  runSql("UPDATE user_settings SET value = '1', updated_at = ? WHERE key = 'trigger_enabled'", [nowSec])
 }
 
-export function onUpgrade(db: any, oldVersion: number, newVersion: number): void {
+export function onUpgrade(oldVersion: number, newVersion: number): void {
   if (oldVersion < 2) {
     runSql("ALTER TABLE daily_summaries ADD COLUMN llm_one_liner TEXT DEFAULT ''")
   }
@@ -43,6 +46,77 @@ export function onUpgrade(db: any, oldVersion: number, newVersion: number): void
     runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_date ON llm_history(created_at)")
     runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_stage ON llm_history(stage)")
   }
+  if (oldVersion < 5) {
+    runSql("DROP TABLE IF EXISTS trigger_rules")
+    runSql("ALTER TABLE app_usage_snapshots ADD COLUMN category TEXT DEFAULT 'other'")
+    runSql("ALTER TABLE app_usage_snapshots ADD COLUMN trigger_count INTEGER DEFAULT 0")
+    runSql("ALTER TABLE app_usage_snapshots ADD COLUMN complete_count INTEGER DEFAULT 0")
+    runSql("ALTER TABLE llm_history ADD COLUMN confidence REAL DEFAULT 0")
+    runSql("ALTER TABLE llm_history ADD COLUMN decision TEXT DEFAULT NULL")
+    runSql("ALTER TABLE llm_history ADD COLUMN target_rule_id INTEGER DEFAULT NULL")
+    runSql("ALTER TABLE llm_history ADD COLUMN user_accepted INTEGER DEFAULT NULL")
+    runSql("ALTER TABLE llm_history ADD COLUMN alternatives_json TEXT DEFAULT NULL")
+    runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_target ON llm_history(target_rule_id, decision, user_accepted)")
+    runSql(`CREATE TABLE IF NOT EXISTS app_tags (
+      package_name TEXT PRIMARY KEY,
+      app_label TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'other',
+      tag_source TEXT NOT NULL DEFAULT 'pending',
+      is_user_locked INTEGER NOT NULL DEFAULT 0,
+      is_in_rule INTEGER NOT NULL DEFAULT 0,
+      total_uses INTEGER NOT NULL DEFAULT 0,
+      last_seen_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`)
+    runSql("CREATE INDEX IF NOT EXISTS idx_app_tags_category ON app_tags(category)")
+    runSql("CREATE INDEX IF NOT EXISTS idx_app_tags_locked ON app_tags(is_user_locked)")
+    runSql(`CREATE TABLE IF NOT EXISTS effective_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      action_id TEXT NOT NULL,
+      app_packages_json TEXT NOT NULL,
+      time_window_json TEXT,
+      time_threshold_minutes INTEGER NOT NULL,
+      trigger_level TEXT NOT NULL DEFAULT 'gentle',
+      category_filter TEXT,
+      source TEXT NOT NULL DEFAULT 'user',
+      source_history_id INTEGER,
+      expires_at INTEGER,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      priority INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`)
+    runSql("CREATE INDEX IF NOT EXISTS idx_effective_rules_enabled ON effective_rules(enabled)")
+  }
+  if (oldVersion < 6) {
+    const nowSec = Math.floor(Date.now() / 1000)
+    runSql("INSERT OR IGNORE INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)",
+      ['trigger_enabled', '0', nowSec])
+  }
+  if (oldVersion < 7) {
+    const nowSec = Math.floor(Date.now() / 1000)
+    runSql("INSERT OR IGNORE INTO effective_rules (action_id, app_packages_json, time_window_json, time_threshold_minutes, trigger_level, category_filter, source, source_history_id, expires_at, enabled, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      ['', '[]', '', 60, 'gentle', '', 'system', '', '', 1, 0, nowSec, nowSec])
+  }
+  if (oldVersion < 8) {
+    const nowSec = Math.floor(Date.now() / 1000)
+    runSql("UPDATE user_settings SET value = '1', updated_at = ? WHERE key = 'trigger_enabled' AND value = '0'", [nowSec])
+  }
+  if (oldVersion < 9) {
+    runSql(`CREATE TABLE IF NOT EXISTS user_achievements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      achievement_id TEXT NOT NULL UNIQUE,
+      unlocked_at INTEGER NOT NULL,
+      current_progress REAL NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    )`)
+    runSql("CREATE INDEX IF NOT EXISTS idx_user_achievements_unlocked ON user_achievements(unlocked_at)")
+  }
+}
+
+export function clearAchievements(): void {
+  runSql("DELETE FROM user_achievements")
 }
 
 function createTables(): void {
@@ -95,20 +169,6 @@ function createTables(): void {
   )`)
   runSql("CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date)")
 
-  runSql(`CREATE TABLE IF NOT EXISTS trigger_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    rule_type TEXT NOT NULL,
-    trigger_type TEXT NOT NULL,
-    condition_json TEXT NOT NULL,
-    action_weights_json TEXT DEFAULT '{}',
-    enabled INTEGER NOT NULL DEFAULT 1,
-    priority INTEGER NOT NULL DEFAULT 0,
-    source TEXT DEFAULT 'local',
-    expires_at INTEGER DEFAULT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  )`)
-
   runSql(`CREATE TABLE IF NOT EXISTS user_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -121,6 +181,9 @@ function createTables(): void {
     package_name TEXT NOT NULL,
     app_label TEXT DEFAULT '',
     total_foreground_sec INTEGER NOT NULL DEFAULT 0,
+    category TEXT DEFAULT 'other',
+    trigger_count INTEGER DEFAULT 0,
+    complete_count INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL
   )`)
   runSql("CREATE INDEX IF NOT EXISTS idx_app_usage_snapshots_date ON app_usage_snapshots(date)")
@@ -159,10 +222,49 @@ function createTables(): void {
     adhoc_text TEXT DEFAULT NULL,
     suggested_rule_json TEXT DEFAULT NULL,
     reasoning TEXT DEFAULT NULL,
+    confidence REAL DEFAULT 0,
+    decision TEXT DEFAULT NULL,
+    target_rule_id INTEGER DEFAULT NULL,
+    user_accepted INTEGER DEFAULT NULL,
+    alternatives_json TEXT DEFAULT NULL,
     created_at INTEGER NOT NULL
   )`)
   runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_date ON llm_history(created_at)")
   runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_stage ON llm_history(stage)")
+  runSql("CREATE INDEX IF NOT EXISTS idx_llm_history_target ON llm_history(target_rule_id, decision, user_accepted)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS app_tags (
+    package_name TEXT PRIMARY KEY,
+    app_label TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'other',
+    tag_source TEXT NOT NULL DEFAULT 'pending',
+    is_user_locked INTEGER NOT NULL DEFAULT 0,
+    is_in_rule INTEGER NOT NULL DEFAULT 0,
+    total_uses INTEGER NOT NULL DEFAULT 0,
+    last_seen_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_app_tags_category ON app_tags(category)")
+  runSql("CREATE INDEX IF NOT EXISTS idx_app_tags_locked ON app_tags(is_user_locked)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS effective_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL,
+    app_packages_json TEXT NOT NULL,
+    time_window_json TEXT,
+    time_threshold_minutes INTEGER NOT NULL,
+    trigger_level TEXT NOT NULL DEFAULT 'gentle',
+    category_filter TEXT,
+    source TEXT NOT NULL DEFAULT 'user',
+    source_history_id INTEGER,
+    expires_at INTEGER,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    priority INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_effective_rules_enabled ON effective_rules(enabled)")
 }
 
 function insertDefaultSettings(): void {
@@ -170,4 +272,10 @@ function insertDefaultSettings(): void {
   for (const s of DEFAULT_SETTINGS) {
     runSql("INSERT OR IGNORE INTO user_settings (key, value, updated_at) VALUES (?, ?, ?)", [s.key, s.value, now])
   }
+}
+
+function insertDefaultSystemRule(): void {
+  const now = Math.floor(Date.now() / 1000)
+  runSql("INSERT OR IGNORE INTO effective_rules (action_id, app_packages_json, time_window_json, time_threshold_minutes, trigger_level, category_filter, source, source_history_id, expires_at, enabled, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ['', '[]', '', 60, 'gentle', '', 'system', '', '', 1, 0, now, now])
 }

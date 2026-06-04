@@ -1,0 +1,217 @@
+// 成就系统核心服务：检查解锁条件 + 计算进度
+
+import { ACHIEVEMENTS, getAllAchievementDefs, getAchievementDef } from '../constants/Achievements'
+import { type AchievementDef, type AchievementItem, type AchievementProgress } from '../models/Achievement'
+import * as AchievementDao from '../database/AchievementDao'
+import { dbManager } from '../database/DatabaseManager'
+import { getNum } from '../utils/DbRowUtils'
+import { today } from '../utils/TimeUtils'
+
+// 计算指定成就的当前进度
+function computeProgress(def: AchievementDef): number {
+  switch (def.conditionType) {
+    case 'total_count':
+      return getTotalCompletedCount()
+    case 'streak_days':
+      return getCurrentStreakDays()
+    case 'eye_score':
+      return getTodayEyeScore()
+    case 'category_count':
+      return getCategoryCompletedCount(def.actionType)
+    case 'hour_range_count':
+      return getHourRangeCompletedCount(def.startHour, def.endHour)
+    case 'daily_count':
+      return getTodayCompletedCount()
+    default:
+      return 0
+  }
+}
+
+function getTotalCompletedCount(): number {
+  try {
+    const row = dbManager.queryOne(
+      "SELECT COUNT(*) as cnt FROM action_logs WHERE result IN ('completed', 'self_reported')"
+    )
+    return getNum(row, 'cnt')
+  } catch (_) { return 0 }
+}
+
+function getTodayCompletedCount(): number {
+  try {
+    const startOfDay = Math.floor(new Date().getTime() / 1000)
+    const dayStart = startOfDay - (new Date().getHours() * 3600 + new Date().getMinutes() * 60 + new Date().getSeconds())
+    const row = dbManager.queryOne(
+      "SELECT COUNT(*) as cnt FROM action_logs WHERE result IN ('completed', 'self_reported') AND created_at >= ?",
+      [dayStart]
+    )
+    return getNum(row, 'cnt')
+  } catch (_) { return 0 }
+}
+
+function getCurrentStreakDays(): number {
+  try {
+    const rows = dbManager.query(
+      'SELECT date, total_completed FROM daily_summaries ORDER BY date DESC LIMIT 30'
+    )
+    if (rows.length < 1) return 0
+    let streak = 0
+    let expectedDate = today()
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      if (r == null) continue
+      const dateVal = r.get('date') as string
+      if (dateVal == null || dateVal.length < 1) continue
+      if (dateVal != expectedDate) {
+        break
+      }
+      const total = getNum(r, 'total_completed')
+      if (total > 0) {
+        streak++
+        expectedDate = prevDateString(expectedDate)
+      } else {
+        break
+      }
+    }
+    return streak
+  } catch (_) { return 0 }
+}
+
+function prevDateString(dateStr: string): string {
+  const parts = dateStr.split('-')
+  if (parts.length < 3) return dateStr
+  const y = parseInt(parts[0] as string)
+  const m = parseInt(parts[1] as string)
+  const d = parseInt(parts[2] as string)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() - 1)
+  return dt.getFullYear() + '-' + ('' + (dt.getMonth() + 1)).padStart(2, '0') + '-' + ('' + dt.getDate()).padStart(2, '0')
+}
+
+function getTodayEyeScore(): number {
+  try {
+    const t = today()
+    const row = dbManager.queryOne(
+      'SELECT eye_score FROM daily_summaries WHERE date = ?',
+      [t]
+    )
+    if (row == null) return 0
+    return getNum(row, 'eye_score')
+  } catch (_) { return 0 }
+}
+
+function getCategoryCompletedCount(category: string): number {
+  try {
+    if (category.length < 1) return 0
+    const row = dbManager.queryOne(
+      "SELECT COUNT(*) as cnt FROM action_logs WHERE result IN ('completed', 'self_reported') AND action_type = ?",
+      [category]
+    )
+    return getNum(row, 'cnt')
+  } catch (_) { return 0 }
+}
+
+function getHourRangeCompletedCount(startHour: number, endHour: number): number {
+  try {
+    const rows = dbManager.query(
+      "SELECT created_at FROM action_logs WHERE result IN ('completed', 'self_reported')"
+    )
+    let n = 0
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      if (r == null) continue
+      const ts = getNum(r, 'created_at')
+      const d = new Date(ts * 1000)
+      const h = d.getHours()
+      if (isHourInRange(h, startHour, endHour)) n++
+    }
+    return n
+  } catch (_) { return 0 }
+}
+
+function isHourInRange(h: number, startHour: number, endHour: number): boolean {
+  if (startHour <= endHour) {
+    return h >= startHour && h < endHour
+  }
+  // 跨天（如 22-2）
+  return h >= startHour || h < endHour
+}
+
+// 公开：检查所有成就，命中则写入 DB，返回新解锁的 id 列表
+export function checkAndUnlock(): string[] {
+  const newUnlocked: string[] = []
+  const defs = getAllAchievementDefs()
+  for (let i = 0; i < defs.length; i++) {
+    const def = defs[i]
+    if (AchievementDao.isUnlocked(def.id)) continue
+    let cur = 0
+    try {
+      cur = computeProgress(def)
+    } catch (e) {
+      console.warn('[AchievementService] computeProgress 失败 id=' + def.id + ' type=' + (typeof e))
+      continue
+    }
+    if (cur >= def.threshold) {
+      try {
+        AchievementDao.insertUnlock(def.id, cur)
+        newUnlocked.push(def.id)
+      } catch (e) {
+        console.warn('[AchievementService] insertUnlock 失败: ' + JSON.stringify(e))
+      }
+    }
+  }
+  return newUnlocked
+}
+
+// 公开：返回带状态的成就列表（用于主页展示）
+export function getAchievementItems(seenSet: Set<string>): AchievementItem[] {
+  const unlockedRows: AchievementDao.UserAchievementRow[] = AchievementDao.getAllUnlocked()
+  const unlockedMap: Map<string, number> = new Map()
+  for (let i = 0; i < unlockedRows.length; i++) {
+    const r = unlockedRows[i]
+    unlockedMap.set(r.achievementId, r.unlockedAt)
+  }
+  const result: AchievementItem[] = []
+  const defs = getAllAchievementDefs()
+  for (let i = 0; i < defs.length; i++) {
+    const def = defs[i]
+    const unlockedAt = unlockedMap.get(def.id)
+    const isUnlocked = unlockedAt != null
+    let cur = 0
+    try {
+      cur = computeProgress(def)
+    } catch (e) {
+      console.warn('[AchievementService] computeProgress 失败 id=' + def.id + ' type=' + (typeof e))
+    }
+    const item: AchievementItem = {
+      def: def,
+      isUnlocked: isUnlocked,
+      currentProgress: cur,
+      unlockedAt: unlockedAt != null ? unlockedAt : 0,
+      isNew: isUnlocked && !seenSet.has(def.id)
+    }
+    result.push(item)
+  }
+  return result
+}
+
+// 公开：获取指定成就的展示进度
+export function getProgressText(item: AchievementItem): AchievementProgress {
+  const def = item.def
+  if (item.isUnlocked) {
+    return {
+      current: def.threshold,
+      target: def.threshold,
+      text: '已达成',
+      percent: 1
+    }
+  }
+  const current = Math.min(item.currentProgress, def.threshold)
+  const target = def.threshold
+  const percent = target > 0 ? Math.min(current / target, 1) : 0
+  return {
+    current: current,
+    target: target,
+    text: current + ' / ' + target,
+    percent: percent
+  }
+}

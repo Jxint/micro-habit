@@ -6,6 +6,9 @@ import { insertActionLog } from '../database/ActionLogDao'
 import { getInt, getBool, getSetting as getSettingVal } from '../database/SettingsDao'
 import { getActionById } from '../constants/Actions'
 import { isInTimeRange, now } from '../utils/TimeUtils'
+import { evaluate as evaluateRule, EffectiveRuleMatch } from './EffectiveRuleEngine'
+import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
+import { MicroAction } from '../models/MicroAction'
 
 export enum TriggerState {
   IDLE,
@@ -18,6 +21,7 @@ export enum TriggerState {
 export type TriggerContext = {
   appPackage: string
   appLabel: string
+  appCategory?: string
   continuousMinutes: number
   triggerType: string
 }
@@ -29,6 +33,8 @@ export type TriggerDecision = {
   durationMs: number
   ttsText: string
   actionName: string
+  matchedRuleId: number
+  matchedRuleSource: string
 }
 
 let currentState: TriggerState = TriggerState.IDLE
@@ -40,14 +46,24 @@ export function getCurrentState(): TriggerState {
 }
 
 export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
-  if (currentState !== TriggerState.IDLE) return null
+  if (currentState !== TriggerState.IDLE) {
+    console.log('[TriggerEngine] skip: state=' + currentState)
+    return null
+  }
 
   const nowMs = Date.now()
-  if (nowMs - lastTriggerTime < COOL_DOWN_MS) return null
+  if (nowMs - lastTriggerTime < COOL_DOWN_MS) {
+    console.log('[TriggerEngine] skip: cooldown remaining=' + (COOL_DOWN_MS - (nowMs - lastTriggerTime)))
+    return null
+  }
 
-  if (isInDndPeriod()) return null
+  let dndOk = false
+  try { dndOk = isInDndPeriod() } catch (e) { console.warn('[TriggerEngine] isInDndPeriod: ' + e) }
+  if (dndOk) return null
 
-  if (isBlacklisted(context.appPackage)) return null
+  let blacklisted = false
+  try { blacklisted = isBlacklisted(context.appPackage) } catch (e) { console.warn('[TriggerEngine] isBlacklisted: ' + e) }
+  if (blacklisted) return null
 
   if (isNewbie()) {
     const minInterval = getMinTriggerIntervalMs()
@@ -56,15 +72,35 @@ export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
 
   if (isFrequencyReduced(context.triggerType)) return null
 
-  const actionId = selectAction(context.triggerType)
-  if (actionId == null) return null
-
-  const action = getActionById(actionId)
+  let match: EffectiveRuleMatch | null = null
+  try { match = evaluateRule(context) } catch (e) { console.warn('[TriggerEngine] evaluateRule: ' + e) }
+  let action: MicroAction | null = null
+  let ruleSource: string = 'system'
+  if (match != null) {
+    ruleSource = match.rule.source
+    if (match.action == null || match.rule.actionId.length < 1) {
+      let fallbackId: string | null = null
+      try { fallbackId = selectAction(context.triggerType) } catch (e) { console.warn('[TriggerEngine] selectAction: ' + e) }
+      if (fallbackId == null) return null
+      action = getActionById(fallbackId)
+    } else {
+      action = match.action
+    }
+  } else {
+    let fallbackId: string | null = null
+    try { fallbackId = selectAction(context.triggerType) } catch (e) { console.warn('[TriggerEngine] selectAction fallback: ' + e) }
+    if (fallbackId == null) return null
+    action = getActionById(fallbackId)
+    if (action == null) return null
+  }
   if (action == null) return null
 
   let triggerLevel = decideTriggerLevel(context)
   if (isNewbie()) {
     triggerLevel = getNewbieTriggerLevel(triggerLevel)
+  }
+  if (match == null) {
+    triggerLevel = 'gentle'
   }
 
   currentState = TriggerState.SHOWING
@@ -73,23 +109,25 @@ export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
   const triggerLog: TriggerLog = {
     id: 0,
     trigger_type: context.triggerType,
-    trigger_level: triggerLevel,
+    trigger_level: match != null ? match.level : 'gentle',
     app_package: context.appPackage,
-    app_category: null,
+    app_category: context.appCategory != null ? context.appCategory : null,
     continuous_minutes: context.continuousMinutes,
-    action_id: actionId,
+    action_id: action.id,
     user_action: null,
     created_at: Math.floor(nowMs / 1000)
   }
   insertTriggerLog(triggerLog)
 
   return {
-    actionId: actionId,
-    triggerLevel: triggerLevel,
+    actionId: action.id,
+    triggerLevel: match != null ? match.level : 'gentle',
     triggerType: context.triggerType,
     durationMs: action.defaultDurationMs,
     ttsText: action.ttsText,
-    actionName: action.name
+    actionName: action.name,
+    matchedRuleId: match != null ? match.rule.id : 0,
+    matchedRuleSource: ruleSource
   }
 }
 
@@ -110,6 +148,7 @@ export function onExternalInterrupt(): void {
 
 export function forceIdle(): void {
   currentState = TriggerState.IDLE
+  lastTriggerTime = 0
 }
 
 function dismissOverlay(): void {

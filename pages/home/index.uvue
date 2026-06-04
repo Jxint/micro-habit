@@ -30,6 +30,37 @@
         <text class="guard-sub">微动作累计 {{ guardCount }} 次 · 每一次都是对健康的投资</text>
       </view>
 
+      <view class="achievement-section">
+        <view class="achievement-header" @tap="toggleAchievementsCollapsed">
+          <view class="achievement-title-wrap">
+            <text class="achievement-title">🏅 成就</text>
+            <text class="achievement-count">{{ unlockedCount }} / 12</text>
+            <view v-if="newUnlockedCount > 0" class="achievement-red-dot"></view>
+          </view>
+          <text class="achievement-toggle">{{ achievementsCollapsed ? '▼ 展开' : '▲ 折叠' }}</text>
+        </view>
+        <view v-if="achievementsCollapsed" class="achievement-collapsed-scroll">
+          <scroll-view class="achievement-scroll-x" scroll-x="true" show-scrollbar="false">
+            <view v-for="(a, i) in achievements" :key="'ac-' + i" class="achv-chip" :class="a.isUnlocked ? 'achv-chip-on' : 'achv-chip-off'" @tap="onAchievementChipTap(a)">
+              <text class="achv-chip-icon">{{ a.def.icon }}</text>
+              <text v-if="a.isUnlocked" class="achv-chip-mark">✓</text>
+              <text v-else class="achv-chip-mark achv-chip-mark-lock">🔒</text>
+              <view v-if="a.isNew" class="achv-chip-newdot"></view>
+            </view>
+          </scroll-view>
+        </view>
+        <view v-else class="achievement-grid">
+          <view v-for="(a, i) in achievements" :key="'ag-' + i" class="achv-grid-card" :class="a.isUnlocked ? 'achv-grid-on' : 'achv-grid-off'" @tap="onAchievementGridTap(a)">
+            <text class="achv-grid-icon">{{ a.def.icon }}</text>
+            <text class="achv-grid-name">{{ a.def.name }}</text>
+            <text class="achv-grid-cat">{{ a.def.category }}</text>
+            <text class="achv-grid-prog" v-if="a.isUnlocked">✓ 已达成</text>
+            <text class="achv-grid-prog achv-grid-prog-off" v-else>{{ a.currentProgress }} / {{ a.def.threshold }}</text>
+            <view v-if="a.isNew" class="achv-grid-newdot"></view>
+          </view>
+        </view>
+      </view>
+
       <StatusIndicator
         title="护眼"
         :percent="eyeScore"
@@ -114,6 +145,29 @@
       @decline="closeRuleDialog"
       @never-ask="neverAskRule"
     />
+    <AchievementDetailDialog
+      :visible="showAchvDetail"
+      :achievement-icon="detailIcon"
+      :achievement-name="detailName"
+      :achievement-category="detailCat"
+      :achievement-description="detailDesc"
+      :is-unlocked="detailUnlocked"
+      :unlocked-date="detailUnlockedDate"
+      :reward-text="detailReward"
+      :progress-text="detailProgressText"
+      :progress-percent="detailProgressPercent"
+      :history-text="detailHistoryText"
+      @close="closeAchvDetail"
+    />
+    <AchievementUnlockDialog
+      :visible="showAchvUnlock"
+      :achievement-icon="unlockIcon"
+      :achievement-name="unlockName"
+      :achievement-description="unlockDesc"
+      :reward-text="unlockReward"
+      @close="onUnlockDismiss"
+      @viewDetail="onUnlockViewDetail"
+    />
   </view>
 </template>
 
@@ -127,11 +181,18 @@ import { useAppStore, DailyOutput } from '../../stores/appStore'
 import { MicroAction } from '../../models/MicroAction'
 import { LlmHistoryEntry } from '../../models/LlmHistoryEntry'
 import { EffectiveTriggerRule, ScreenConditions } from '../../models/EffectiveTriggerRule'
+import { PersistedEffectiveRule } from '../../models/PersistedEffectiveRule'
+import { AchievementItem } from '../../models/Achievement'
 import { currentHour } from '../../utils/TimeUtils'
 import { getEnabledActions } from '../../services/ActionManager'
-import { getSetting, putBool } from '../../database/SettingsDao'
+import { getSetting, putBool, getInt, putInt, putSetting } from '../../database/SettingsDao'
+import { insertRule } from '../../database/EffectiveRuleDao'
 import { setActionIdForNextPage } from '../../utils/NavigationHelper'
 import { getActionById } from '../../constants/Actions'
+import { getAchievementDef } from '../../constants/Achievements'
+import { getProgressText as computeProgressText } from '../../services/AchievementService'
+import AchievementDetailDialog from '../../components/AchievementDetailDialog.uvue'
+import AchievementUnlockDialog from '../../components/AchievementUnlockDialog.uvue'
 
 const store = useAppStore()
 
@@ -200,6 +261,172 @@ const showPhoneDialog = ref<boolean>(false)
 const showRuleDialog = ref<boolean>(false)
 const pendingRule = ref<EffectiveTriggerRule | null>(null)
 const pendingReasoning = ref<string>('')
+const pendingHistoryId = ref<number>(0)
+
+// ============ 成就系统 ============
+const achievements = computed<AchievementItem[]>(() : AchievementItem[] => store.achievements.value)
+const achievementsCollapsed = ref<boolean>(getInt('achievements_collapsed', 1) == 1)
+const seenSet = ref<Set<string>>(new Set<string>())
+
+const unlockedCount = computed<number>(() : number => {
+  let n = 0
+  for (let i = 0; i < achievements.value.length; i++) {
+    if (achievements.value[i].isUnlocked) n++
+  }
+  return n
+})
+
+const newUnlockedCount = computed<number>(() : number => {
+  let n = 0
+  for (let i = 0; i < achievements.value.length; i++) {
+    const a = achievements.value[i]
+    if (a.isUnlocked && !seenSet.value.has(a.def.id)) n++
+  }
+  return n
+})
+
+function refreshSeenSet(): void {
+  try {
+    const raw = getSetting('seen_achievements', '[]')
+    const arr = JSON.parse(raw) as Array<any>
+    const s = new Set<string>()
+    if (arr != null) {
+      for (let i = 0; i < arr.length; i++) {
+        const v = arr[i]
+        if (typeof v === 'string' && (v as string).length > 0) {
+          s.add(v as string)
+        }
+      }
+    }
+    seenSet.value = s
+  } catch (_) {
+    seenSet.value = new Set<string>()
+  }
+}
+
+function markAchievementSeen(id: string): void {
+  const s = seenSet.value
+  s.add(id)
+  const arr: string[] = []
+  s.forEach((v: string): void => { arr.push(v) })
+  const json = '[' + arr.map((v: string): string => '"' + v + '"').join(',') + ']'
+  try { putSetting('seen_achievements', json) } catch (_) {}
+}
+
+// 详情弹窗状态
+const showAchvDetail = ref<boolean>(false)
+const detailItem = ref<AchievementItem | null>(null)
+const detailIcon = ref<string>('')
+const detailName = ref<string>('')
+const detailCat = ref<string>('')
+const detailDesc = ref<string>('')
+const detailUnlocked = ref<boolean>(false)
+const detailUnlockedDate = ref<string>('')
+const detailReward = ref<string>('')
+const detailProgressText = ref<string>('')
+const detailProgressPercent = ref<number>(0)
+const detailHistoryText = ref<string>('')
+
+// 解锁动画弹窗状态
+const showAchvUnlock = ref<boolean>(false)
+const unlockIcon = ref<string>('')
+const unlockName = ref<string>('')
+const unlockDesc = ref<string>('')
+const unlockReward = ref<string>('')
+const unlockCurrentId = ref<string>('')
+
+function toggleAchievementsCollapsed(): void {
+  achievementsCollapsed.value = !achievementsCollapsed.value
+  try { putInt('achievements_collapsed', achievementsCollapsed.value ? 1 : 0) } catch (_) {}
+}
+
+function openAchvDetail(item: AchievementItem): void {
+  detailItem.value = item
+  detailIcon.value = item.def.icon
+  detailName.value = item.def.name
+  detailCat.value = item.def.category
+  detailDesc.value = item.def.description
+  detailUnlocked.value = item.isUnlocked
+  if (item.isUnlocked && item.unlockedAt > 0) {
+    const d = new Date(item.unlockedAt * 1000)
+    detailUnlockedDate.value = d.getFullYear() + '-' + ('' + (d.getMonth() + 1)).padStart(2, '0') + '-' + ('' + d.getDate()).padStart(2, '0')
+  } else {
+    detailUnlockedDate.value = ''
+  }
+  detailReward.value = item.def.rewardText
+  const prog = computeProgressText(item)
+  detailProgressText.value = prog.text
+  detailProgressPercent.value = prog.percent
+  detailHistoryText.value = item.def.historyText
+  showAchvDetail.value = true
+}
+
+function closeAchvDetail(): void {
+  showAchvDetail.value = false
+  detailItem.value = null
+}
+
+function tryShowNextUnlock(): void {
+  const pending = store.pendingUnlockIds.value
+  if (pending.length < 1) return
+  const firstId = pending[0] as string
+  const def = getAchievementDef(firstId)
+  if (def == null) {
+    store.shiftPendingUnlock()
+    tryShowNextUnlock()
+    return
+  }
+  unlockIcon.value = def.icon
+  unlockName.value = def.name
+  unlockDesc.value = def.description
+  unlockReward.value = def.rewardText
+  unlockCurrentId.value = firstId
+  showAchvUnlock.value = true
+}
+
+function onUnlockDismiss(): void {
+  if (unlockCurrentId.value.length > 0) {
+    markAchievementSeen(unlockCurrentId.value)
+  }
+  showAchvUnlock.value = false
+  unlockCurrentId.value = ''
+  store.shiftPendingUnlock()
+  setTimeout((): void => {
+    tryShowNextUnlock()
+  }, 200)
+}
+
+function onUnlockViewDetail(): void {
+  const firstId = unlockCurrentId.value
+  if (firstId.length > 0) {
+    markAchievementSeen(firstId)
+  }
+  showAchvUnlock.value = false
+  unlockCurrentId.value = ''
+  store.shiftPendingUnlock()
+  setTimeout((): void => {
+    for (let i = 0; i < achievements.value.length; i++) {
+      const it = achievements.value[i]
+      if (it.def.id == firstId) {
+        openAchvDetail(it)
+        break
+      }
+    }
+    tryShowNextUnlock()
+  }, 200)
+}
+
+function onAchievementChipTap(item: AchievementItem): void {
+  if (item.isNew) markAchievementSeen(item.def.id)
+  openAchvDetail(item)
+}
+
+function onAchievementGridTap(item: AchievementItem): void {
+  if (item.isNew) markAchievementSeen(item.def.id)
+  openAchvDetail(item)
+}
+
+// ============ 成就系统结束 ============
 
 const ruleActionName = computed<string>(() : string => {
   const r = pendingRule.value
@@ -243,16 +470,54 @@ function closePhoneDialog(): void {
 }
 
 function closeRuleDialog(): void {
+  if (pendingHistoryId.value > 0) {
+    try { uni.$emit('rejectLlmRule', { historyId: pendingHistoryId.value }) } catch (_) {}
+  }
   showRuleDialog.value = false
   pendingRule.value = null
   pendingReasoning.value = ''
+  pendingHistoryId.value = 0
 }
 
 function acceptRule(): void {
+  const r = pendingRule.value
+  if (r != null) {
+    try {
+      const nowSec = Math.floor(Date.now() / 1000)
+      let pkgList: string[] = []
+      if (r.screenConditions != null) {
+        pkgList = r.screenConditions.appPackages
+      }
+      const ruleRow: PersistedEffectiveRule = {
+        id: 0,
+        actionId: r.actionId,
+        appPackages: pkgList,
+        timeWindow: r.timeWindow,
+        timeThresholdMinutes: r.timeThresholdMinutes,
+        triggerLevel: 'gentle',
+        categoryFilter: null,
+        source: 'llm',
+        sourceHistoryId: pendingHistoryId.value,
+        expiresAt: null,
+        enabled: true,
+        priority: 5,
+        createdAt: nowSec,
+        updatedAt: nowSec
+      }
+      const newId = insertRule(ruleRow)
+      if (pendingHistoryId.value > 0) {
+        try { uni.$emit('acceptLlmRule', { historyId: pendingHistoryId.value }) } catch (_) {}
+      }
+      console.log('[home] acceptRule id=' + newId)
+    } catch (e) {
+      console.warn('[home] acceptRule 失败: ' + JSON.stringify(e))
+    }
+  }
   showRuleDialog.value = false
   pendingRule.value = null
   pendingReasoning.value = ''
-  uni.showToast({ title: '规则已接受（持久化待 Day 5）', icon: 'none' })
+  pendingHistoryId.value = 0
+  uni.showToast({ title: '规则已生效', icon: 'none' })
 }
 
 function neverAskRule(): void {
@@ -285,6 +550,11 @@ const dateStr = computed<string>(getDateStr)
 onPageShow(() => {
   store.refreshHomeData()
   store.refreshLlmHistory()
+  refreshSeenSet()
+  store.refreshAchievements()
+  setTimeout((): void => {
+    tryShowNextUnlock()
+  }, 500)
 })
 
 function startAction(actionId: string): void {
@@ -315,6 +585,8 @@ onLoad((): void => {
         pendingRule.value = rule
         const reasoning = typeof reasoningRaw === 'string' ? (reasoningRaw as string) : ''
         pendingReasoning.value = reasoning
+        const historyId = obj['historyId'] as number
+        pendingHistoryId.value = historyId > 0 ? historyId : 0
         showRuleDialog.value = true
       } catch (e) {
         console.warn('[home] showTriggerRuleDialog 处理异常: ' + JSON.stringify(e))
@@ -322,6 +594,35 @@ onLoad((): void => {
     })
   } catch (e) {
     console.warn('[home] $on showTriggerRuleDialog 异常: ' + JSON.stringify(e))
+  }
+  try {
+    uni.$on('pendingAchievementUnlock', (data: any): void => {
+      try {
+        if (data == null) return
+        const obj = data as UTSJSONObject
+        if (obj == null) return
+        const idsRaw = obj['ids']
+        if (idsRaw == null) return
+        const idsStr = JSON.stringify(idsRaw)
+        const ids = JSON.parse(idsStr) as Array<any>
+        if (ids == null || ids.length < 1) return
+        const idArr: string[] = []
+        for (let i = 0; i < ids.length; i++) {
+          const v = ids[i]
+          if (typeof v === 'string' && (v as string).length > 0) {
+            idArr.push(v as string)
+          }
+        }
+        if (idArr.length > 0) {
+          store.setPendingUnlocks(idArr)
+          tryShowNextUnlock()
+        }
+      } catch (e) {
+        console.warn('[home] pendingAchievementUnlock 异常: ' + JSON.stringify(e))
+      }
+    })
+  } catch (e) {
+    console.warn('[home] $on pendingAchievementUnlock 异常: ' + JSON.stringify(e))
   }
 })
 </script>
@@ -448,6 +749,146 @@ onLoad((): void => {
 .guard-sub {
   font-size: 12px;
   color: #95A5A6;
+}
+
+/* ============ 成就系统样式 ============ */
+.achievement-section {
+  background-color: #FFFFFF;
+  margin: 8px 16px 8px 16px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+.achievement-header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px 8px 4px;
+}
+.achievement-title-wrap {
+  flex-direction: row;
+  align-items: center;
+}
+.achievement-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-right: 8px;
+}
+.achievement-count {
+  font-size: 12px;
+  color: #95A5A6;
+}
+.achievement-red-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background-color: #E74C3C;
+  margin-left: 6px;
+}
+.achievement-toggle {
+  font-size: 12px;
+  color: #3498DB;
+}
+.achievement-collapsed-scroll {
+  flex-direction: row;
+  margin-top: 4px;
+}
+.achievement-scroll-x {
+  flex-direction: row;
+}
+.achv-chip {
+  width: 56px;
+  height: 64px;
+  border-radius: 12px;
+  margin-right: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  position: relative;
+}
+.achv-chip-on {
+  background-color: #FEF5E7;
+}
+.achv-chip-off {
+  background-color: #F0F3F4;
+}
+.achv-chip-icon {
+  font-size: 28px;
+  margin-bottom: 2px;
+}
+.achv-chip-mark {
+  font-size: 10px;
+  color: #27AE60;
+  font-weight: bold;
+}
+.achv-chip-mark-lock {
+  color: #95A5A6;
+}
+.achv-chip-newdot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background-color: #E74C3C;
+}
+.achievement-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.achv-grid-card {
+  width: 31%;
+  background-color: #F0F3F4;
+  border-radius: 12px;
+  padding: 12px 8px 10px 8px;
+  margin-bottom: 8px;
+  align-items: center;
+  flex-direction: column;
+  position: relative;
+}
+.achv-grid-on {
+  background-color: #FEF5E7;
+}
+.achv-grid-off {
+  background-color: #F0F3F4;
+}
+.achv-grid-icon {
+  font-size: 28px;
+  margin-bottom: 4px;
+}
+.achv-grid-name {
+  font-size: 12px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 2px;
+}
+.achv-grid-cat {
+  font-size: 10px;
+  color: #95A5A6;
+  margin-bottom: 4px;
+}
+.achv-grid-prog {
+  font-size: 10px;
+  color: #27AE60;
+  font-weight: bold;
+}
+.achv-grid-prog-off {
+  color: #7F8C8D;
+  font-weight: normal;
+}
+.achv-grid-newdot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background-color: #E74C3C;
 }
 .penetration-section {
   flex-direction: row;

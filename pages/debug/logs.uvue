@@ -161,8 +161,9 @@ const currentTab = ref<string>('trigger')
 
 const KNOWN_TABLES: string[] = [
   'action_logs', 'trigger_logs', 'user_settings',
-  'daily_summaries', 'trigger_rules', 'app_usage_snapshots',
-  'tts_cache', 'heartbeat_logs', 'llm_cache'
+  'daily_summaries', 'app_usage_snapshots',
+  'tts_cache', 'heartbeat_logs', 'llm_cache',
+  'llm_history', 'app_tags', 'effective_rules'
 ]
 
 type DbTableInfo = { name: string, count: number }

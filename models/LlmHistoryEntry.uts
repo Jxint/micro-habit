@@ -7,6 +7,10 @@ export type ParsedLlmResult = {
   stateDescription?: string
   suggestedRule?: EffectiveTriggerRule
   reasoning?: string
+  decision?: string
+  targetRuleId?: number
+  confidence?: number
+  alternatives?: Array<any>
 }
 
 export type LlmHistoryEntry = {

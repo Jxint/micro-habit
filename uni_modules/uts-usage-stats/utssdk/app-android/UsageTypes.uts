@@ -1,0 +1,22 @@
+// 公共服务类型定义
+
+export type AppForegroundInfo = {
+  packageName: string
+  startTime: number
+  continuousMs: number
+}
+
+export type UsageStatEntry = {
+  packageName: string
+  totalTimeInForeground: number
+  lastTimeUsed: number
+}
+
+export type UsageMonitorCallbacks = {
+  onAppSwitch: (fromPkg: string, toPkg: string) => void
+  onAppDurationTrigger: (info: AppForegroundInfo) => void
+  onUsageTick: (pkg: string, deltaSec: number) => void
+  onTimePeriodTrigger: (periodName: string) => void
+  onDayRollover: (oldDate: string, newDate: string) => void
+  onPermissionMissing: () => void
+}

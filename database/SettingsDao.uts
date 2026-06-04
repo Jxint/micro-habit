@@ -25,7 +25,7 @@ export function getFloat(key: string, defaultVal: number = 0): number {
 
 export function getBool(key: string, defaultVal: boolean = false): boolean {
   const val = getSetting(key, defaultVal ? '1' : '0')
-  return val === '1' || val === 'true'
+  return val == '1' || val == 'true'
 }
 
 export function putSetting(key: string, value: string): void {

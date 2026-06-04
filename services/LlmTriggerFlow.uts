@@ -1,12 +1,13 @@
 import { callLlmEvaluate } from './CloudService'
 import * as LlmHistoryDao from '../database/LlmHistoryDao'
-import { EffectiveTriggerRule, TimeWindow, ScreenConditions } from '../models/EffectiveTriggerRule'
+import { EffectiveTriggerRule, TimeWindow, ScreenConditions, TriggerLevel } from '../models/EffectiveTriggerRule'
 import { ParsedLlmResult, LlmHistoryStage } from '../models/LlmHistoryEntry'
 import {
   PreTriggerContext,
   PostActionContext,
   getFallbackAdhoc
 } from '../constants/LlmPrompts'
+import { hasBeenRejected } from './LlmRejectTracker'
 
 export type PreTriggerResult = {
   adhocText: string
@@ -16,7 +17,11 @@ export type PreTriggerResult = {
 
 export type PostActionResult = {
   suggestedRule: EffectiveTriggerRule | null
+  decision: string
   reasoning: string
+  confidence: number
+  alternatives: string
+  historyId: number
   fallback: boolean
 }
 
@@ -47,19 +52,25 @@ export function evaluatePre(
   onReady: (result: PreTriggerResult) => void,
   onFail: () => void
 ): void {
+  console.log('[LlmFlow] evaluatePre 开始')
   const ctx = preContextCache
   if (ctx == null) {
+    console.warn('[LlmFlow] evaluatePre: preContextCache 为空')
     onFail()
     return
   }
   const contextJson = JSON.stringify(ctx)
+  console.log('[LlmFlow] evaluatePre 上下文长度: ' + contextJson.length)
   try {
+    console.log('[LlmFlow] evaluatePre 调用 callLlmEvaluate pre')
     callLlmEvaluate(
       'pre',
-      contextJson,
+      ctx,
       (raw: string): void => {
+        console.log('[LlmFlow] evaluatePre LLM 返回 raw 长度: ' + raw.length)
         try {
           const parsed = parsePreResponse(raw)
+          console.log('[LlmFlow] evaluatePre parsePreResult adhocText=' + (parsed.adhocText != null ? parsed.adhocText.substring(0, 30) : 'null'))
           const adhoc = parsed.adhocText != null ? parsed.adhocText : getFallbackAdhoc()
           const stateDesc = parsed.stateDescription != null ? parsed.stateDescription : '检测到需要休息'
           try {
@@ -83,6 +94,7 @@ export function evaluatePre(
         }
       },
       (): void => {
+        console.warn('[LlmFlow] evaluatePre LLM 请求失败，使用 fallback')
         const fallback: PreTriggerResult = buildFallbackPre()
         try {
           LlmHistoryDao.insertHistory('pre', contextJson, '', {}, fallback.adhocText, null, fallback.stateDescription)
@@ -108,7 +120,11 @@ export function evaluatePost(
     onFail()
     return
   }
-  const ctx = postContextCache!!
+  const ctx = postContextCache
+  if (ctx == null) {
+    onFail()
+    return
+  }
   const enriched: PostActionContext = {
     actionId: actionId,
     actionName: actionName,
@@ -117,50 +133,95 @@ export function evaluatePost(
     originalContext: ctx.originalContext,
     todayCompletedCount: ctx.todayCompletedCount,
     guardMinutes: ctx.guardMinutes,
+    todaySkipCount: ctx.todaySkipCount,
     recentActions: ctx.recentActions,
-    currentRules: ctx.currentRules
+    appHistory: ctx.appHistory,
+    currentRules: ctx.currentRules,
+    userPreference: ctx.userPreference,
+    lastWeekSameTime: ctx.lastWeekSameTime
   }
   const contextJson = JSON.stringify(enriched)
   try {
     callLlmEvaluate(
       'post',
-      contextJson,
+      enriched,
       (raw: string): void => {
         try {
           const parsed = parsePostResponse(raw)
+          const decision = parsed.decision != null ? parsed.decision : 'no_change'
           const rule = parsed.suggestedRule != null ? parsed.suggestedRule : null
           const reasoning = parsed.reasoning != null ? parsed.reasoning : ''
+          const confidence = parsed.confidence != null ? parsed.confidence : 0
+          const alternatives = parsed.alternatives != null ? JSON.stringify(parsed.alternatives) : ''
+          let finalDecision = decision
+          let finalRule = rule
+          if (decision == 'modify_rule' || decision == 'delete_rule') {
+            if (parsed.targetRuleId != null && parsed.targetRuleId > 0) {
+              if (hasBeenRejected(parsed.targetRuleId, decision)) {
+                finalDecision = 'no_change'
+                finalRule = null
+              }
+            }
+          }
+          let historyId = 0
           try {
-            LlmHistoryDao.insertHistory('post', contextJson, raw, parsed, null, rule, reasoning)
+            historyId = LlmHistoryDao.insertHistory(
+              'post',
+              contextJson,
+              raw,
+              parsed,
+              null,
+              finalRule,
+              reasoning,
+              confidence,
+              finalDecision,
+              parsed.targetRuleId != null ? parsed.targetRuleId : null,
+              null,
+              alternatives
+            )
           } catch (e) {
             console.warn('[LlmTriggerFlow] 写 post history 失败: ' + JSON.stringify(e))
           }
           const result: PostActionResult = {
-            suggestedRule: rule,
+            suggestedRule: finalRule,
+            decision: finalDecision,
             reasoning: reasoning,
+            confidence: confidence,
+            alternatives: alternatives,
+            historyId: historyId,
             fallback: false
           }
           onReady(result)
         } catch (e) {
           console.warn('[LlmTriggerFlow] post parse 失败: ' + JSON.stringify(e))
+          let hid = 0
           try {
-            LlmHistoryDao.insertHistory('post', contextJson, raw, {}, null, null, '')
+            hid = LlmHistoryDao.insertHistory('post', contextJson, raw, {}, null, null, '', 0, null, null, null, null)
           } catch (_) {}
           const result: PostActionResult = {
             suggestedRule: null,
+            decision: 'no_change',
             reasoning: '',
+            confidence: 0,
+            alternatives: '',
+            historyId: hid,
             fallback: true
           }
           onReady(result)
         }
       },
       (): void => {
+        let hid = 0
         try {
-          LlmHistoryDao.insertHistory('post', contextJson, '', {}, null, null, '')
+          hid = LlmHistoryDao.insertHistory('post', contextJson, '', {}, null, null, '', 0, null, null, null, null)
         } catch (_) {}
         const result: PostActionResult = {
           suggestedRule: null,
+          decision: 'no_change',
           reasoning: '',
+          confidence: 0,
+          alternatives: '',
+          historyId: hid,
           fallback: true
         }
         onReady(result)
@@ -199,9 +260,29 @@ function parsePostResponse(raw: string): ParsedLlmResult {
   const obj = parseJsonThreeLevels(raw)
   const result: ParsedLlmResult = {}
   if (obj == null) return result
+  const decision = obj['decision']
+  if (typeof decision === 'string' && (decision as string).length > 0) {
+    result.decision = decision as string
+  }
+  const targetId = obj['targetRuleId']
+  if (typeof targetId === 'number') {
+    result.targetRuleId = targetId as number
+  }
   const reasoning = obj['reasoning']
   if (typeof reasoning === 'string' && (reasoning as string).length > 0) {
     result.reasoning = reasoning as string
+  }
+  const conf = obj['confidence']
+  if (typeof conf === 'number') {
+    result.confidence = conf as number
+  }
+  const altArr = obj['alternatives']
+  if (altArr != null) {
+    try {
+      const altStr = JSON.stringify(altArr)
+      const alt = JSON.parse(altStr) as Array<any>
+      if (alt != null) result.alternatives = alt
+    } catch (_) {}
   }
   const rawRule = obj['suggestedRule']
   if (rawRule != null && typeof rawRule === 'object') {
@@ -217,7 +298,6 @@ function normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule | null {
   const actionId = raw['actionId']
   if (typeof actionId !== 'string' || (actionId as string).length < 1) return null
   const actionIdStr = actionId as string
-
   let timeWindow: TimeWindow | null = null
   const tw = raw['timeWindow']
   if (tw != null && typeof tw === 'object') {
@@ -233,7 +313,6 @@ function normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule | null {
       }
     }
   }
-
   let screenConditions: ScreenConditions | null = null
   const sc = raw['screenConditions']
   if (sc != null && typeof sc === 'object') {
@@ -257,14 +336,11 @@ function normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule | null {
     const cond: ScreenConditions = { appPackages: pkgs, includeHome: includeHome }
     screenConditions = cond
   }
-
-  let threshold: number = 0
+  let threshold: number = 60
   const thresholdRaw = raw['timeThresholdMinutes']
   if (typeof thresholdRaw === 'number') {
-    const t = thresholdRaw as number
-    threshold = t.toInt()
+    threshold = (thresholdRaw as number).toInt()
   }
-
   const rule: EffectiveTriggerRule = {
     id: 0,
     actionId: actionIdStr,
@@ -279,11 +355,24 @@ function normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule | null {
 }
 
 function parseJsonThreeLevels(raw: string): UTSJSONObject | null {
+  let cleaned = raw
+  if (cleaned.indexOf('```') >= 0) {
+    const fenceStart = cleaned.indexOf('```')
+    const afterFence = cleaned.substring(fenceStart + 3)
+    const newlineIdx = afterFence.indexOf('\n')
+    const afterLang = newlineIdx >= 0 ? afterFence.substring(newlineIdx + 1) : afterFence
+    const endFence = afterLang.lastIndexOf('```')
+    if (endFence > 0) {
+      cleaned = afterLang.substring(0, endFence)
+    } else {
+      cleaned = afterLang
+    }
+  }
   try {
-    return JSON.parse(raw) as UTSJSONObject
+    return JSON.parse(cleaned) as UTSJSONObject
   } catch (_) {}
   try {
-    const match = raw.match(/\{[\s\S]*\}/)
+    const match = cleaned.match(/\{[\s\S]*\}/)
     if (match != null) {
       const m = match[0]
       if (m != null && m.length > 0) {

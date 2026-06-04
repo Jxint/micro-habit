@@ -1,0 +1,73 @@
+import { dbManager, type SqlRow } from './DatabaseManager'
+import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
+
+export type UserAchievementRow = {
+  id: number
+  achievementId: string
+  unlockedAt: number
+  currentProgress: number
+  createdAt: number
+}
+
+function mapRow(row: Map<string, any>): UserAchievementRow {
+  return {
+    id: getNum(row, 'id'),
+    achievementId: getStr(row, 'achievement_id'),
+    unlockedAt: getNum(row, 'unlocked_at'),
+    currentProgress: getNum(row, 'current_progress'),
+    createdAt: getNum(row, 'created_at')
+  }
+}
+
+export function getAllUnlocked(): UserAchievementRow[] {
+  const result: UserAchievementRow[] = []
+  try {
+    const rows = dbManager.query('SELECT * FROM user_achievements ORDER BY unlocked_at DESC')
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]
+      if (r == null) continue
+      try {
+        result.push(mapRow(r))
+      } catch (e) {
+        console.warn('[AchievementDao] mapRow skip dirty row: ' + JSON.stringify(e))
+      }
+    }
+  } catch (e) {
+    console.warn('[AchievementDao] getAllUnlocked 异常（表可能尚未创建）: ' + JSON.stringify(e))
+  }
+  return result
+}
+
+export function isUnlocked(achievementId: string): boolean {
+  try {
+    const row = dbManager.queryOne(
+      'SELECT id FROM user_achievements WHERE achievement_id = ? LIMIT 1',
+      [achievementId]
+    )
+    return row != null
+  } catch (e) {
+    console.warn('[AchievementDao] isUnlocked 异常（表可能尚未创建）: ' + JSON.stringify(e))
+    return false
+  }
+}
+
+export function insertUnlock(achievementId: string, progress: number): void {
+  const now = Math.floor(Date.now() / 1000)
+  const row: SqlRow = {
+    columns: ['achievement_id', 'unlocked_at', 'current_progress', 'created_at'],
+    values: [achievementId, now, progress, now]
+  }
+  try {
+    dbManager.insert('user_achievements', row)
+  } catch (e) {
+    console.warn('[AchievementDao] insertUnlock 失败: ' + JSON.stringify(e))
+  }
+}
+
+export function clearAll(): void {
+  try {
+    dbManager.delete('user_achievements', '', [])
+  } catch (e) {
+    console.warn('[AchievementDao] clearAll 异常: ' + JSON.stringify(e))
+  }
+}

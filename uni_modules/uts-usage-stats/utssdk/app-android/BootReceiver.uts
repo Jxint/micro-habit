@@ -1,0 +1,28 @@
+// 开机自启 + 屏幕解锁后启动监听 Service
+
+import BroadcastReceiver from 'android.content.BroadcastReceiver'
+import Context from 'android.content.Context'
+import Intent from 'android.content.Intent'
+
+const SERVICE_CLASS_NAME: string = 'uts.sdk.modules.utsUsageStats.UsageStatsForegroundService'
+
+export class BootReceiver extends BroadcastReceiver {
+  constructor() {
+    super()
+  }
+
+  override onReceive(context: Context, intent: Intent): void {
+    try {
+      const action = intent.action
+      if (action == 'android.intent.action.BOOT_COMPLETED' ||
+          action == 'android.intent.action.QUICKBOOT_POWERON' ||
+          action == 'android.intent.action.USER_PRESENT') {
+        const serviceIntent: Intent = Intent()
+        serviceIntent.setClassName(context, SERVICE_CLASS_NAME)
+        context.startForegroundService(serviceIntent)
+      }
+    } catch (e) {
+      console.warn('[UsageStats] BootReceiver 异常: ' + JSON.stringify(e))
+    }
+  }
+}

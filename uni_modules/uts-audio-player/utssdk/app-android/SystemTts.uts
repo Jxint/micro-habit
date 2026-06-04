@@ -1,18 +1,38 @@
 import TextToSpeech from 'android.speech.tts.TextToSpeech'
 import Locale from 'java.util.Locale'
+import Bundle from 'android.os.Bundle'
 
 let ttsInstance: TextToSpeech | null = null
 let ttsReady: boolean = false
 let pendingText: string = ''
+let pendingVolume: number = 1.0
 
-export function speakSystemTts(text: string): void {
+function clampVolume(volume: number): number {
+  if (volume < 0) return 0
+  if (volume > 1) return 1
+  return volume
+}
+
+function makeVolumeParams(volume: number): Bundle {
+  const params = Bundle()
+  params.putFloat('volume', clampVolume(volume).toFloat())
+  return params
+}
+
+export function speakSystemTts(text: string, volume: number = 1.0): void {
+  const v = clampVolume(volume)
   if (ttsInstance != null && ttsReady) {
-    ttsInstance!!.speak(text, TextToSpeech.QUEUE_FLUSH, null, 'micro_habit_tts')
+    try {
+      ttsInstance!!.speak(text, TextToSpeech.QUEUE_FLUSH, makeVolumeParams(v), 'micro_habit_tts')
+    } catch (_) {
+      ttsInstance!!.speak(text, TextToSpeech.QUEUE_FLUSH, null, 'micro_habit_tts')
+    }
   } else {
     if (ttsInstance == null) {
       initTts()
     }
     pendingText = text
+    pendingVolume = v
   }
 }
 
@@ -43,8 +63,12 @@ function initTts(): void {
       if (status == TextToSpeech.SUCCESS) {
         const result = ttsInstance!!.setLanguage(Locale.CHINESE)
         ttsReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
-        if (ttsReady && !pendingText.isEmpty()) {
-          ttsInstance!!.speak(pendingText, TextToSpeech.QUEUE_FLUSH, null, 'micro_habit_tts')
+        if (ttsReady && pendingText.length > 0) {
+          try {
+            ttsInstance!!.speak(pendingText, TextToSpeech.QUEUE_FLUSH, makeVolumeParams(pendingVolume), 'micro_habit_tts')
+          } catch (_) {
+            ttsInstance!!.speak(pendingText, TextToSpeech.QUEUE_FLUSH, null, 'micro_habit_tts')
+          }
           pendingText = ''
         }
       }

@@ -1,0 +1,6 @@
+{
+  "id": "uts-usage-stats",
+  "name": "前台应用使用情况监听",
+  "version": "1.0.0",
+  "minSdkVersion": "29"
+}

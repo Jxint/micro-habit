@@ -16,7 +16,7 @@ type TtsAdhocOptions = {
   timeout: number
 }
 
-function callMinimaxChat(systemPrompt: string, userPrompt: string, maxTokens: number, onOK: (raw: string) => void, onFail: () => void): void {
+export function callMinimaxChat(systemPrompt: string, userPrompt: string, maxTokens: number, onOK: (raw: string) => void, onFail: () => void): void {
   if (MINIMAX_API_KEY === 'PLACEHOLDER_KEY') {
     console.warn('[CloudService] MiniMax API key 未配置，走降级路径')
     onFail()
@@ -116,25 +116,35 @@ export function callTtsAdhoc(context: any, options: TtsAdhocOptions, onOK: (resu
 
 export function callLlmEvaluate(
   stage: 'pre' | 'post',
-  contextJson: string,
+  ctx: PreTriggerContext | PostActionContext,
   onOK: (raw: string) => void,
   onFail: () => void
 ): void {
   let userPrompt = ''
   try {
     if (stage === 'pre') {
-      const ctx = JSON.parse(contextJson) as PreTriggerContext
-      userPrompt = buildPreTriggerPrompt(ctx)
+      const pCtx = ctx as PreTriggerContext
+      userPrompt = buildPreTriggerPrompt(pCtx)
+      console.log('[CloudService] callLlmEvaluate pre userPrompt len=' + userPrompt.length)
     } else {
-      const ctx = JSON.parse(contextJson) as PostActionContext
-      userPrompt = buildPostActionPrompt(ctx)
+      const pCtx = ctx as PostActionContext
+      userPrompt = buildPostActionPrompt(pCtx)
+      console.log('[CloudService] callLlmEvaluate post userPrompt len=' + userPrompt.length)
     }
-  } catch (_) {
+  } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    console.warn('[CloudService] callLlmEvaluate prompt 构造失败: ' + msg)
     onFail()
     return
   }
 
-  callMinimaxChat(SYSTEM_PROMPT_EVALUATE, userPrompt, 1500, onOK, onFail)
+  callMinimaxChat(SYSTEM_PROMPT_EVALUATE, userPrompt, 1500, (raw: string): void => {
+    console.log('[CloudService] callLlmEvaluate ' + stage + ' OK, rawLen=' + raw.length + ' preview=' + raw.substring(0, 80))
+    onOK(raw)
+  }, (): void => {
+    console.warn('[CloudService] callLlmEvaluate ' + stage + ' FAIL')
+    onFail()
+  })
 }
 
 function extractChatContent(data: any): string {

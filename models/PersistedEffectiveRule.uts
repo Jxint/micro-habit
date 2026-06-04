@@ -1,0 +1,37 @@
+import { EffectiveTriggerRule, TimeWindow, ScreenConditions, TriggerLevel } from './EffectiveTriggerRule'
+
+// 持久化格式：与 effective_rules 表一一对应
+export type PersistedEffectiveRule = {
+  id: number
+  actionId: string
+  appPackages: string[]
+  timeWindow: TimeWindow | null
+  timeThresholdMinutes: number
+  triggerLevel: TriggerLevel
+  categoryFilter: string | null
+  source: 'user' | 'llm' | 'system'
+  sourceHistoryId: number | null
+  expiresAt: number | null
+  enabled: boolean
+  priority: number
+  createdAt: number
+  updatedAt: number
+}
+
+export function toEffectiveTriggerRule(p: PersistedEffectiveRule): EffectiveTriggerRule {
+  const screenConditions: ScreenConditions = {
+    appPackages: p.appPackages,
+    includeHome: p.appPackages.length < 1
+  }
+  const rule: EffectiveTriggerRule = {
+    id: p.id,
+    actionId: p.actionId,
+    timeWindow: p.timeWindow,
+    screenConditions: screenConditions,
+    timeThresholdMinutes: p.timeThresholdMinutes,
+    source: p.source,
+    enabled: p.enabled,
+    createdAt: p.createdAt
+  }
+  return rule
+}

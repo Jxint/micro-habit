@@ -18,14 +18,16 @@ export function speakAdhocOpen(context: AdhocContext): void {
 export function speakAdhoc(text: string): void {
   if (isSystemMuted()) return
   if (text.length < 1) return
-  try { pluginSpeakSystemTts(text) } catch (e) {
+  const vol = getAdjustedVolume()
+  try { pluginSpeakSystemTts(text, vol) } catch (e) {
     console.warn('[TtsService] speakAdhoc plugin 调用失败: ' + JSON.stringify(e))
   }
 }
 
 export function speakFixedGuide(text: string): void {
   if (isSystemMuted()) return
-  try { pluginSpeakSystemTts(text) } catch (e) {
+  const vol = getAdjustedVolume()
+  try { pluginSpeakSystemTts(text, vol) } catch (e) {
     console.warn('[TtsService] speakFixedGuide plugin 调用失败: ' + JSON.stringify(e))
   }
 }
@@ -40,7 +42,7 @@ function playFallbackIntro(volume: number): void {
     '你的身体发来一条提醒——'
   ]
   const idx = Math.floor(Math.random() * intros.length)
-  try { pluginSpeakSystemTts(intros[idx]) } catch (e) {
+  try { pluginSpeakSystemTts(intros[idx] as string, volume) } catch (e) {
     console.warn('[TtsService] playFallbackIntro plugin 调用失败: ' + JSON.stringify(e))
   }
 }

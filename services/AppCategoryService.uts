@@ -1,0 +1,122 @@
+import * as AppTagsDao from '../database/AppTagsDao'
+import { AppTag, AppCategory } from '../models/AppTag'
+import { callMinimaxChat } from './CloudService'
+import { today } from '../utils/TimeUtils'
+
+const SYSTEM_PROMPT_CLASSIFY =
+  '你是一个 App 分类助手。\n根据用户的应用名和包名，分类到以下之一：social | video | game | work | study | reading | other\n严格按 JSON 输出，不要任何额外文字：{"results":[{"packageName":"...","category":"..."}]}'
+
+const VALID_CATEGORIES: AppCategory[] = ['social', 'video', 'game', 'work', 'study', 'reading', 'other']
+
+function isValidCategory(s: string): boolean {
+  for (let i = 0; i < VALID_CATEGORIES.length; i++) {
+    if (VALID_CATEGORIES[i] == s) return true
+  }
+  return false
+}
+
+export function ensureCategory(pkg: string, appLabel: string): void {
+  try {
+    const existing = AppTagsDao.getByPackage(pkg)
+    if (existing != null) {
+      AppTagsDao.incrementUses(pkg)
+      return
+    }
+    const now = Math.floor(Date.now() / 1000)
+    const tag: AppTag = {
+      packageName: pkg,
+      appLabel: appLabel,
+      category: 'other',
+      tagSource: 'pending',
+      isUserLocked: false,
+      isInRule: false,
+      totalUses: 1,
+      lastSeenAt: now,
+      createdAt: now,
+      updatedAt: now
+    }
+    AppTagsDao.upsert(tag)
+  } catch (e) {
+    console.warn('[AppCategoryService] ensureCategory 失败: ' + JSON.stringify(e))
+  }
+}
+
+export function batchClassifyTodayNewApps(onComplete: ((n: number) => void) | null = null): void {
+  try {
+    const pending = AppTagsDao.listPendingForLlm()
+    if (pending.length < 1) {
+      if (onComplete != null) onComplete(0)
+      return
+    }
+    const items: string[] = []
+    for (let i = 0; i < pending.length; i++) {
+      const p = pending[i]
+      items.push('{"packageName":"' + p.packageName + '","appLabel":"' + p.appLabel + '"}')
+    }
+    const userPrompt = '请分类以下应用：\n' + items.join('\n')
+    callMinimaxChat(SYSTEM_PROMPT_CLASSIFY, userPrompt, 800, (raw: string): void => {
+      try {
+        const obj = parseClassifyResponse(raw, pending)
+        let n = 0
+        for (let i = 0; i < obj.length; i++) {
+          const item = obj[i]
+          const tag = AppTagsDao.getByPackage(item.pkg)
+          if (tag == null) continue
+          if (tag.isUserLocked) continue
+          AppTagsDao.updateCategory(item.pkg, item.category, 'llm')
+          n++
+        }
+        if (onComplete != null) onComplete(n)
+      } catch (e) {
+        console.warn('[AppCategoryService] batchClassify 解析失败: ' + JSON.stringify(e))
+        if (onComplete != null) onComplete(0)
+      }
+    }, (): void => {
+      console.warn('[AppCategoryService] batchClassify LLM 失败')
+      if (onComplete != null) onComplete(0)
+    })
+  } catch (e) {
+    console.warn('[AppCategoryService] batchClassifyTodayNewApps 异常: ' + JSON.stringify(e))
+    if (onComplete != null) onComplete(0)
+  }
+}
+
+type ClassifyItem = { pkg: string; category: AppCategory }
+
+function parseClassifyResponse(raw: string, pending: AppTag[]): ClassifyItem[] {
+  const result: ClassifyItem[] = []
+  let text = raw.trim()
+  const startIdx = text.indexOf('[')
+  const endIdx = text.lastIndexOf(']')
+  if (startIdx < 0 || endIdx < 0 || endIdx < startIdx) return result
+  text = text.substring(startIdx, endIdx + 1)
+  let arr: Array<UTSJSONObject> = []
+  try {
+    const parsed = JSON.parse(text) as Array<any>
+    if (parsed != null) {
+      for (let i = 0; i < parsed.length; i++) {
+        const v = parsed[i]
+        if (v != null && typeof v === 'object') {
+          arr.push(v as UTSJSONObject)
+        }
+      }
+    }
+  } catch (_) {
+    return result
+  }
+  for (let i = 0; i < arr.length; i++) {
+    const obj = arr[i]
+    const pkg = obj['packageName'] as string
+    const cat = obj['category'] as string
+    if (pkg == null || cat == null) continue
+    if (!isValidCategory(cat)) continue
+    const item: ClassifyItem = { pkg: pkg, category: cat as AppCategory }
+    result.push(item)
+  }
+  return result
+}
+
+export function manualSetCategory(pkg: string, category: AppCategory): void {
+  AppTagsDao.setUserLocked(pkg, true)
+  AppTagsDao.updateCategory(pkg, category, 'user')
+}

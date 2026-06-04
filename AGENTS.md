@@ -2620,83 +2620,6 @@ Get-ChildItem -Recurse -Include "*.uts" |
 
 ---
 
-### 52. MiniMax 推理模型：使用 `reasoning_effort: "low"` 参数控制推理深度
-
-**【最高优先级】** MiniMax-M2.7 是推理模型（类似 OpenAI o1），默认情况下：
-```json
-{
-  "choices": [{
-    "message": {
-      "content": "",
-      "reasoning_content": "实际思考过程...",
-      "reasoning_details": [...]
-    },
-    "finish_reason": "length"
-  }],
-  "usage": {
-    "completion_tokens": 400,
-    "completion_tokens_details": { "reasoning_tokens": 400 }
-  }
-}
-```
-- `content` 为空，所有 token 被 reasoning 消耗
-- `finish_reason: "length"` 表示 token 用完
-
-**实测解决方案**：在请求体中加 `"reasoning_effort": "low"` 参数，让模型减少推理：
-
-```ts
-const reqBody = {
-  model: 'MiniMax-M2.7',
-  messages: [...],
-  temperature: 0.7,
-  max_completion_tokens: 500,
-  reasoning_effort: 'low'  // ← 关键参数
-}
-```
-
-**效果对比**（同一 prompt "User did 3 micro-actions, eye score 80"）：
-
-| 配置 | content | finish_reason | reasoning_tokens | total_tokens |
-|------|---------|---------------|-----------------|--------------|
-| 默认（无参数）| 空字符串 | `length` | 400 | 400（全推理）|
-| `reasoning_effort: "low"` | `{"one_liner":"...","summary":"...","tomorrow_goal":"...","encourage":"..."}` | `stop` | 51 | 213 |
-
-**为什么不直接换非推理模型**：实测 `abab6.5s-chat` / `abab7-chat-preview` / `MiniMax-Text-01` 等非推理模型：
-- 输出冗余（不严格遵循 "JSON only" 指令，常带解释文字）
-- 需要更强 prompt 工程约束
-- 输出质量（中文表达/JSON 严格度）不如 M2.7 + `reasoning_effort: "low"`
-
-**经验**：M2.7 + `reasoning_effort: "low"` 是**最佳平衡点**（模型质量 + 输出可控性 + token 效率）。
-
-**预防措施**：
-- `max_completion_tokens` 设 400-600（实测够用）
-- 监听 `finish_reason`，若为 `length` 说明 token 不够，记录 warn
-- 保留 `reasoning_content` fallback（防御性，万一 `content` 仍为空）
-
-**uni.request 发送 HTTP POST 的机制**：
-```ts
-uni.request({
-  url: 'https://api.minimax.chat/v1/text/chatcompletion_v2',
-  method: 'POST',
-  header: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + API_KEY
-  },
-  data: JSON.stringify(reqBody),  // 字符串化后的 JSON body
-  timeout: 8000,
-  success(res) { /* res.data = 响应体 */ },
-  fail(err) { /* 网络错误 */ }
-})
-```
-- `data: JSON.stringify(reqBody)` — UTS 中必须手动序列化，`uni.request` 不会自动 stringify
-- `success(res)` 回调中 `res.data` 是自动解析的响应体（JSON → 对象）
-- UTS 中 success/fail 回调参数不要手动标注类型（让编译器推断）
-
-**关联规则**：
-- §2 uniCloud.callFunction → uni.request HTTP 直连 — `uni.request` 是唯一可行的远程调用方式
-- §39 异步回调必须 try-catch — success 回调内必须有 try-catch
-
----
 
 ### 53. LLM 调用统一架构：`callMinimaxChat` 公共函数 + 避免循环依赖
 
@@ -2820,128 +2743,166 @@ Get-ChildItem "pages" -Recurse -Filter "*.uvue" |
 
 ---
 
-### 55. 实战结论：LLM 推理模型 (M2.7) 即使 `reasoning_effort: "low"` 仍倾向把 JSON 当字符串输出 → **改用纯文本方案更稳**
+### 54. 模块级函数访问类 `private` 字段 → 编译失败（"it is private in"）
 
-**【最高优先级】** 实战中反复确认：
+**【最高优先级】** UTS 类的访问修饰符（`public` / `private`）与 Kotlin 语义一致 —— `private` 字段**只能在类内部访问**，**不能在模块级函数 / 其他类 / 其他 .uts 文件中访问**。即使字段在同一个 .uts 文件中定义，**模块级函数仍然属于"外部"**。
 
-| 配置 | LLM 实际 `content` 输出 | 结果 |
-|------|------------------------|------|
-| prompt 要求"裸 JSON 对象" | `"content":"{\"title\":\"...\"}"`（**字符串内嵌 JSON**）| `JSON.parse` 第一次拿到 `string`，第二次才能拿到 object |
-| prompt 要求"纯文本/Markdown" | 直接是自然语言文本 | 简单 `replace` 一下 `\n` 即可使用 |
-| `temperature: 0.0` | 仍可能字符串内嵌 | 无效 |
-| `reasoning_effort: "low"` | 仍可能字符串内嵌 | 无效 |
-
-**实测现象**（来自项目日志）：
-```json
-{
-  "finish_reason": "stop",
-  "content": "{\"title\":\"本周守护报告\",\"highlight\":\"...\"}"
-}
+**错误**：
 ```
-LLM 即使被 prompt 明确告知"不要把 JSON 包在字符串里"，仍然倾向于把 JSON 文本转义为字符串输出。这是 M2.7 推理模型的固有行为。
+error: Cannot access 'var currentPkg: String': it is private in 'uni/xxx/UsageStatsForegroundService'.
+at UsageStatsForegroundService.uts:452:10
+  if (svc.currentPkg.length < 1) return null
+              ^
+```
 
-**修复方案（已采用）**：
-
-1. **长文本（周报）改用纯文本/Markdown**：
-   - prompt 改为"回复必须是纯中文文本（不要 JSON、不要 Markdown 标题/列表）"
-   - `WeeklyReport` 类型简化为 `{ bodyMarkdown: string, stats: WeeklyReportStats }`
-   - `callWeekly` 直接返回 raw 字符串，调用方 `cleanMarkdown` 简单处理（去 ```/##/****等标记，规范化换行）
-   - 模板用 `<text class="report-body">{{ wkBody }}</text>` + `white-space: pre-wrap` 直接显示
-   - 优点：彻底解决解析难题，LLM 100% 稳定输出，调用方代码极简
-
-2. **短文本（每日小结/pre/post 评估）仍用 JSON**：
-   - 因为 LLM 在短 prompt 下 JSON 行为更稳定
-   - 用 §54 增强的 `parseJsonThreeLevels`（含二次 parse）兜底
-
-**`cleanMarkdown` 标准实现**：
+**案例**（本项目 Day 5 实战）：
 ```ts
-function cleanMarkdown(raw: string): string {
-  if (raw == null) return ''
-  let text = raw
-  text = text.replace(/^```[\s\S]*?\n/, '')     // 去掉开头代码块标记
-  text = text.replace(/```$/, '')                // 去掉结尾代码块标记
-  text = text.replace(/^#+\s*/gm, '')            // 去掉标题 # 
-  text = text.replace(/\*\*([^*]+)\*\*/g, '$1')   // 去掉加粗 **
-  text = text.replace(/\*([^*]+)\*/g, '$1')       // 去掉斜体 *
-  text = text.replace(/`([^`]+)`/g, '$1')         // 去掉行内代码 `
-  text = text.replace(/[ \t]+\n/g, '\n')          // 去掉行尾空白
-  text = text.replace(/\n{3,}/g, '\n\n')          // 合并多余空行
-  return text.trim()
+class UsageStatsForegroundService {
+  private currentPkg: string = ''        // ❌ private
+  private currentStartTime: Long = 0     // ❌ private
+}
+
+let serviceInstance: UsageStatsForegroundService | null = null
+
+export function getCurrentForeground(): AppForegroundInfo | null {
+  const svc = serviceInstance
+  if (svc == null) return null
+  if (svc.currentPkg.length < 1) return null        // ❌ 编译失败
+  const info: AppForegroundInfo = {
+    packageName: svc.currentPkg,                      // ❌ 编译失败
+    startTime: svc.currentStartTime as number,       // ❌ 编译失败
+    continuousMs: now - svc.currentStartTime         // ❌ 编译失败
+  }
+  return info
 }
 ```
 
-**决策矩阵**（什么场景用什么格式）：
-| 输出长度 | 推荐格式 | 理由 |
-|---------|---------|------|
-| 1-3 句话（如 adhocText） | 单字段 JSON | 简单，LLM 100% 稳定 |
-| 1-2 段（如 summary） | JSON or 纯文本 | 都行，按团队习惯 |
-| 3+ 段（如周报） | **纯文本** | LLM 长 prompt 容易内嵌字符串 |
-| 包含结构化建议（如 suggestions 列表） | JSON | 列表用 JSON 解析比 split 简单 |
+**根因**：
+- UTS 的 `private` 是**类作用域**的，与 TypeScript 的"模块作用域 private"完全不同
+- 模块级函数（如 `getCurrentForeground`）虽然定义在同一个 .uts 文件中，但**不属于类** → 访问类 private 字段被拒绝
+- 即使 Java/Kotlin 中 `internal` 关键字能放宽到 module 作用域，UTS 也不暴露这个机制
+
+**修复方案 A（推荐）：字段标 `public`**
+
+如果字段**确实需要被外部读取**（如服务实例的状态字段），直接标 `public`：
+
+```ts
+export class UsageStatsForegroundService {
+  public currentPkg: string = ''           // ✅
+  public currentStartTime: Long = 0        // ✅
+  // 内部状态仍可标 private
+  private handler: Handler | null = null
+  private wakeLock: PowerManager.WakeLock | null = null
+  private lastTickTime: Long = 0
+  // ...
+}
+```
+
+**修复方案 B：加 public getter 方法**
+
+如果想隐藏字段直接暴露，加 getter：
+
+```ts
+export class UsageStatsForegroundService {
+  private currentPkg: string = ''
+
+  public getCurrentPkg(): string { return this.currentPkg }
+  public getCurrentStartTime(): Long { return this.currentStartTime }
+}
+
+export function getCurrentForeground(): AppForegroundInfo | null {
+  const svc = serviceInstance
+  if (svc == null) return null
+  if (svc.getCurrentPkg().length < 1) return null
+  // ...
+}
+```
+
+**修复方案 C：把读取逻辑移到类内**
+
+让类自己提供 `public` 方法封装读取：
+
+```ts
+export class UsageStatsForegroundService {
+  private currentPkg: string = ''
+
+  public getForegroundInfo(): AppForegroundInfo | null {
+    if (this.currentPkg.length < 1) return null
+    const now: Long = System.currentTimeMillis()
+    const info: AppForegroundInfo = {
+      packageName: this.currentPkg,
+      startTime: this.currentStartTime as number,
+      continuousMs: now - this.currentStartTime
+    }
+    return info
+  }
+}
+
+export function getCurrentForeground(): AppForegroundInfo | null {
+  const svc = serviceInstance
+  return svc != null ? svc.getForegroundInfo() : null
+}
+```
+
+**方案选择决策**：
+- **简单状态字段**（如 `currentPkg`、`currentStartTime`）→ 方案 A（`public`）
+- **需要复杂计算 / 校验的字段**（如带缓存的、可能为 null 的）→ 方案 B（getter）
+- **业务逻辑复杂的查询**（如"当前是否有前台 App"）→ 方案 C（类内方法）
+
+**反模式**（不要用）：
+
+| 反模式 | 问题 |
+|--------|------|
+| `private` 字段 + 模块级函数 `svc.field` 直接访问 | 编译失败 |
+| `private` 字段 + `svc.field!!`（以为加 !! 就能访问） | 编译失败（`!!` 只解 null，不改可见性）|
+| `private` 字段 + `as any` 强转 | 编译失败（类型断言不改可见性）|
+| 把 `private` 字段放到 `getInfo()` 函数内 return | 复杂、容易漏掉 null 守卫 |
+| 用 `// @ts-ignore` 忽略错误 | UTS 没有这个指令，编译一定失败 |
+
+**自查命令**（找出项目中所有"模块级函数访问类 private 字段"反模式）：
+
+```powershell
+# 1. 找出所有 private 字段声明
+Get-ChildItem "uni_modules" -Recurse -Filter "*.uts" |
+  Select-String -Pattern "private\s+(\w+)\s*:" |
+  ForEach-Object { "{0}|{1}" -f $_.Path, $_.Matches[0].Groups[1].Value }
+
+# 2. 找出模块级函数中通过实例访问字段的位置
+# 模式：serviceInstance/svc/svc!!.<field> 但不接 ()
+Get-ChildItem "uni_modules" -Recurse -Filter "*.uts" |
+  Select-String -Pattern "(serviceInstance|svc)!!?\.\w+(?!\()" |
+  Where-Object { $_.Line -notmatch "//" }  # 排除注释
+```
+
+**对比 TypeScript 行为**：
+- TypeScript：`private` 是"软约束"，运行时仍可访问（仅编译警告）
+- UTS：`private` 是"硬约束"，编译时直接拒绝访问
+- **从 TS 转 UTS 时容易踩坑**（依赖 TS 经验的开发者）
+
+**类内访问 OK**（编译器不报错）：
+```ts
+class Foo {
+  private field: string = ''
+  private method(): void {
+    this.field = 'x'      // ✅ 类内访问自己的 private 字段
+    this.otherPrivateMethod()  // ✅ 类内调用自己的 private 方法
+  }
+}
+```
+
+**类内调用类 public 方法**（编译器不报错）：
+```ts
+export function externalApi(): void {
+  const svc = serviceInstance
+  if (svc != null) {
+    svc.publicMethod()      // ✅ 访问 public 方法
+  }
+}
+```
 
 **关联规则**：
-- §52 MiniMax M2.7 reasoning_effort — 同模型的另一类问题（token 消耗）
-- §43 LLM JSON 三级容错解析 — 短文本场景保留
-- §54 DAO mapRow 容错 — 解析失败的下游容错
+- §23 模块级 let smart cast 失效 — 都是"模块级代码访问实例属性"边界问题
+- §50 函数参数 any 访问字段 — 同一类"类型可见性"边界问题
 
 ---
-
-### 56. 实测确认：M2.7 + `reasoning_effort: "low"` + `max_completion_tokens: 1500` 是日/周报稳定配置
-
-**【最高优先级】** 3 次实测后的稳态配置：
-
-| Run | finish | completion | reasoning | contentLen | reasoning 占比 |
-|-----|--------|------------|-----------|-----------|--------------|
-| 1 | stop | 276 | 73 | 412 字符 | **26%** |
-| 2 | stop | 246 | 91 | 314 字符 | **37%** |
-| 3 | stop | 281 | 110 | 350 字符 | **39%** |
-
-**关键发现**：
-- `reasoning_effort: "low"` 实际把 reasoning 占比从 77% 降到 26-39%
-- `max_completion_tokens: 1500`（周报 2000）足够容纳 reasoning + content
-- `finish_reason: stop`（非 `length`）稳定
-- **不需要**换非推理模型（M2.7 + low 推理的输出质量仍优于 abab6.5s）
-
-**之前项目的失败案例**（max_completion_tokens=500-600，prompt 上下文长）：
-- 实际 reasoning 仍占 358/466 = 77%
-- `finish_reason: "length"` 频繁
-- `content` 为空或被截断
-
-**教训**：
-- **`max_completion_tokens` 至少 1500**（周报 2000），给 reasoning 留 buffer
-- **`reasoning_effort: "low"` 必须保留**（不加时 reasoning 接近 100%）
-- **实测数据比理论配置更可靠**——M2.7 推理深度与 prompt 长度相关
-- **`uni.request` timeout 至少 30000ms**（之前 15000ms 频繁超时）
-  - M2.7 推理 + 输出 1500 token 实际网络耗时 8-15s
-  - 实测日志：多次 `SocketTimeoutException: Read timed out` + `SocketException: Socket closed`
-  - 15s 太短，30s 是合理上限
-
-**最终配置**（已采用）：
-```ts
-const reqBody = {
-  model: 'MiniMax-M2.7',
-  messages: [...],
-  temperature: 0.7,
-  max_completion_tokens: 1500,   // daily / evaluate
-  // max_completion_tokens: 2000, // weekly
-  reasoning_effort: 'low'         // 关键
-}
-
-// uni.request
-uni.request({
-  url: ...,
-  timeout: 30000,                 // 30s
-  ...
-})
-```
-
-**为什么之前"调高 max_completion_tokens"没解决 parsing 问题**：
-- parsing 问题（"字符串内嵌 JSON"）是 **prompt 风格**问题，不是 token 数问题
-- M2.7 即使 token 充足也倾向把 JSON 当字符串输出
-- 解决 parsing 只能靠 **改 prompt 为纯文本**（§55）+ **简化类型**（`{ bodyText: string }`）
-- 高 token 只解决"content 被截断"问题
-
-**关联规则**：
-- §52 reasoning_effort: "low" — 同条规则的 token 优化版本
-- §55 改用纯文本方案 — 解决 parsing 问题
-- §39 异步回调必须 try-catch — uni.request fail 回调必须 try-catch
 

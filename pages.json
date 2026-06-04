@@ -38,6 +38,12 @@
       "style": {
         "navigationBarTitleText": "调试日志"
       }
+    },
+    {
+      "path": "pages/settings/app-categories/index",
+      "style": {
+        "navigationBarTitleText": "App 分类管理"
+      }
     }
   ],
   "tabBar": {

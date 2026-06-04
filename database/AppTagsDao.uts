@@ -1,0 +1,117 @@
+import { dbManager, type SqlRow } from './DatabaseManager'
+import { AppTag, AppCategory, TagSource } from '../models/AppTag'
+import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
+
+function mapRow(row: Map<string, any>): AppTag {
+  const total = getNum(row, 'total_uses')
+  return {
+    packageName: getStr(row, 'package_name'),
+    appLabel: getStr(row, 'app_label'),
+    category: getStr(row, 'category') as AppCategory,
+    tagSource: getStr(row, 'tag_source') as TagSource,
+    isUserLocked: getNum(row, 'is_user_locked') == 1,
+    isInRule: getNum(row, 'is_in_rule') == 1,
+    totalUses: total,
+    lastSeenAt: getNum(row, 'last_seen_at'),
+    createdAt: getNum(row, 'created_at'),
+    updatedAt: getNum(row, 'updated_at')
+  }
+}
+
+export function getByPackage(pkg: string): AppTag | null {
+  const row = dbManager.queryOne('SELECT * FROM app_tags WHERE package_name = ?', [pkg])
+  if (row == null) return null
+  return mapRow(row)
+}
+
+export function listByCategory(category: string): AppTag[] {
+  const rows = dbManager.query('SELECT * FROM app_tags WHERE category = ? ORDER BY total_uses DESC', [category])
+  const result: AppTag[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r == null) continue
+    result.push(mapRow(r))
+  }
+  return result
+}
+
+export function listAll(): AppTag[] {
+  const rows = dbManager.query('SELECT * FROM app_tags ORDER BY last_seen_at DESC')
+  const result: AppTag[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r == null) continue
+    result.push(mapRow(r))
+  }
+  return result
+}
+
+export function listPendingForLlm(): AppTag[] {
+  const rows = dbManager.query(
+    "SELECT * FROM app_tags WHERE tag_source = 'pending' AND is_user_locked = 0 ORDER BY last_seen_at DESC"
+  )
+  const result: AppTag[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r == null) continue
+    result.push(mapRow(r))
+  }
+  return result
+}
+
+export function upsert(tag: AppTag): void {
+  const existing = dbManager.queryOne('SELECT package_name FROM app_tags WHERE package_name = ?', [tag.packageName])
+  if (existing != null) {
+    const row: SqlRow = {
+      columns: ['app_label', 'last_seen_at', 'updated_at', 'total_uses'],
+      values: [tag.appLabel, tag.lastSeenAt, tag.updatedAt, tag.totalUses]
+    }
+    dbManager.update('app_tags', row, 'package_name = ?', [tag.packageName])
+  } else {
+    const row: SqlRow = {
+      columns: [
+        'package_name', 'app_label', 'category', 'tag_source',
+        'is_user_locked', 'is_in_rule', 'total_uses',
+        'last_seen_at', 'created_at', 'updated_at'
+      ],
+      values: [
+        tag.packageName, tag.appLabel, tag.category, tag.tagSource,
+        tag.isUserLocked ? 1 : 0, tag.isInRule ? 1 : 0, tag.totalUses,
+        tag.lastSeenAt, tag.createdAt, tag.updatedAt
+      ]
+    }
+    dbManager.insert('app_tags', row)
+  }
+}
+
+export function updateCategory(pkg: string, category: AppCategory, source: TagSource): void {
+  const now = Math.floor(Date.now() / 1000)
+  const row: SqlRow = {
+    columns: ['category', 'tag_source', 'updated_at'],
+    values: [category, source, now]
+  }
+  dbManager.update('app_tags', row, 'package_name = ?', [pkg])
+}
+
+export function setUserLocked(pkg: string, locked: boolean): void {
+  const now = Math.floor(Date.now() / 1000)
+  const row: SqlRow = {
+    columns: ['is_user_locked', 'updated_at'],
+    values: [locked ? 1 : 0, now]
+  }
+  dbManager.update('app_tags', row, 'package_name = ?', [pkg])
+}
+
+export function incrementUses(pkg: string): void {
+  try {
+    const existing = getByPackage(pkg)
+    if (existing == null) return
+    const newCount = existing.totalUses + 1
+    const now = Math.floor(Date.now() / 1000)
+    const row: SqlRow = {
+      columns: ['total_uses', 'last_seen_at', 'updated_at'],
+      values: [newCount, now, now]
+    }
+    dbManager.update('app_tags', row, 'package_name = ?', [pkg])
+  } catch (_) {}
+}

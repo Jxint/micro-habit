@@ -24,5 +24,6 @@ export const DEFAULT_SETTINGS: DefaultSetting[] = [
   { key: 'health_preference', value: 'balanced' },
   { key: 'body_limit', value: 'none' },
   { key: 'llm_trigger_enabled', value: '1' },
-  { key: 'llm_trigger_ask_each_time', value: '1' }
+  { key: 'llm_trigger_ask_each_time', value: '1' },
+  { key: 'trigger_enabled', value: '1' }
 ]

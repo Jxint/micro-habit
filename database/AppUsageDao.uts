@@ -47,6 +47,30 @@ export function insertOrUpdateSnapshot(packageName: string, appLabel: string, fo
   }
 }
 
+// 绝对值写入（覆盖已有 total_foreground_sec），用于 doPoll 把 queryUsageStats 聚合数据同步到表
+// 区别于 insertOrUpdateSnapshot 的累加语义
+export function setSnapshotTotal(packageName: string, appLabel: string, totalSec: number): void {
+  const date = today()
+  const existing = dbManager.queryOne(
+    'SELECT id FROM app_usage_snapshots WHERE date = ? AND package_name = ?',
+    [date, packageName]
+  )
+  if (existing != null) {
+    const id = getNum(existing, 'id')
+    const row: SqlRow = {
+      columns: ['total_foreground_sec', 'app_label'],
+      values: [totalSec, appLabel]
+    }
+    dbManager.update('app_usage_snapshots', row, 'id = ?', [id])
+  } else {
+    const row: SqlRow = {
+      columns: ['date', 'package_name', 'app_label', 'total_foreground_sec', 'created_at'],
+      values: [date, packageName, appLabel, totalSec, Math.floor(Date.now() / 1000)]
+    }
+    dbManager.insert('app_usage_snapshots', row)
+  }
+}
+
 export function getTodayTotalUsageMinutes(): number {
   const date = today()
   const row = dbManager.queryOne(

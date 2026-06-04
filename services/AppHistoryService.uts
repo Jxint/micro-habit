@@ -1,0 +1,124 @@
+import { dbManager } from '../database/DatabaseManager'
+import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
+import { daysAgo } from '../utils/TimeUtils'
+
+export type AppHistorySummary = {
+  packageName: string
+  appLabel: string
+  appCategory: string
+  totalTriggers: number
+  totalCompletes: number
+  totalSkips: number
+  acceptRate: number
+  typicalContinuousMin: number
+  avgTriggerHour: number
+  lastTriggerAt: number
+  lastWeekTrend: 'improving' | 'declining' | 'stable'
+}
+
+function startOfDay(date: string): number {
+  const parts = date.split('-')
+  if (parts.length < 3) return 0
+  return Math.floor(new Date(parseInt(parts[0] as string), parseInt(parts[1] as string) - 1, parseInt(parts[2] as string)).getTime() / 1000)
+}
+
+function rowToNum(row: Map<string, any> | null, col: string): number {
+  return getNum(row, col)
+}
+
+function rowToStr(row: Map<string, any> | null, col: string): string {
+  return getStr(row, col)
+}
+
+export function getAppHistory(pkg: string, days: number = 7): AppHistorySummary | null {
+  try {
+    const start = startOfDay(daysAgo(days - 1))
+    const prevStart = startOfDay(daysAgo(days * 2 - 1))
+    const triggerRows = dbManager.query(
+      "SELECT created_at, continuous_minutes FROM trigger_logs WHERE app_package = ? AND created_at >= ? ORDER BY created_at DESC",
+      [pkg, start]
+    )
+    if (triggerRows.length < 1) {
+      const labelRow = dbManager.queryOne('SELECT app_label FROM app_usage_snapshots WHERE package_name = ? LIMIT 1', [pkg])
+      const catRow = dbManager.queryOne('SELECT category FROM app_tags WHERE package_name = ?', [pkg])
+      return {
+        packageName: pkg,
+        appLabel: labelRow != null ? getStr(labelRow, 'app_label') : pkg,
+        appCategory: catRow != null ? getStr(catRow, 'category') : 'other',
+        totalTriggers: 0,
+        totalCompletes: 0,
+        totalSkips: 0,
+        acceptRate: 0,
+        typicalContinuousMin: 0,
+        avgTriggerHour: 0,
+        lastTriggerAt: 0,
+        lastWeekTrend: 'stable'
+      }
+    }
+    const totalTriggers = triggerRows.length
+    let totalContinMin = 0
+    let totalHours = 0
+    let lastTriggerAt = 0
+    for (let i = 0; i < triggerRows.length; i++) {
+      const r = triggerRows[i]
+      if (r == null) continue
+      totalContinMin += getNum(r, 'continuous_minutes')
+      const ts = getNum(r, 'created_at')
+      if (ts > lastTriggerAt) lastTriggerAt = ts
+      const d = new Date(ts * 1000)
+      totalHours += d.getHours()
+    }
+    let totalCompletes = 0
+    let totalSkips = 0
+    for (let i = 0; i < triggerRows.length; i++) {
+      const r = triggerRows[i]
+      if (r == null) continue
+      const ts = getNum(r, 'created_at')
+      const actionId = getStrOrNull(r, 'action_id')
+      if (actionId == null) continue
+      const actionRow = dbManager.queryOne(
+        "SELECT result FROM action_logs WHERE created_at >= ? AND created_at < ? AND action_id = ? LIMIT 1",
+        [ts - 60, ts + 60, actionId]
+      )
+      const result = rowToStr(actionRow, 'result')
+      if (result == 'completed' || result == 'self_reported') {
+        totalCompletes++
+      } else if (result == 'skipped') {
+        totalSkips++
+      }
+    }
+    const prevRows = dbManager.query(
+      "SELECT created_at FROM trigger_logs WHERE app_package = ? AND created_at >= ? AND created_at < ?",
+      [pkg, prevStart, start]
+    )
+    const prevTriggers = prevRows.length
+    const prevCompletes = 0
+    const prevAccept = prevTriggers > 0 ? prevCompletes / prevTriggers : 0
+    const currAccept = totalTriggers > 0 ? totalCompletes / totalTriggers : 0
+    let trend: 'improving' | 'declining' | 'stable' = 'stable'
+    if (prevTriggers >= 3) {
+      if (currAccept - prevAccept > 0.1) trend = 'improving'
+      else if (currAccept - prevAccept < -0.1) trend = 'declining'
+    }
+    const labelRow = dbManager.queryOne('SELECT app_label FROM app_usage_snapshots WHERE package_name = ? LIMIT 1', [pkg])
+    const catRow = dbManager.queryOne('SELECT category FROM app_tags WHERE package_name = ?', [pkg])
+    const total = totalCompletes + totalSkips
+    const acceptRate = total > 0 ? totalCompletes / total : 0
+    return {
+      packageName: pkg,
+      appLabel: labelRow != null ? getStr(labelRow, 'app_label') : pkg,
+      appCategory: catRow != null ? getStr(catRow, 'category') : 'other',
+      totalTriggers: totalTriggers,
+      totalCompletes: totalCompletes,
+      totalSkips: totalSkips,
+      acceptRate: acceptRate,
+      typicalContinuousMin: totalTriggers > 0 ? Math.round(totalContinMin / totalTriggers) : 0,
+      avgTriggerHour: totalTriggers > 0 ? Math.round(totalHours / totalTriggers) : 0,
+      lastTriggerAt: lastTriggerAt,
+      lastWeekTrend: trend
+    }
+  } catch (e) {
+    console.warn('[AppHistoryService] getAppHistory 异常: ' + JSON.stringify(e))
+    return null
+  }
+}

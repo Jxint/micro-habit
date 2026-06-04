@@ -3,14 +3,25 @@
     <scroll-view class="scroll-area" scroll-y="true">
       <view class="settings-section">
         <text class="section-title">触发设置</text>
-        <view class="setting-item" @tap="openThresholdPicker">
+        <view class="setting-item">
           <view class="setting-left">
-            <text class="setting-label">连续使用提醒阈值</text>
-            <text class="setting-hint">同一 App 连续使用多久后提醒</text>
+            <text class="setting-label">自动触发</text>
+            <text class="setting-hint">开启后才会根据应用使用时长自动弹出微动作提醒</text>
           </view>
-          <text class="setting-value">{{ durationThreshold }} 分钟 ›</text>
+          <switch :checked="triggerEnabled" @change="onTriggerEnabledChange" />
         </view>
-        <view class="setting-item" @tap="openDndPicker">
+        <view class="setting-item" @tap="onManualTrigger">
+          <view class="setting-left">
+            <text class="setting-label">立即检查一次</text>
+            <text class="setting-hint">主动查询当前 App 使用时长并判断是否触发微动作提醒</text>
+          </view>
+          <text class="setting-value">检查 ›</text>
+        </view>
+      </view>
+
+    <view class="settings-section">
+      <text class="section-title">通知设置</text>
+      <view class="setting-item" @tap="openDndPicker">
           <view class="setting-left">
             <text class="setting-label">免打扰时段</text>
             <text class="setting-hint">该时段不触发提醒</text>
@@ -55,21 +66,32 @@
         <text class="section-title">触发规则（{{ rules.length }} 条）</text>
         <view v-if="rules.length === 0" class="empty-rules">
           <text class="empty-text">暂无启用的触发规则</text>
+          <text class="empty-hint">完成微动作后 AI 会自动建议规则</text>
         </view>
-        <view v-for="(rule, idx) in rules" :key="rule.id" class="rule-card">
+        <view v-for="(rule, idx) in rules" :key="'r-' + idx" class="rule-card">
           <view class="rule-row1">
-            <text class="rule-type">{{ formatRuleType(rule.rule_type) }}</text>
-            <text class="rule-trigger">{{ formatTriggerLabel(rule.trigger_type) }}</text>
-            <text class="rule-priority">优先级 {{ rule.priority }}</text>
+            <text class="rule-type">{{ getActionDisplayName(rule.actionId) }}</text>
+            <text class="rule-trigger">≥ {{ rule.timeThresholdMinutes }} 分钟</text>
+            <text class="rule-priority">{{ rule.triggerLevel }}</text>
           </view>
           <view class="rule-row2">
             <text class="rule-source">{{ formatSource(rule.source) }}</text>
-            <text class="rule-cond">{{ formatCondition(rule.condition_json) }}</text>
+            <text class="rule-cond">{{ formatAppPackages(rule.appPackages) }}{{ rule.timeWindow != null ? ' · ' + rule.timeWindow.start + '-' + rule.timeWindow.end : '' }}</text>
           </view>
           <view class="rule-row3">
-            <text class="rule-time">创建 {{ formatTime(rule.created_at) }}</text>
-            <text class="rule-time">更新 {{ formatTime(rule.updated_at) }}</text>
+            <text class="rule-time">创建 {{ formatTime(rule.createdAt) }}</text>
           </view>
+        </view>
+      </view>
+
+      <view class="settings-section">
+        <text class="section-title">App 分类</text>
+        <view class="setting-item" @tap="goAppCategories">
+          <view class="setting-left">
+            <text class="setting-label">App 分类管理</text>
+            <text class="setting-hint">手动调整每个 App 的分类，锁定后 LLM 不会覆盖</text>
+          </view>
+          <text class="setting-value">›</text>
         </view>
       </view>
 
@@ -84,6 +106,13 @@
         <view class="setting-item" @tap="goDebugDB">
           <view class="setting-left">
             <text class="setting-label">数据库巡检 & 配置</text>
+          </view>
+          <text class="setting-value">›</text>
+        </view>
+        <view class="setting-item" @tap="resetAchievements">
+          <view class="setting-left">
+            <text class="setting-label">重置成就进度</text>
+            <text class="setting-hint">清空所有已解锁成就，可重新触发</text>
           </view>
           <text class="setting-value">›</text>
         </view>
@@ -159,8 +188,12 @@
 import NumberPickerDialog from '../../components/NumberPickerDialog.uvue'
 import TimeRangePickerDialog from '../../components/TimeRangePickerDialog.uvue'
 import { getInt, putInt, getBool, putBool, getSetting, putSetting } from '../../database/SettingsDao'
-import { getAllEnabledRules } from '../../database/RuleDao'
-import { TriggerRule } from '../../models/TriggerRule'
+import { clearAchievements } from '../../database/DatabaseHelper'
+import { useAppStore } from '../../stores/appStore'
+import { getActiveRules } from '../../database/EffectiveRuleDao'
+import { PersistedEffectiveRule } from '../../models/PersistedEffectiveRule'
+import { getActionById } from '../../constants/Actions'
+import { setTriggerEnabled } from '../../uni_modules/uts-usage-stats/utssdk/app-android/index'
 
 function pad2(n: number): string {
   if (n < 10) return '0' + n
@@ -180,7 +213,8 @@ const dndStartHour = ref<number>(parseHourFromSetting(getSetting('dnd_start', '2
 const dndEndHour = ref<number>(parseHourFromSetting(getSetting('dnd_end', '07:00'), 7))
 const durationPref = ref<number>(getInt('action_duration_pref', 15))
 const targetCount = ref<number>(getInt('category_target_count', 3))
-const rules = ref<TriggerRule[]>([])
+const rules = ref<PersistedEffectiveRule[]>([])
+const triggerEnabled = ref<boolean>(getBool('trigger_enabled', true))
 const llmEnabled = ref<boolean>(getBool('llm_trigger_enabled', true))
 const askEachTime = ref<boolean>(getBool('llm_trigger_ask_each_time', true))
 
@@ -193,10 +227,19 @@ function formatTime(t: number): string {
   return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes())
 }
 
+function getActionDisplayName(actionId: string): string {
+  const a = getActionById(actionId)
+  return a != null ? a.name : actionId
+}
+
+function formatAppPackages(pkgs: string[]): string {
+  if (pkgs.length < 1) return '任意 App'
+  if (pkgs.length === 1) return pkgs[0] as string
+  return pkgs.length + ' 个应用'
+}
+
 function formatRuleType(t: string): string {
-  if (t === 'frequency') return '频率控制'
-  if (t === 'duration') return '时长控制'
-  if (t === 'time_window') return '时间窗口'
+  if (t.length < 1) return '时长控制'
   return t
 }
 
@@ -208,23 +251,36 @@ function formatTriggerLabel(t: string): string {
 }
 
 function formatSource(s: string): string {
-  if (s === 'ai_suggest') return '🤖 AI建议'
-  if (s === 'default') return '📦 默认'
-  if (s === 'manual') return '👤 手动'
+  if (s === 'llm') return '🤖 LLM建议'
+  if (s === 'user') return '👤 用户'
+  if (s === 'system') return '📦 系统'
   return s
 }
 
 function formatCondition(json: string): string {
-  if (json === '{}' || json.length === 0) return '无条件'
+  if (json.length === 0) return '无条件'
   try {
     const obj = JSON.parse(json) as UTSJSONObject
     if (obj == null) return json.substring(0, 20)
-    const hourMin = obj.get('hour_min')
-    const hourMax = obj.get('hour_max')
-    if (hourMin != null && hourMax != null) {
-      return '时段 ' + hourMin + ':00-' + hourMax + ':00'
+    const apps = obj.get('appPackages')
+    const tw = obj.get('timeWindow')
+    const parts: string[] = []
+    if (apps != null) {
+      const arr = apps as Array<any>
+      if (arr.length > 0) {
+        parts.push('包名 ' + (arr.length === 1 ? (arr[0] as string) : (arr.length + ' 个')))
+      }
     }
-    return json.substring(0, 20)
+    if (tw != null) {
+      const twObj = tw as UTSJSONObject
+      const s = twObj.get('start') as string
+      const e = twObj.get('end') as string
+      if (s != null && e != null) {
+        parts.push('时段 ' + s + '-' + e)
+      }
+    }
+    if (parts.length === 0) return json.substring(0, 20)
+    return parts.join(' / ')
   } catch (_) {
     return json.substring(0, 20)
   }
@@ -278,6 +334,36 @@ function goDebugDB(): void {
   uni.navigateTo({ url: '/pages/debug/logs' })
 }
 
+function resetAchievements(): void {
+  try {
+    uni.showModal({
+      title: '确认重置',
+      content: '清空所有成就解锁记录，重新开始统计。',
+      success: (res) => {
+        try {
+          if (res == null) return
+          const obj = res as UTSJSONObject
+          if (obj == null) return
+          const confirm = obj['confirm']
+          if (confirm !== true) return
+          clearAchievements()
+          putSetting('seen_achievements', '[]')
+          try { useAppStore().refreshAchievements() } catch (_) {}
+          uni.showToast({ title: '已重置成就', icon: 'none' })
+        } catch (e) {
+          console.warn('[settings] resetAchievements 回调异常: ' + JSON.stringify(e))
+        }
+      }
+    })
+  } catch (e) {
+    console.warn('[settings] resetAchievements 异常: ' + JSON.stringify(e))
+  }
+}
+
+function goAppCategories(): void {
+  uni.navigateTo({ url: '/pages/settings/app-categories/index' })
+}
+
 let debugTapCount = 0
 let debugTapTimer: number | null = null
 
@@ -293,19 +379,51 @@ function handleDebugTap(): void {
   }
 }
 
-function onLlmEnabledChange(e: any): void {
+function onManualTrigger(): void {
+  try {
+    uni.$emit('manualTriggerCheck', {})
+    uni.showToast({ title: '正在检查...', icon: 'none', position: 'bottom' })
+  } catch (e) {
+    console.warn('[settings] manualTrigger 异常: ' + JSON.stringify(e))
+  }
+}
+
+function extractBoolFromSwitch(e: any): boolean | null {
   try {
     const obj = e as UTSJSONObject
-    if (obj == null) return
+    if (obj == null) return null
     const v = obj['detail']
-    if (v == null) return
+    if (v == null) return null
     const detail = v as UTSJSONObject
-    if (detail == null) return
+    if (detail == null) return null
     const valRaw = detail['value']
-    if (valRaw == null) return
-    const enabled = valRaw as boolean
-    llmEnabled.value = enabled === true
-    putBool('llm_trigger_enabled', enabled === true)
+    if (valRaw == null) return null
+    if (typeof valRaw === 'boolean') return valRaw as boolean
+    if (typeof valRaw === 'number') return (valRaw as number) != 0
+    return null
+  } catch (_) {
+    return null
+  }
+}
+
+function onTriggerEnabledChange(e: any): void {
+  try {
+    const enabled = extractBoolFromSwitch(e)
+    if (enabled == null) return
+    triggerEnabled.value = enabled
+    putBool('trigger_enabled', enabled)
+    setTriggerEnabled(enabled)
+  } catch (err) {
+    console.warn('[settings] onTriggerEnabledChange 异常: ' + JSON.stringify(err))
+  }
+}
+
+function onLlmEnabledChange(e: any): void {
+  try {
+    const enabled = extractBoolFromSwitch(e)
+    if (enabled == null) return
+    llmEnabled.value = enabled
+    putBool('llm_trigger_enabled', enabled)
   } catch (err) {
     console.warn('[settings] onLlmEnabledChange 异常: ' + JSON.stringify(err))
   }
@@ -313,24 +431,17 @@ function onLlmEnabledChange(e: any): void {
 
 function onAskEachTimeChange(e: any): void {
   try {
-    const obj = e as UTSJSONObject
-    if (obj == null) return
-    const v = obj['detail']
-    if (v == null) return
-    const detail = v as UTSJSONObject
-    if (detail == null) return
-    const valRaw = detail['value']
-    if (valRaw == null) return
-    const v2 = valRaw as boolean
-    askEachTime.value = v2 === true
-    putBool('llm_trigger_ask_each_time', v2 === true)
+    const enabled = extractBoolFromSwitch(e)
+    if (enabled == null) return
+    askEachTime.value = enabled
+    putBool('llm_trigger_ask_each_time', enabled)
   } catch (err) {
     console.warn('[settings] onAskEachTimeChange 异常: ' + JSON.stringify(err))
   }
 }
 
 onPageShow(() => {
-  try { rules.value = getAllEnabledRules() } catch (_) { rules.value = [] }
+  try { rules.value = getActiveRules() } catch (_) { rules.value = [] }
   durationThreshold.value = getInt('app_duration_threshold', 60)
   durationPref.value = getInt('action_duration_pref', 15)
   targetCount.value = getInt('category_target_count', 3)
@@ -338,6 +449,7 @@ onPageShow(() => {
   dndEndHour.value = parseHourFromSetting(getSetting('dnd_end', '07:00'), 7)
   llmEnabled.value = getBool('llm_trigger_enabled', true)
   askEachTime.value = getBool('llm_trigger_ask_each_time', true)
+  triggerEnabled.value = getBool('trigger_enabled', true)
 })
 </script>
 

@@ -1,0 +1,45 @@
+// 成就系统数据模型
+
+export type AchievementCategory = '累计' | '坚持' | '评分' | '动作' | '时段' | '单日'
+
+export type AchievementConditionType =
+  | 'total_count'        // 累计完成次数
+  | 'streak_days'        // 连续天数
+  | 'eye_score'          // 护眼评分（单日）
+  | 'category_count'     // 某一动作分类累计完成次数
+  | 'hour_range_count'   // 某时段累计完成次数
+  | 'daily_count'        // 单日完成次数
+
+// 成就预设定义（前端常量表中）
+export type AchievementDef = {
+  id: string
+  name: string
+  icon: string           // emoji
+  description: string    // 解锁条件描述
+  category: AchievementCategory
+  conditionType: AchievementConditionType
+  threshold: number
+  rewardText: string     // 解锁后显示的奖励
+  historyText: string    // 历程/进度文字
+  // 条件参数（如 category_count 需要指定 action_type，hour_range_count 需要指定 startHour/endHour）
+  actionType: string
+  startHour: number
+  endHour: number
+}
+
+// 用户当前成就项（带解锁状态 + 进度）
+export type AchievementItem = {
+  def: AchievementDef
+  isUnlocked: boolean
+  currentProgress: number
+  unlockedAt: number     // 0 表示未解锁
+  isNew: boolean         // 已解锁但用户未在主页查看过
+}
+
+// 进度显示文本（"3/10" / "✓"）
+export type AchievementProgress = {
+  current: number
+  target: number
+  text: string
+  percent: number        // 0~1
+}

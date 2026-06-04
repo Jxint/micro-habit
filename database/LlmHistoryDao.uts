@@ -3,69 +3,15 @@ import { LlmHistoryEntry, LlmHistoryStage, ParsedLlmResult } from '../models/Llm
 import { EffectiveTriggerRule } from '../models/EffectiveTriggerRule'
 import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
 
-export function insertHistory(
-  stage: LlmHistoryStage,
-  contextJson: string,
-  aiRawResponse: string,
-  parsedResult: ParsedLlmResult,
-  adhocText: string | null,
-  suggestedRule: EffectiveTriggerRule | null,
-  reasoning: string | null
-): number {
-  const createdAt = Math.floor(Date.now() / 1000)
-  const parsedJson = JSON.stringify(parsedResult)
-  const ruleJson = suggestedRule == null ? null : JSON.stringify(suggestedRule)
-  const row: SqlRow = {
-    columns: [
-      'stage', 'context_json', 'ai_raw_response', 'parsed_result_json',
-      'adhoc_text', 'suggested_rule_json', 'reasoning', 'created_at'
-    ],
-    values: [
-      stage, contextJson, aiRawResponse, parsedJson,
-      adhocText, ruleJson, reasoning, createdAt
-    ]
-  }
-  return dbManager.insert('llm_history', row)
-}
-
-export function getAllHistory(limit: number): LlmHistoryEntry[] {
-  const rows = dbManager.query(
-    'SELECT * FROM llm_history ORDER BY created_at DESC LIMIT ?',
-    [limit]
-  )
-  return mapRows(rows)
-}
-
-export function getHistoryByStage(stage: LlmHistoryStage, limit: number): LlmHistoryEntry[] {
-  const rows = dbManager.query(
-    'SELECT * FROM llm_history WHERE stage = ? ORDER BY created_at DESC LIMIT ?',
-    [stage, limit]
-  )
-  return mapRows(rows)
-}
-
-export function cleanOldHistory(daysKeep: number): void {
-  const cutoff = Math.floor(Date.now() / 1000) - daysKeep * 86400
-  dbManager.delete('llm_history', 'created_at < ?', [cutoff])
-}
-
-function mapRows(rows: Map<string, any>[]): LlmHistoryEntry[] {
-  const result: LlmHistoryEntry[] = []
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i]
-    if (r == null) continue
-    try {
-      result.push(mapRow(r))
-    } catch (e) {
-      console.warn('[LlmHistoryDao] mapRow skip dirty row, err: ' + JSON.stringify(e))
-    }
-  }
-  return result
+export type LlmAcceptanceRate = {
+  total: number
+  accepted: number
+  rejected: number
+  pending: number
 }
 
 function mapRow(row: Map<string, any>): LlmHistoryEntry {
   const parsedJson = getStr(row, 'parsed_result_json')
-  const ruleJson = getStrOrNull(row, 'suggested_rule_json')
   let parsed: ParsedLlmResult = {}
   if (parsedJson != null && parsedJson.length > 0) {
     try {
@@ -75,6 +21,7 @@ function mapRow(row: Map<string, any>): LlmHistoryEntry {
       parsed = {}
     }
   }
+  const ruleJson = getStrOrNull(row, 'suggested_rule_json')
   let rule: EffectiveTriggerRule | null = null
   if (ruleJson != null && ruleJson.length > 0) {
     try {
@@ -95,4 +42,123 @@ function mapRow(row: Map<string, any>): LlmHistoryEntry {
     reasoning: getStrOrNull(row, 'reasoning'),
     createdAt: getNum(row, 'created_at')
   }
+}
+
+function mapRows(rows: Map<string, any>[]): LlmHistoryEntry[] {
+  const result: LlmHistoryEntry[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r == null) continue
+    try {
+      result.push(mapRow(r))
+    } catch (e) {
+      console.warn('[LlmHistoryDao] mapRow skip dirty row, err: ' + JSON.stringify(e))
+    }
+  }
+  return result
+}
+
+export function insertHistory(
+  stage: LlmHistoryStage,
+  contextJson: string,
+  aiRawResponse: string,
+  parsedResult: ParsedLlmResult,
+  adhocText: string | null,
+  suggestedRule: EffectiveTriggerRule | null,
+  reasoning: string | null,
+  confidence: number = 0,
+  decision: string | null = null,
+  targetRuleId: number | null = null,
+  userAccepted: number | null = null,
+  alternativesJson: string | null = null
+): number {
+  const createdAt = Math.floor(Date.now() / 1000)
+  const parsedJson = JSON.stringify(parsedResult)
+  const ruleJson = suggestedRule == null ? null : JSON.stringify(suggestedRule)
+  const row: SqlRow = {
+    columns: [
+      'stage', 'context_json', 'ai_raw_response', 'parsed_result_json',
+      'adhoc_text', 'suggested_rule_json', 'reasoning',
+      'confidence', 'decision', 'target_rule_id', 'user_accepted', 'alternatives_json',
+      'created_at'
+    ],
+    values: [
+      stage, contextJson, aiRawResponse, parsedJson,
+      adhocText, ruleJson, reasoning,
+      confidence, decision, targetRuleId, userAccepted, alternativesJson,
+      createdAt
+    ]
+  }
+  return dbManager.insert('llm_history', row)
+}
+
+export function updateUserAccepted(historyId: number, accepted: number): void {
+  const row: SqlRow = {
+    columns: ['user_accepted'],
+    values: [accepted]
+  }
+  dbManager.update('llm_history', row, 'id = ?', [historyId])
+}
+
+export function getAllHistory(limit: number): LlmHistoryEntry[] {
+  const rows = dbManager.query(
+    'SELECT * FROM llm_history ORDER BY created_at DESC LIMIT ?',
+    [limit]
+  )
+  return mapRows(rows)
+}
+
+export function getHistoryByStage(stage: LlmHistoryStage, limit: number): LlmHistoryEntry[] {
+  const rows = dbManager.query(
+    'SELECT * FROM llm_history WHERE stage = ? ORDER BY created_at DESC LIMIT ?',
+    [stage, limit]
+  )
+  return mapRows(rows)
+}
+
+export function getRecentDecisions(limit: number): LlmHistoryEntry[] {
+  const rows = dbManager.query(
+    "SELECT * FROM llm_history WHERE stage = 'post' AND decision IS NOT NULL ORDER BY created_at DESC LIMIT ?",
+    [limit]
+  )
+  return mapRows(rows)
+}
+
+export function existsRejectedByRule(targetRuleId: number, decision: string): boolean {
+  const row = dbManager.queryOne(
+    "SELECT id FROM llm_history WHERE target_rule_id = ? AND decision = ? AND user_accepted = 0 LIMIT 1",
+    [targetRuleId, decision]
+  )
+  return row != null
+}
+
+export function getAcceptanceRate(days: number): LlmAcceptanceRate {
+  const cutoff = Math.floor(Date.now() / 1000) - days * 86400
+  const totalRow = dbManager.queryOne(
+    "SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND decision IS NOT NULL AND decision != 'no_change'",
+    [cutoff]
+  )
+  const acceptedRow = dbManager.queryOne(
+    "SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND user_accepted = 1",
+    [cutoff]
+  )
+  const rejectedRow = dbManager.queryOne(
+    "SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND user_accepted = 0",
+    [cutoff]
+  )
+  const pendingRow = dbManager.queryOne(
+    "SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND user_accepted IS NULL AND decision IS NOT NULL AND decision != 'no_change'",
+    [cutoff]
+  )
+  return {
+    total: getNum(totalRow, 'cnt'),
+    accepted: getNum(acceptedRow, 'cnt'),
+    rejected: getNum(rejectedRow, 'cnt'),
+    pending: getNum(pendingRow, 'cnt')
+  }
+}
+
+export function cleanOldHistory(daysKeep: number): void {
+  const cutoff = Math.floor(Date.now() / 1000) - daysKeep * 86400
+  dbManager.delete('llm_history', 'created_at < ?', [cutoff])
 }

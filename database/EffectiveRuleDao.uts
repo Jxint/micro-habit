@@ -1,0 +1,151 @@
+import { dbManager, type SqlRow } from './DatabaseManager'
+import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
+import { TimeWindow, TriggerLevel } from '../models/EffectiveTriggerRule'
+import { getNum, getStr, getStrOrNull } from '../utils/DbRowUtils'
+
+function mapRow(row: Map<string, any>): PersistedEffectiveRule {
+  const pkgJson = getStr(row, 'app_packages_json')
+  let appPackages: string[] = []
+  if (pkgJson.length > 0) {
+    try {
+      const parsed = JSON.parse(pkgJson) as Array<any>
+      if (parsed != null) {
+        const tmp: string[] = []
+        for (let i = 0; i < parsed.length; i++) {
+          const v = parsed[i]
+          if (typeof v === 'string' && (v as string).length > 0) {
+            tmp.push(v as string)
+          }
+        }
+        appPackages = tmp
+      }
+    } catch (_) {
+      appPackages = []
+    }
+  }
+  const twJson = getStrOrNull(row, 'time_window_json')
+  let timeWindow: TimeWindow | null = null
+  if (twJson != null && twJson.length > 0) {
+    try {
+      const obj = JSON.parse(twJson) as UTSJSONObject
+      if (obj != null) {
+        const start = obj['start'] as string
+        const end = obj['end'] as string
+        if (start != null && end != null && start.length > 0 && end.length > 0) {
+          timeWindow = { start: start, end: end }
+        }
+      }
+    } catch (_) {
+      timeWindow = null
+    }
+  }
+  const srcStr = getStr(row, 'source')
+  const source: 'user' | 'llm' | 'system' = srcStr == 'llm' ? 'llm' : (srcStr == 'system' ? 'system' : 'user')
+  return {
+    id: getNum(row, 'id'),
+    actionId: getStr(row, 'action_id'),
+    appPackages: appPackages,
+    timeWindow: timeWindow,
+    timeThresholdMinutes: getNum(row, 'time_threshold_minutes'),
+    triggerLevel: getStr(row, 'trigger_level') as TriggerLevel,
+    categoryFilter: getStrOrNull(row, 'category_filter'),
+    source: source,
+    sourceHistoryId: getStrOrNull(row, 'source_history_id') == null || getStr(row, 'source_history_id').length < 1 ? null : getNum(row, 'source_history_id'),
+    expiresAt: getStrOrNull(row, 'expires_at') == null || getStr(row, 'expires_at').length < 1 ? null : getNum(row, 'expires_at'),
+    enabled: getNum(row, 'enabled') == 1,
+    priority: getNum(row, 'priority'),
+    createdAt: getNum(row, 'created_at'),
+    updatedAt: getNum(row, 'updated_at')
+  }
+}
+
+export function insertRule(rule: PersistedEffectiveRule): number {
+  const pkgJson = JSON.stringify(rule.appPackages)
+  const twJson = rule.timeWindow == null ? null : JSON.stringify(rule.timeWindow)
+  const row: SqlRow = {
+    columns: [
+      'action_id', 'app_packages_json', 'time_window_json',
+      'time_threshold_minutes', 'trigger_level', 'category_filter',
+      'source', 'source_history_id', 'expires_at',
+      'enabled', 'priority', 'created_at', 'updated_at'
+    ],
+    values: [
+      rule.actionId, pkgJson, twJson,
+      rule.timeThresholdMinutes, rule.triggerLevel, rule.categoryFilter,
+      rule.source, rule.sourceHistoryId, rule.expiresAt,
+      rule.enabled ? 1 : 0, rule.priority, rule.createdAt, rule.updatedAt
+    ]
+  }
+  return dbManager.insert('effective_rules', row)
+}
+
+export function updateRule(rule: PersistedEffectiveRule): void {
+  const pkgJson = JSON.stringify(rule.appPackages)
+  const twJson = rule.timeWindow == null ? null : JSON.stringify(rule.timeWindow)
+  const row: SqlRow = {
+    columns: [
+      'action_id', 'app_packages_json', 'time_window_json',
+      'time_threshold_minutes', 'trigger_level', 'category_filter',
+      'source', 'source_history_id', 'expires_at',
+      'enabled', 'priority', 'updated_at'
+    ],
+    values: [
+      rule.actionId, pkgJson, twJson,
+      rule.timeThresholdMinutes, rule.triggerLevel, rule.categoryFilter,
+      rule.source, rule.sourceHistoryId, rule.expiresAt,
+      rule.enabled ? 1 : 0, rule.priority, rule.updatedAt
+    ]
+  }
+  dbManager.update('effective_rules', row, 'id = ?', [rule.id])
+}
+
+export function deleteRule(id: number): void {
+  dbManager.delete('effective_rules', 'id = ?', [id])
+}
+
+export function setEnabled(id: number, enabled: boolean): void {
+  const now = Math.floor(Date.now() / 1000)
+  const row: SqlRow = {
+    columns: ['enabled', 'updated_at'],
+    values: [enabled ? 1 : 0, now]
+  }
+  dbManager.update('effective_rules', row, 'id = ?', [id])
+}
+
+export function getActiveRules(): PersistedEffectiveRule[] {
+  const rows = dbManager.query('SELECT * FROM effective_rules WHERE enabled = 1 ORDER BY priority DESC, time_threshold_minutes ASC')
+  const result: PersistedEffectiveRule[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r == null) continue
+    result.push(mapRow(r))
+  }
+  return result
+}
+
+export function getById(id: number): PersistedEffectiveRule | null {
+  const row = dbManager.queryOne('SELECT * FROM effective_rules WHERE id = ?', [id])
+  if (row == null) return null
+  return mapRow(row)
+}
+
+export function getRulesByApp(pkg: string): PersistedEffectiveRule[] {
+  const all = getActiveRules()
+  const result: PersistedEffectiveRule[] = []
+  for (let i = 0; i < all.length; i++) {
+    const r = all[i]
+    if (r.appPackages.indexOf(pkg) >= 0) {
+      result.push(r)
+    }
+  }
+  return result
+}
+
+export function disableAll(): void {
+  const now = Math.floor(Date.now() / 1000)
+  const row: SqlRow = {
+    columns: ['enabled', 'updated_at'],
+    values: [0, now]
+  }
+  dbManager.update('effective_rules', row, 'enabled = 1', [])
+}

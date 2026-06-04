@@ -1,0 +1,72 @@
+import { getActiveRules } from '../database/EffectiveRuleDao'
+import { getActionById } from '../constants/Actions'
+import { TriggerContext } from './TriggerEngine'
+import { isInTimeRange } from '../utils/TimeUtils'
+import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
+import { MicroAction } from '../models/MicroAction'
+
+export type EffectiveRuleMatch = {
+  rule: PersistedEffectiveRule
+  action: MicroAction | null
+  level: 'gentle' | 'strong' | 'forced'
+}
+
+export function evaluate(ctx: TriggerContext): EffectiveRuleMatch | null {
+  let candidates: PersistedEffectiveRule[] = []
+  const all = getActiveRules()
+  const nowSec = Math.floor(Date.now() / 1000)
+  for (let i = 0; i < all.length; i++) {
+    const r = all[i]
+    if (!r.enabled) continue
+    if (r.expiresAt != null && r.expiresAt > 0 && nowSec > r.expiresAt) continue
+    if (r.appPackages.length > 0 && r.appPackages.indexOf(ctx.appPackage) < 0) continue
+    if (r.timeWindow != null && !isInTimeRange(r.timeWindow.start, r.timeWindow.end)) continue
+    if (r.timeThresholdMinutes > 0 && ctx.continuousMinutes < r.timeThresholdMinutes) continue
+    candidates.push(r)
+  }
+  if (candidates.length < 1) return null
+  // 优先级排序：LLM > system/user；同 source 时更短时间段优先；同时间段时更多 app 指定优先
+  let best = candidates[0]
+  for (let i = 1; i < candidates.length; i++) {
+    const c = candidates[i]
+    const bIsLlm = best.source == 'llm'
+    const cIsLlm = c.source == 'llm'
+    if (cIsLlm && !bIsLlm) {
+      best = c
+      continue
+    }
+    if (!cIsLlm && bIsLlm) {
+      continue
+    }
+    // 同 source：时间段更短（更具体）优先
+    const bHasTw = best.timeWindow != null
+    const cHasTw = c.timeWindow != null
+    if (cHasTw && !bHasTw) {
+      best = c
+      continue
+    }
+    if (!cHasTw && bHasTw) {
+      continue
+    }
+    // 同时间段：指定了 app（更具体）优先
+    const bHasApp = best.appPackages.length > 0
+    const cHasApp = c.appPackages.length > 0
+    if (cHasApp && !bHasApp) {
+      best = c
+      continue
+    }
+    if (!cHasApp && bHasApp) {
+      continue
+    }
+    // 同等具体度：更短阈值优先
+    if (c.timeThresholdMinutes < best.timeThresholdMinutes) {
+      best = c
+    }
+  }
+  const action = getActionById(best.actionId)
+  return {
+    rule: best,
+    action: action,
+    level: best.triggerLevel
+  }
+}

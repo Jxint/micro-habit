@@ -8,13 +8,15 @@ export type ScreenConditions = {
   includeHome: boolean
 }
 
+export type TriggerLevel = 'gentle' | 'strong' | 'forced'
+
 export type EffectiveTriggerRule = {
   id: number
   actionId: string
   timeWindow: TimeWindow | null
   screenConditions: ScreenConditions | null
   timeThresholdMinutes: number
-  source: 'local' | 'llm' | 'user'
+  source: 'local' | 'llm' | 'user' | 'system'
   enabled: boolean
   createdAt: number
 }

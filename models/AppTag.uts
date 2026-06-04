@@ -1,0 +1,16 @@
+export type AppCategory = 'social' | 'video' | 'game' | 'work' | 'study' | 'reading' | 'other'
+
+export type TagSource = 'pending' | 'llm' | 'user'
+
+export type AppTag = {
+  packageName: string
+  appLabel: string
+  category: AppCategory
+  tagSource: TagSource
+  isUserLocked: boolean
+  isInRule: boolean
+  totalUses: number
+  lastSeenAt: number
+  createdAt: number
+  updatedAt: number
+}

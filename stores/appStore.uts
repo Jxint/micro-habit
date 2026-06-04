@@ -13,6 +13,8 @@ import { generateWeeklyReport } from '../services/WeeklyReportService'
 import { getTodayTotalUsageMinutes } from '../database/AppUsageDao'
 import * as LlmHistoryDao from '../database/LlmHistoryDao'
 import { LlmHistoryEntry } from '../models/LlmHistoryEntry'
+import { AchievementItem } from '../models/Achievement'
+import * as AchievementService from '../services/AchievementService'
 
 export type DailyOutput = {
   bodyText: string
@@ -37,9 +39,14 @@ export type AppStore = {
   weeklyReport: Ref<WeeklyReport | null>
   weeklyReportLoading: Ref<boolean>
   llmHistory: Ref<LlmHistoryEntry[]>
+  achievements: Ref<AchievementItem[]>
+  pendingUnlockIds: Ref<string[]>
   refreshHomeData(): void
   refreshWeeklyReport(): void
   refreshLlmHistory(): void
+  refreshAchievements(): void
+  setPendingUnlocks(ids: string[]): void
+  shiftPendingUnlock(): void
 }
 
 const eyeScore = ref<number>(0)
@@ -60,6 +67,34 @@ const homeDataLoaded = ref<boolean>(false)
 const weeklyReport = ref<WeeklyReport | null>(null)
 const weeklyReportLoading = ref<boolean>(false)
 const llmHistory = ref<LlmHistoryEntry[]>([])
+const achievements = ref<AchievementItem[]>([])
+const pendingUnlockIds = ref<string[]>([])
+
+function emptySeenSet(): Set<string> {
+  return new Set<string>()
+}
+
+function refreshAchievementsFn(): void {
+  try {
+    achievements.value = AchievementService.getAchievementItems(emptySeenSet())
+  } catch (e) {
+    console.warn('[appStore] refreshAchievements 失败 type=' + (typeof e) + ' msg=' + (e != null ? ('' + e) : 'null'))
+    achievements.value = []
+  }
+}
+
+function setPendingUnlocksFn(ids: string[]): void {
+  pendingUnlockIds.value = ids
+}
+
+function shiftPendingUnlockFn(): void {
+  if (pendingUnlockIds.value.length < 1) return
+  const newArr: string[] = []
+  for (let i = 1; i < pendingUnlockIds.value.length; i++) {
+    newArr.push(pendingUnlockIds.value[i])
+  }
+  pendingUnlockIds.value = newArr
+}
 
 function refreshLlmHistory(): void {
   try {
@@ -90,9 +125,23 @@ export function useAppStore(): AppStore {
     weeklyReport,
     weeklyReportLoading,
     llmHistory,
+    achievements,
+    pendingUnlockIds,
 
     refreshLlmHistory(): void {
       refreshLlmHistory()
+    },
+
+    refreshAchievements(): void {
+      refreshAchievementsFn()
+    },
+
+    setPendingUnlocks(ids: string[]): void {
+      setPendingUnlocksFn(ids)
+    },
+
+    shiftPendingUnlock(): void {
+      shiftPendingUnlockFn()
     },
 
     refreshHomeData(): void {
@@ -160,6 +209,10 @@ export function useAppStore(): AppStore {
   return store
 }
 
+// 每日小结 LLM 调用冷却：1h 内不重复调
+let lastDailySummaryAt: number = 0
+const DAILY_SUMMARY_COOLDOWN_MS: number = 60 * 60 * 1000
+
 function buildLocalSummary(completedCount: number, count: number): DailyOutput {
   if (completedCount > 0) {
     return {
@@ -172,6 +225,14 @@ function buildLocalSummary(completedCount: number, count: number): DailyOutput {
 }
 
 function generateDailySummary(date: string, onComplete: (summary: DailyOutput) => void): void {
+  // 1h 冷却：上次调用后 1h 内不再调 LLM，直接返回本地降级
+  const nowMs = Date.now()
+  if (lastDailySummaryAt > 0 && nowMs - lastDailySummaryAt < DAILY_SUMMARY_COOLDOWN_MS) {
+    const data = getHomepageData(date)
+    onComplete(buildLocalSummary(data.todayCompletedCount, data.guardCount))
+    return
+  }
+
   const data = getHomepageData(date)
 
   if (!isNetworkAvailable()) {
@@ -194,6 +255,7 @@ function generateDailySummary(date: string, onComplete: (summary: DailyOutput) =
 
   callDaily(date, dto, (raw: string): void => {
     if (raw.length > 10) {
+      lastDailySummaryAt = Date.now()  // 记录成功调用时刻
       onComplete({ bodyText: raw })
       return
     }
