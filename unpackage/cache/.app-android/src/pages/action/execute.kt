@@ -32,8 +32,6 @@ open class GenPagesActionExecute : BasePage {
             val encourageText = ref<String>("")
             val showFeedback = ref<Boolean>(false)
             val remainingMs = ref<Number>(0)
-            val showRuleSuggest = ref<Boolean>(false)
-            val pendingRule = ref<TriggerRule?>(null)
             var countdownTimerId: Number? = null
             val showButtons = computed<Boolean>(fun(): Boolean {
                 val a = action.value
@@ -149,15 +147,15 @@ open class GenPagesActionExecute : BasePage {
                     uni__emit("llmActionCompleted", _uO("actionId" to a.id, "actionName" to a.name, "actionCategory" to a.category, "durationMs" to durationMs, "result" to result))
                 }
                  catch (e: Throwable) {
-                    console.warn("[execute] emitLlmActionCompleted 失败: " + JSON.stringify(e), " at pages/action/execute.uvue:157")
+                    console.warn("[execute] emitLlmActionCompleted 失败: " + JSON.stringify(e), " at pages/action/execute.uvue:141")
                 }
             }
             val emitLlmActionCompleted = ::gen_emitLlmActionCompleted_fn
             fun recordAction(result: String, skipReason: String = ""): Unit {
-                console.log("[execute] recordAction enter, result=" + result, " at pages/action/execute.uvue:162")
+                console.log("[execute] recordAction enter, result=" + result, " at pages/action/execute.uvue:146")
                 val a = action.value
                 if (a == null) {
-                    console.log("[execute] recordAction SKIP: action.value is null", " at pages/action/execute.uvue:165")
+                    console.log("[execute] recordAction SKIP: action.value is null", " at pages/action/execute.uvue:149")
                     return
                 }
                 val nowMs = Date.now()
@@ -173,83 +171,9 @@ open class GenPagesActionExecute : BasePage {
                 }
                 , trigger_type = "manual", trigger_level = "gentle", duration_ms = dur, target_ms = a.defaultDurationMs, triggered_at = nowMs - 30000, completed_at = nowMs, created_at = Math.floor(nowMs / 1000))
                 val insertId = insertActionLog(log)
-                console.log("[execute] insertActionLog 返回 id=" + insertId, " at pages/action/execute.uvue:185")
+                console.log("[execute] insertActionLog 返回 id=" + insertId, " at pages/action/execute.uvue:169")
                 emitLlmActionCompleted(a, dur, result)
             }
-            fun gen_onRejectRule_fn(): Unit {
-                showRuleSuggest.value = false
-                pendingRule.value = null
-            }
-            val onRejectRule = ::gen_onRejectRule_fn
-            fun gen_onAcceptRule_fn(): Unit {
-                val r = pendingRule.value
-                if (r != null) {
-                    val now = Math.floor(Date.now() / 1000)
-                    val rule = TriggerRule(id = 0, rule_type = if (r.rule_type.length > 0) {
-                        r.rule_type
-                    } else {
-                        "frequency"
-                    }
-                    , trigger_type = if (r.trigger_type.length > 0) {
-                        r.trigger_type
-                    } else {
-                        "app_duration"
-                    }
-                    , condition_json = if (r.condition_json.length > 0) {
-                        r.condition_json
-                    } else {
-                        "{}"
-                    }
-                    , action_weights_json = if (r.action_weights_json.length > 0) {
-                        r.action_weights_json
-                    } else {
-                        "{}"
-                    }
-                    , enabled = 1, priority = if (r.priority > 0) {
-                        r.priority
-                    } else {
-                        1
-                    }
-                    , source = "ai_suggest", expires_at = r.expires_at, created_at = now, updated_at = now)
-                    insertRule(rule)
-                    uni_showToast(ShowToastOptions(title = "规则已添加", icon = "none"))
-                }
-                showRuleSuggest.value = false
-                pendingRule.value = null
-            }
-            val onAcceptRule = ::gen_onAcceptRule_fn
-            fun gen_maybeSuggestRule_fn(): Unit {
-                val a = action.value
-                if (a == null) {
-                    return
-                }
-                val emptyArr: UTSArray<Any> = _uA()
-                callRuleSuggest(_uO("completionRateByCategory" to _uO(), "completionRateByHour" to _uO(), "avgContinuousMinutesByCategory" to _uO(), "recentTriggers" to emptyArr), fun(result: Any){
-                    try {
-                        val s = JSON.stringify(result)
-                        val obj = UTSAndroid.consoleDebugError(JSON.parse(s), " at pages/action/execute.uvue:230") as UTSJSONObject
-                        if (obj == null) {
-                            return
-                        }
-                        val should = obj.get("shouldSuggest")
-                        if (should == null) {
-                            return
-                        }
-                        if ((should as Boolean) !== true) {
-                            return
-                        }
-                        val ruleRaw = obj.get("rule")
-                        if (ruleRaw == null) {
-                            return
-                        }
-                        pendingRule.value = ruleRaw as TriggerRule
-                        showRuleSuggest.value = true
-                    }
-                     catch (_: Throwable) {}
-                }
-                )
-            }
-            val maybeSuggestRule = ::gen_maybeSuggestRule_fn
             fun gen_showEncourageNow_fn(): Unit {
                 val a = action.value
                 val cat = if (a != null) {
@@ -260,7 +184,6 @@ open class GenPagesActionExecute : BasePage {
                 encourageText.value = getRandomEncourage(cat)
                 showEncourage.value = true
                 isCompleted.value = true
-                maybeSuggestRule()
                 setTimeout(fun(): Unit {
                     showEncourage.value = false
                     uni_navigateBack(NavigateBackOptions())
@@ -270,7 +193,7 @@ open class GenPagesActionExecute : BasePage {
             val showEncourageNow = ::gen_showEncourageNow_fn
             fun gen_startCountdown_fn(): Unit {
                 val interval: Number = 100
-                console.log("[execute] startCountdown total=" + remainingMs.value + "ms", " at pages/action/execute.uvue:260")
+                console.log("[execute] startCountdown total=" + remainingMs.value + "ms", " at pages/action/execute.uvue:187")
                 countdownTimerId = setInterval(fun(): Unit {
                     remainingMs.value -= interval
                     if (remainingMs.value <= 0) {
@@ -291,7 +214,7 @@ open class GenPagesActionExecute : BasePage {
             }
             val startCountdown = ::gen_startCountdown_fn
             fun gen_handleAgree_fn(): Unit {
-                console.log("[execute] handleAgree", " at pages/action/execute.uvue:275")
+                console.log("[execute] handleAgree", " at pages/action/execute.uvue:202")
                 val a = action.value
                 if (a == null) {
                     uni_showToast(ShowToastOptions(title = "未找到动作", icon = "none"))
@@ -299,7 +222,7 @@ open class GenPagesActionExecute : BasePage {
                 }
                 isExecuting.value = true
                 remainingMs.value = a.defaultDurationMs
-                console.log("[execute] countdown start, ms=" + a.defaultDurationMs, " at pages/action/execute.uvue:283")
+                console.log("[execute] countdown start, ms=" + a.defaultDurationMs, " at pages/action/execute.uvue:210")
                 startCountdown()
                 try {
                     uni_vibrateShort(VibrateShortOptions(type = "light"))
@@ -345,12 +268,12 @@ open class GenPagesActionExecute : BasePage {
             }
             val onFeedbackCancel = ::gen_onFeedbackCancel_fn
             onLoad(fun(option){
-                console.log("[execute] onLoad begin", " at pages/action/execute.uvue:320")
+                console.log("[execute] onLoad begin", " at pages/action/execute.uvue:247")
                 var aid = takeActionId()
-                console.log("[execute] from helper aid=" + aid, " at pages/action/execute.uvue:322")
+                console.log("[execute] from helper aid=" + aid, " at pages/action/execute.uvue:249")
                 if (aid.length === 0) {
                     aid = getActionIdFromOption(option)
-                    console.log("[execute] from option aid=" + aid, " at pages/action/execute.uvue:325")
+                    console.log("[execute] from option aid=" + aid, " at pages/action/execute.uvue:252")
                 }
                 actionId.value = aid
                 if (aid.length > 0) {
@@ -360,9 +283,9 @@ open class GenPagesActionExecute : BasePage {
                         found.name
                     } else {
                         "null"
-                    }), " at pages/action/execute.uvue:331")
+                    }), " at pages/action/execute.uvue:258")
                 } else {
-                    console.log("[execute] no actionId", " at pages/action/execute.uvue:333")
+                    console.log("[execute] no actionId", " at pages/action/execute.uvue:260")
                 }
             }
             )
@@ -416,21 +339,7 @@ open class GenPagesActionExecute : BasePage {
                     )),
                     _cV(unref(GenComponentsFeedbackDialogClass), _uM("visible" to unref(showFeedback), "onConfirm" to onFeedbackConfirm, "onCancel" to onFeedbackCancel), null, 8, _uA(
                         "visible"
-                    )),
-                    if (isTrue(unref(showRuleSuggest))) {
-                        _cE("view", _uM("key" to 0, "class" to "dialog-overlay"), _uA(
-                            _cE("view", _uM("class" to "dialog-content"), _uA(
-                                _cE("text", _uM("class" to "dialog-title"), "发现新的触发模式"),
-                                _cE("text", _uM("class" to "dialog-body-text"), "根据你的完成习惯，建议添加一条自动提醒规则"),
-                                _cE("view", _uM("class" to "dialog-actions"), _uA(
-                                    _cE("button", _uM("class" to "cancel-btn", "onClick" to onRejectRule), "暂不使用"),
-                                    _cE("button", _uM("class" to "confirm-btn", "onClick" to onAcceptRule), "添加规则")
-                                ))
-                            ))
-                        ))
-                    } else {
-                        _cC("v-if", true)
-                    }
+                    ))
                 ))
             }
         }

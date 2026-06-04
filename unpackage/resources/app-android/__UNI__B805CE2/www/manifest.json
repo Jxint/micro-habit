@@ -1,0 +1,49 @@
+{
+  "id": "__UNI__B805CE2",
+  "name": "微习惯健康伴侣",
+  "description": "一个在你不经意间，悄悄改善健康的 AI 微习惯伙伴",
+  "version": {
+    "name": "1.0.2",
+    "code": "102"
+  },
+  "uni-app-x": {
+    "styleIsolationVersion": "2",
+    "compilerVersion": "5.11"
+  },
+  "app-android": {
+    "distribute": {
+      "minSdkVersion": 24,
+      "targetSdkVersion": 34,
+      "abiFilters": [
+        "armeabi-v7a",
+        "arm64-v8a"
+      ],
+      "permissions": [
+        "<uses-permission android:name=\"android.permission.BIND_ACCESSIBILITY_SERVICE\"/>",
+        "<uses-permission android:name=\"android.permission.SYSTEM_ALERT_WINDOW\"/>",
+        "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\"/>",
+        "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>",
+        "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+        "<uses-permission android:name=\"android.permission.RECEIVE_BOOT_COMPLETED\"/>",
+        "<uses-permission android:name=\"android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS\"/>"
+      ],
+      "modules": {
+        "uni-event": {},
+        "uni-exit": {},
+        "uni-vibrate": {},
+        "uni-network": {},
+        "uni-prompt": {},
+        "uni-cloud-client": {}
+      },
+      "icons": {
+        "hdpi": "",
+        "xhdpi": "",
+        "xxhdpi": "",
+        "xxxhdpi": ""
+      },
+      "splashScreens": {
+        "default": {}
+      }
+    }
+  }
+}

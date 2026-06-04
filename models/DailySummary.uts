@@ -13,3 +13,16 @@ export type DailySummary = {
   guard_count: number
   created_at: number
 }
+
+export type DailyData = {
+  totalCompleted: number
+  totalSkipped: number
+  totalDurationSec: number
+  guardMinutes: number
+  guardCount: number
+  penetration: number
+  eyeScore: number
+  postureScore: number
+  vitalityScore: number
+  todayCompletedCount: number
+}

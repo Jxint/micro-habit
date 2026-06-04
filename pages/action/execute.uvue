@@ -31,17 +31,6 @@
     <EncourageToast :visible="showEncourage" :text="encourageText" />
 
     <FeedbackDialog :visible="showFeedback" @confirm="onFeedbackConfirm" @cancel="onFeedbackCancel" />
-
-    <view class="dialog-overlay" v-if="showRuleSuggest">
-      <view class="dialog-content">
-        <text class="dialog-title">发现新的触发模式</text>
-        <text class="dialog-body-text">根据你的完成习惯，建议添加一条自动提醒规则</text>
-        <view class="dialog-actions">
-          <button class="cancel-btn" @tap="onRejectRule">暂不使用</button>
-          <button class="confirm-btn" @tap="onAcceptRule">添加规则</button>
-        </view>
-      </view>
-    </view>
   </view>
 </template>
 
@@ -51,13 +40,10 @@ import EncourageToast from '../../components/EncourageToast.uvue'
 import FeedbackDialog from '../../components/FeedbackDialog.uvue'
 import { ActionLog } from '../../models/ActionLog'
 import { MicroAction } from '../../models/MicroAction'
-import { TriggerRule } from '../../models/TriggerRule'
 import { getActionById } from '../../constants/Actions'
 import { getRandomEncourage } from '../../constants/EncourageTexts'
 import { insertActionLog } from '../../database/ActionLogDao'
-import { insertRule } from '../../database/RuleDao'
 import { onCompleted, onConsecutiveSkip } from '../../services/RuleEngine'
-import { callRuleSuggest } from '../../services/CloudService'
 import { takeActionId } from '../../utils/NavigationHelper'
 
 const actionId = ref<string>('')
@@ -68,8 +54,6 @@ const showEncourage = ref<boolean>(false)
 const encourageText = ref<string>('')
 const showFeedback = ref<boolean>(false)
 const remainingMs = ref<number>(0)
-const showRuleSuggest = ref<boolean>(false)
-const pendingRule = ref<TriggerRule | null>(null)
 let countdownTimerId: number | null = null
 
 const showButtons = computed<boolean>((): boolean => {
@@ -186,69 +170,12 @@ function recordAction(result: string, skipReason: string = ''): void {
   emitLlmActionCompleted(a, dur, result)
 }
 
-function onRejectRule(): void {
-  showRuleSuggest.value = false
-  pendingRule.value = null
-}
-
-function onAcceptRule(): void {
-  const r = pendingRule.value
-  if (r != null) {
-    const now = Math.floor(Date.now() / 1000)
-    const rule: TriggerRule = {
-      id: 0,
-      rule_type: r.rule_type.length > 0 ? r.rule_type : 'frequency',
-      trigger_type: r.trigger_type.length > 0 ? r.trigger_type : 'app_duration',
-      condition_json: r.condition_json.length > 0 ? r.condition_json : '{}',
-      action_weights_json: r.action_weights_json.length > 0 ? r.action_weights_json : '{}',
-      enabled: 1,
-      priority: r.priority > 0 ? r.priority : 1,
-      source: 'ai_suggest',
-      expires_at: r.expires_at,
-      created_at: now,
-      updated_at: now
-    }
-    insertRule(rule)
-    uni.showToast({ title: '规则已添加', icon: 'none' })
-  }
-  showRuleSuggest.value = false
-  pendingRule.value = null
-}
-
-function maybeSuggestRule(): void {
-  const a = action.value
-  if (a == null) return
-  const emptyArr: any[] = []
-  callRuleSuggest({
-    completionRateByCategory: {},
-    completionRateByHour: {},
-    avgContinuousMinutesByCategory: {},
-    recentTriggers: emptyArr
-  }, (result: any) => {
-    try {
-      const s = JSON.stringify(result)
-      const obj = JSON.parse(s) as UTSJSONObject
-      if (obj == null) return
-      const should = obj.get('shouldSuggest')
-      if (should == null) return
-      if ((should as boolean) !== true) return
-      const ruleRaw = obj.get('rule')
-      if (ruleRaw == null) return
-      pendingRule.value = ruleRaw as TriggerRule
-      showRuleSuggest.value = true
-    } catch (_) {}
-  })
-}
-
-/* ---------- mid-layer functions ---------- */
-
 function showEncourageNow(): void {
   const a = action.value
   const cat = a != null ? a.category : ''
   encourageText.value = getRandomEncourage(cat)
   showEncourage.value = true
   isCompleted.value = true
-  maybeSuggestRule()
   setTimeout((): void => {
     showEncourage.value = false
     uni.navigateBack({})

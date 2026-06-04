@@ -91,8 +91,6 @@
             <text class="loading-text">生成中...</text>
           </view>
           <view class="report-box" v-if="weeklyLoaded && !weeklyReportLoading">
-            <text class="report-title">{{ wkTitle }}</text>
-            <text class="report-highlight">{{ wkHighlight }}</text>
             <view class="report-stats">
               <view class="stat-item">
                 <text class="stat-val">{{ wkTotalCompleted }}</text>
@@ -107,14 +105,7 @@
                 <text class="stat-label">最佳日次</text>
               </view>
             </view>
-            <text class="report-improve" v-if="wkImprovement !== ''">{{ wkImprovement }}</text>
-            <view class="suggestions" v-if="wkSuggestCount > 0">
-              <text class="sug-label">AI 建议</text>
-              <view v-for="(s, sIdx) in wkSuggestions" :key="sIdx">
-                <text class="sug-text">· {{ s }}</text>
-              </view>
-            </view>
-            <text class="report-goal" v-if="wkGoal !== ''">{{ wkGoal }}</text>
+            <text class="report-body">{{ wkBody }}</text>
           </view>
           <view class="empty-hint" v-if="!weeklyLoaded && !weeklyReportLoading">
             <text class="empty-text">点击下方按钮生成周报</text>
@@ -174,13 +165,9 @@ const weeklyToggleText = computed<string>(() : string => weeklyShow.value ? '▼
 const weeklyLoaded = computed<boolean>(() : boolean => store.weeklyReport.value != null)
 const weeklyReportLoading = computed<boolean>(() : boolean => store.weeklyReportLoading.value)
 
-function getWkTitle(): string {
+function getWkBody(): string {
   const r = store.weeklyReport.value
-  return r != null ? r.title : ''
-}
-function getWkHighlight(): string {
-  const r = store.weeklyReport.value
-  return r != null ? r.highlight : ''
+  return r != null ? r.bodyMarkdown : ''
 }
 function getWkTotalCompleted(): number {
   const r = store.weeklyReport.value
@@ -194,27 +181,10 @@ function getWkBestDay(): number {
   const r = store.weeklyReport.value
   return r != null ? r.stats.bestDayCount : 0
 }
-function getWkImprovement(): string {
-  const r = store.weeklyReport.value
-  return r != null ? r.improvement : ''
-}
-function getWkSuggestions(): string[] {
-  const r = store.weeklyReport.value
-  return r != null ? r.suggestions : []
-}
-const wkTitle = computed<string>(getWkTitle)
-const wkHighlight = computed<string>(getWkHighlight)
+const wkBody = computed<string>(getWkBody)
 const wkTotalCompleted = computed<number>(getWkTotalCompleted)
 const wkAvgGuard = computed<number>(getWkAvgGuard)
 const wkBestDay = computed<number>(getWkBestDay)
-const wkImprovement = computed<string>(getWkImprovement)
-const wkSuggestions = computed<string[]>(getWkSuggestions)
-const wkSuggestCount = computed<number>(() => wkSuggestions.value.length)
-function getWkGoal(): string {
-  const r = store.weeklyReport.value
-  return r != null ? r.nextWeekGoal : ''
-}
-const wkGoal = computed<string>(getWkGoal)
 
 const todayDetails = ref<ActionDetail[]>([])
 const detailCount = computed<number>(() : number => todayDetails.value.length)
@@ -425,6 +395,13 @@ onPageShow(() => {
   color: #34495E;
   line-height: 1.5;
 }
+.report-body {
+  font-size: 14px;
+  color: #2C3E50;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin-top: 8px;
+}
 .report-stats {
   flex-direction: row;
   justify-content: space-around;
@@ -451,29 +428,6 @@ onPageShow(() => {
   color: #7F8C8D;
   line-height: 1.5;
   margin-top: 8px;
-}
-.suggestions {
-  margin-top: 12px;
-}
-.sug-label {
-  font-size: 13px;
-  font-weight: bold;
-  color: #2C3E50;
-  margin-bottom: 6px;
-}
-.sug-text {
-  font-size: 13px;
-  color: #34495E;
-  line-height: 1.5;
-}
-.report-goal {
-  font-size: 14px;
-  font-weight: bold;
-  color: #27AE60;
-  margin-top: 12px;
-  padding: 8px 12px;
-  background-color: #EAFAF1;
-  border-radius: 8px;
 }
 .refresh-btn {
   margin-top: 12px;

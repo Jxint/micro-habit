@@ -1,4 +1,6 @@
 import { EffectiveTriggerRule, TimeWindow, ScreenConditions } from '../models/EffectiveTriggerRule'
+import { DailyData } from '../models/DailySummary'
+import { WeeklyReportStats } from '../models/WeeklyReport'
 
 export type PreTriggerContext = {
   appLabel: string
@@ -22,7 +24,7 @@ export type PostActionContext = {
   currentRules: string
 }
 
-export const SYSTEM_PROMPT_EVALUATE = '你是一个微习惯健康助手，正在帮用户做碎片化健康动作。\n你的回答必须严格按 JSON 格式输出，不要有额外文字（包括 ```json``` 标记）。\n基调用温柔+轻度幽默+不油腻的中文风格。避免医学恐吓和引发焦虑的表述。\n绝对禁止读取用户隐私内容，只能使用提供的脱敏聚合数据。'
+export const SYSTEM_PROMPT_EVALUATE = '你是一个微习惯健康助手，正在帮用户做碎片化健康动作。\n你的回答必须是一个**裸的 JSON 对象**（直接以 { 开头，以 } 结尾），不要有额外文字、不要 Markdown 包裹、不要把 JSON 包在字符串里。\n调用温柔+轻度幽默+不油腻的中文风格。避免医学恐吓和引发焦虑的表述。\n绝对禁止读取用户隐私内容，只能使用提供的脱敏聚合数据。'
 
 export function buildPreTriggerPrompt(context: PreTriggerContext): string {
   const recentStr = context.recentActions.length > 0 ? context.recentActions.join('、') : '无'
@@ -67,4 +69,40 @@ export const FALLBACK_ADHOC_TEXTS: string[] = [
 export function getFallbackAdhoc(): string {
   const idx = Math.floor(Math.random() * FALLBACK_ADHOC_TEXTS.length)
   return FALLBACK_ADHOC_TEXTS[idx]
+}
+
+export const SYSTEM_PROMPT_DAILY = '你是一个微习惯健康助手，负责生成每日健康小结。\n请用**纯中文文本**回复（不要 JSON 格式，不要 Markdown 标题/列表标记）。\n风格：温柔+轻度幽默+不油腻的中文。避免医学恐吓和引发焦虑的表述。\n绝对禁止读取用户隐私内容，只能使用提供的脱敏聚合数据。'
+
+export function buildDailySummaryPrompt(data: DailyData): string {
+  return '以下是用户今日（截止当前）的健康微动作数据：\n' +
+    '- 今日完成微动作：' + data.todayCompletedCount + ' 次\n' +
+    '- 今日跳过：' + data.totalSkipped + ' 次\n' +
+    '- 累计守护时长：' + data.totalDurationSec + ' 秒\n' +
+    '- 护眼评分：' + data.eyeScore + ' / 100\n' +
+    '- 体态评分：' + data.postureScore + ' / 100\n' +
+    '- 活力评分：' + data.vitalityScore + ' / 100\n' +
+    '- 穿透率：' + Math.round(data.penetration * 100) + '%\n\n' +
+    '请用 2-3 段纯中文（用换行分段）生成今日小结：\n' +
+    '1. 开场一句总结（15-25字，要温暖）\n' +
+    '2. 今日表现小结（40-60字，指出具体数据）\n' +
+    '3. 明日小目标（20-30字，给出可执行建议）\n\n' +
+    '回复必须是纯中文文本，禁止 JSON、禁止 Markdown 标题/列表标记。'
+}
+
+export const SYSTEM_PROMPT_WEEKLY = '你是一个微习惯健康助手，负责生成每周健康报告。\n请用**纯文本**回复（不要 JSON 格式，不要 Markdown 标题/列表标记）。\n可以使用换行分段，风格温暖+鼓励+不油腻的中文。\n绝对禁止读取用户隐私内容，只能使用提供的脱敏聚合数据。'
+
+export function buildWeeklyReportPrompt(stats: WeeklyReportStats): string {
+  return '以下是用户本周（过去 7 天）的健康微动作汇总数据：\n' +
+    '- 本周完成微动作总数：' + stats.totalCompleted + ' 次\n' +
+    '- 本周累计守护时长：' + stats.totalDurationSec + ' 秒\n' +
+    '- 平均穿透率：' + Math.round(stats.avgPenetration * 100) + '%\n' +
+    '- 平均每日守护：' + stats.avgGuardMinutes + ' 分钟\n' +
+    '- 最佳一天：' + (stats.bestDay.length > 0 ? stats.bestDay + '（' + stats.bestDayCount + '次）' : '无数据') + '\n' +
+    '- 最弱一天：' + (stats.worstDay.length > 0 ? stats.worstDay + '（' + stats.worstDayCount + '次）' : '无数据') + '\n\n' +
+    '请用 2-4 段纯中文（可用换行分段）写一份周报：\n' +
+    '1. 先给一个鼓励性的开场（30-50字）\n' +
+    '2. 总结本周亮点和值得肯定的地方（50-80字）\n' +
+    '3. 指出可以改进的地方（50-80字）\n' +
+    '4. 给出下周的小目标（30-50字）\n' +
+    '回复必须是纯中文文本，禁止 JSON、禁止 Markdown 标题/列表标记。'
 }

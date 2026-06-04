@@ -2618,3 +2618,330 @@ Get-ChildItem -Recurse -Include "*.uts" |
 - §9 script setup 函数不提升 — 同类"UTS 限制 vs JS 灵活性"问题
 - §33(A) 模块内函数不能重复 — `refreshLlmHistory` 在模块级和对象方法中同名是合法的（不同作用域）
 
+---
+
+### 52. MiniMax 推理模型：使用 `reasoning_effort: "low"` 参数控制推理深度
+
+**【最高优先级】** MiniMax-M2.7 是推理模型（类似 OpenAI o1），默认情况下：
+```json
+{
+  "choices": [{
+    "message": {
+      "content": "",
+      "reasoning_content": "实际思考过程...",
+      "reasoning_details": [...]
+    },
+    "finish_reason": "length"
+  }],
+  "usage": {
+    "completion_tokens": 400,
+    "completion_tokens_details": { "reasoning_tokens": 400 }
+  }
+}
+```
+- `content` 为空，所有 token 被 reasoning 消耗
+- `finish_reason: "length"` 表示 token 用完
+
+**实测解决方案**：在请求体中加 `"reasoning_effort": "low"` 参数，让模型减少推理：
+
+```ts
+const reqBody = {
+  model: 'MiniMax-M2.7',
+  messages: [...],
+  temperature: 0.7,
+  max_completion_tokens: 500,
+  reasoning_effort: 'low'  // ← 关键参数
+}
+```
+
+**效果对比**（同一 prompt "User did 3 micro-actions, eye score 80"）：
+
+| 配置 | content | finish_reason | reasoning_tokens | total_tokens |
+|------|---------|---------------|-----------------|--------------|
+| 默认（无参数）| 空字符串 | `length` | 400 | 400（全推理）|
+| `reasoning_effort: "low"` | `{"one_liner":"...","summary":"...","tomorrow_goal":"...","encourage":"..."}` | `stop` | 51 | 213 |
+
+**为什么不直接换非推理模型**：实测 `abab6.5s-chat` / `abab7-chat-preview` / `MiniMax-Text-01` 等非推理模型：
+- 输出冗余（不严格遵循 "JSON only" 指令，常带解释文字）
+- 需要更强 prompt 工程约束
+- 输出质量（中文表达/JSON 严格度）不如 M2.7 + `reasoning_effort: "low"`
+
+**经验**：M2.7 + `reasoning_effort: "low"` 是**最佳平衡点**（模型质量 + 输出可控性 + token 效率）。
+
+**预防措施**：
+- `max_completion_tokens` 设 400-600（实测够用）
+- 监听 `finish_reason`，若为 `length` 说明 token 不够，记录 warn
+- 保留 `reasoning_content` fallback（防御性，万一 `content` 仍为空）
+
+**uni.request 发送 HTTP POST 的机制**：
+```ts
+uni.request({
+  url: 'https://api.minimax.chat/v1/text/chatcompletion_v2',
+  method: 'POST',
+  header: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + API_KEY
+  },
+  data: JSON.stringify(reqBody),  // 字符串化后的 JSON body
+  timeout: 8000,
+  success(res) { /* res.data = 响应体 */ },
+  fail(err) { /* 网络错误 */ }
+})
+```
+- `data: JSON.stringify(reqBody)` — UTS 中必须手动序列化，`uni.request` 不会自动 stringify
+- `success(res)` 回调中 `res.data` 是自动解析的响应体（JSON → 对象）
+- UTS 中 success/fail 回调参数不要手动标注类型（让编译器推断）
+
+**关联规则**：
+- §2 uniCloud.callFunction → uni.request HTTP 直连 — `uni.request` 是唯一可行的远程调用方式
+- §39 异步回调必须 try-catch — success 回调内必须有 try-catch
+
+---
+
+### 53. LLM 调用统一架构：`callMinimaxChat` 公共函数 + 避免循环依赖
+
+**【最高优先级】** 项目中所有 LLM 调用（daily summary / weekly report / pre-trigger / post-action）统一走 `CloudService.callMinimaxChat()` 公共函数。
+
+**架构**：
+
+```
+callMinimaxChat(systemPrompt, userPrompt, maxTokens, onOK, onFail)
+  ├─ callDaily()       → SYSTEM_PROMPT_DAILY + buildDailySummaryPrompt
+  ├─ callWeekly()      → SYSTEM_PROMPT_WEEKLY + buildWeeklyReportPrompt
+  └─ callLlmEvaluate() → SYSTEM_PROMPT_EVALUATE + buildPreTriggerPrompt / buildPostActionPrompt
+```
+
+**循环依赖陷阱**：
+- `CloudService.uts` import `LlmPrompts.uts`（prompt 函数）
+- `LlmPrompts.uts` 如果 import `CloudService.uts`（取 DailyData 类型）→ **循环依赖**
+- **解决方案**：`DailyData` 类型定义移到 `models/DailySummary.uts`，CloudService 和 LlmPrompts 都从 models 导入
+
+**规则**：
+- 类型定义放 `models/`，不放 `services/`（避免 service 之间的循环依赖）
+- prompt 构建函数放 `constants/LlmPrompts.uts`（输入类型化数据，输出 string）
+- API 调用逻辑放 `services/CloudService.uts`（唯一负责 `uni.request` 的文件）
+- 每个 LLM 场景需要 3 件东西：`SYSTEM_PROMPT_XXX` + `buildXxxPrompt()` + `callXxx()` 入口函数
+- `parseJsonThreeLevels` 在 CloudService 和 LlmTriggerFlow 中各有一份（模块私有，不冲突）
+
+**关联规则**：
+- §12 跨文件类型必须 export — `DailyData` 从 models 导出
+- §2 uniCloud.callFunction → uni.request HTTP 直连
+- §52 MiniMax M2.7 reasoning_content 兜底
+
+---
+
+### 54. DAO `mapRow` 内部 JSON 解析抛异常 → 整批查询失败 + 渲染 NPE
+
+**【最高优先级】** 任何 DAO 函数在 `mapRow` 内部调用 `JSON.parse` 都需要 try-catch + 单行级 fallback。**一行脏数据不应该让整批查询失败，进而导致上层 ref 异常 + Vue 渲染 NPE**。
+
+**问题链路**：
+```
+数据库中 llm_history 有脏数据（如 parsed_result_json = "null" 或损坏 JSON）
+  → mapRow 调用 JSON.parse("null") 返回 null
+  → as ParsedLlmResult (null 强转非空类型) → 实际变量是 null
+  → LlmHistoryCard 模板访问 entry.parsedResult.adhocText → NPE
+  → 渲染管线抛 NPE，触发 "Possible Unhandled Promise Rejection"
+  → 同时上层 try-catch 捕获 refreshLlmHistory 失败 → console.warn("失败: {}")
+```
+
+**修复模式**：**`mapRows` 中每行单独 try-catch**：
+
+```ts
+function mapRows(rows: Map<string, any>[]): LlmHistoryEntry[] {
+  const result: LlmHistoryEntry[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (r == null) continue
+    try {
+      result.push(mapRow(r))
+    } catch (e) {
+      console.warn('[DaoName] mapRow skip dirty row, err: ' + JSON.stringify(e))
+    }
+  }
+  return result
+}
+```
+
+**`mapRow` 内部 JSON.parse 也需要 null 守卫**：
+```ts
+// ❌ 危险：JSON.parse("null") 返回 null，强转非空类型后变量是 null
+parsed = JSON.parse(parsedJson) as ParsedLlmResult
+
+// ✅ 安全：null 检查后才赋值
+let parsed: ParsedLlmResult = {}
+if (parsedJson != null && parsedJson.length > 0) {
+  try {
+    const p = JSON.parse(parsedJson)
+    if (p != null) parsed = p as ParsedLlmResult
+  } catch (_) { parsed = {} }
+}
+```
+
+**修复后的双层防护**：
+1. `mapRow` 内部对每个 JSON.parse 加 `if (p != null)` 守卫（防止特殊字符串 `"null"` 攻击）
+2. `mapRows` 循环中 try-catch（防止单行意外崩溃）
+
+**模板中对象 prop 字段访问也要 null 守卫**：
+
+```ts
+// ❌ 危险：s.one_liner 可能是 null（NPE）
+return s != null && s.one_liner.length > 0 ? s.one_liner : 'fallback'
+
+// ✅ 安全：先取出 s.one_liner 到局部变量，再 null 检查
+if (s == null) return 'fallback'
+const v = s.one_liner
+return v != null && v.length > 0 ? v : 'fallback'
+```
+
+**为什么 `s != null && s.one_liner.length > 0` 不够安全**：
+- UTS 编译器对**通过计算属性链式访问**的字段类型推断可能不够精确
+- 即使 `s != null` 守卫了，访问 `s.one_liner` 时 UTS 仍可能推断为非空 string
+- 实际运行中 `one_liner` 可能是 null（LLM 输出字段缺失或 JSON `null`）
+- 显式赋值到局部变量 `const v = s.one_liner` 让 UTS 推断为 `string | null`，强制 null 检查
+
+**自查**：
+```powershell
+# 找 DAO 中无 try-catch 的 JSON.parse
+Get-ChildItem "database" -Recurse -Filter "*.uts" |
+  Select-String -Pattern "JSON\.parse" |
+  Where-Object { $_.Line -notmatch "try|as" }
+
+# 找模板/computed 中链式字段访问
+Get-ChildItem "pages" -Recurse -Filter "*.uvue" |
+  Select-String -Pattern "s\.\w+\.length" |
+  Where-Object { $_.Line -notmatch "s\s*!=\s*null" }
+```
+
+**关联规则**：
+- §37 Map.get() null 安全 — 同一类"边界处必须显式守卫"
+- §38 ref<T | null> 重要 ref 必须有非空初始值 — 上下层都需要保护
+- §39 异步回调必须 try-catch — DAO 函数虽然非异步，但被异步调用时单行崩溃会传播
+- §43 LLM JSON 三级容错解析 — `JSON.parse` 边界检查是 LLM 解析的子集
+
+---
+
+### 55. 实战结论：LLM 推理模型 (M2.7) 即使 `reasoning_effort: "low"` 仍倾向把 JSON 当字符串输出 → **改用纯文本方案更稳**
+
+**【最高优先级】** 实战中反复确认：
+
+| 配置 | LLM 实际 `content` 输出 | 结果 |
+|------|------------------------|------|
+| prompt 要求"裸 JSON 对象" | `"content":"{\"title\":\"...\"}"`（**字符串内嵌 JSON**）| `JSON.parse` 第一次拿到 `string`，第二次才能拿到 object |
+| prompt 要求"纯文本/Markdown" | 直接是自然语言文本 | 简单 `replace` 一下 `\n` 即可使用 |
+| `temperature: 0.0` | 仍可能字符串内嵌 | 无效 |
+| `reasoning_effort: "low"` | 仍可能字符串内嵌 | 无效 |
+
+**实测现象**（来自项目日志）：
+```json
+{
+  "finish_reason": "stop",
+  "content": "{\"title\":\"本周守护报告\",\"highlight\":\"...\"}"
+}
+```
+LLM 即使被 prompt 明确告知"不要把 JSON 包在字符串里"，仍然倾向于把 JSON 文本转义为字符串输出。这是 M2.7 推理模型的固有行为。
+
+**修复方案（已采用）**：
+
+1. **长文本（周报）改用纯文本/Markdown**：
+   - prompt 改为"回复必须是纯中文文本（不要 JSON、不要 Markdown 标题/列表）"
+   - `WeeklyReport` 类型简化为 `{ bodyMarkdown: string, stats: WeeklyReportStats }`
+   - `callWeekly` 直接返回 raw 字符串，调用方 `cleanMarkdown` 简单处理（去 ```/##/****等标记，规范化换行）
+   - 模板用 `<text class="report-body">{{ wkBody }}</text>` + `white-space: pre-wrap` 直接显示
+   - 优点：彻底解决解析难题，LLM 100% 稳定输出，调用方代码极简
+
+2. **短文本（每日小结/pre/post 评估）仍用 JSON**：
+   - 因为 LLM 在短 prompt 下 JSON 行为更稳定
+   - 用 §54 增强的 `parseJsonThreeLevels`（含二次 parse）兜底
+
+**`cleanMarkdown` 标准实现**：
+```ts
+function cleanMarkdown(raw: string): string {
+  if (raw == null) return ''
+  let text = raw
+  text = text.replace(/^```[\s\S]*?\n/, '')     // 去掉开头代码块标记
+  text = text.replace(/```$/, '')                // 去掉结尾代码块标记
+  text = text.replace(/^#+\s*/gm, '')            // 去掉标题 # 
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1')   // 去掉加粗 **
+  text = text.replace(/\*([^*]+)\*/g, '$1')       // 去掉斜体 *
+  text = text.replace(/`([^`]+)`/g, '$1')         // 去掉行内代码 `
+  text = text.replace(/[ \t]+\n/g, '\n')          // 去掉行尾空白
+  text = text.replace(/\n{3,}/g, '\n\n')          // 合并多余空行
+  return text.trim()
+}
+```
+
+**决策矩阵**（什么场景用什么格式）：
+| 输出长度 | 推荐格式 | 理由 |
+|---------|---------|------|
+| 1-3 句话（如 adhocText） | 单字段 JSON | 简单，LLM 100% 稳定 |
+| 1-2 段（如 summary） | JSON or 纯文本 | 都行，按团队习惯 |
+| 3+ 段（如周报） | **纯文本** | LLM 长 prompt 容易内嵌字符串 |
+| 包含结构化建议（如 suggestions 列表） | JSON | 列表用 JSON 解析比 split 简单 |
+
+**关联规则**：
+- §52 MiniMax M2.7 reasoning_effort — 同模型的另一类问题（token 消耗）
+- §43 LLM JSON 三级容错解析 — 短文本场景保留
+- §54 DAO mapRow 容错 — 解析失败的下游容错
+
+---
+
+### 56. 实测确认：M2.7 + `reasoning_effort: "low"` + `max_completion_tokens: 1500` 是日/周报稳定配置
+
+**【最高优先级】** 3 次实测后的稳态配置：
+
+| Run | finish | completion | reasoning | contentLen | reasoning 占比 |
+|-----|--------|------------|-----------|-----------|--------------|
+| 1 | stop | 276 | 73 | 412 字符 | **26%** |
+| 2 | stop | 246 | 91 | 314 字符 | **37%** |
+| 3 | stop | 281 | 110 | 350 字符 | **39%** |
+
+**关键发现**：
+- `reasoning_effort: "low"` 实际把 reasoning 占比从 77% 降到 26-39%
+- `max_completion_tokens: 1500`（周报 2000）足够容纳 reasoning + content
+- `finish_reason: stop`（非 `length`）稳定
+- **不需要**换非推理模型（M2.7 + low 推理的输出质量仍优于 abab6.5s）
+
+**之前项目的失败案例**（max_completion_tokens=500-600，prompt 上下文长）：
+- 实际 reasoning 仍占 358/466 = 77%
+- `finish_reason: "length"` 频繁
+- `content` 为空或被截断
+
+**教训**：
+- **`max_completion_tokens` 至少 1500**（周报 2000），给 reasoning 留 buffer
+- **`reasoning_effort: "low"` 必须保留**（不加时 reasoning 接近 100%）
+- **实测数据比理论配置更可靠**——M2.7 推理深度与 prompt 长度相关
+- **`uni.request` timeout 至少 30000ms**（之前 15000ms 频繁超时）
+  - M2.7 推理 + 输出 1500 token 实际网络耗时 8-15s
+  - 实测日志：多次 `SocketTimeoutException: Read timed out` + `SocketException: Socket closed`
+  - 15s 太短，30s 是合理上限
+
+**最终配置**（已采用）：
+```ts
+const reqBody = {
+  model: 'MiniMax-M2.7',
+  messages: [...],
+  temperature: 0.7,
+  max_completion_tokens: 1500,   // daily / evaluate
+  // max_completion_tokens: 2000, // weekly
+  reasoning_effort: 'low'         // 关键
+}
+
+// uni.request
+uni.request({
+  url: ...,
+  timeout: 30000,                 // 30s
+  ...
+})
+```
+
+**为什么之前"调高 max_completion_tokens"没解决 parsing 问题**：
+- parsing 问题（"字符串内嵌 JSON"）是 **prompt 风格**问题，不是 token 数问题
+- M2.7 即使 token 充足也倾向把 JSON 当字符串输出
+- 解决 parsing 只能靠 **改 prompt 为纯文本**（§55）+ **简化类型**（`{ bodyText: string }`）
+- 高 token 只解决"content 被截断"问题
+
+**关联规则**：
+- §52 reasoning_effort: "low" — 同条规则的 token 优化版本
+- §55 改用纯文本方案 — 解决 parsing 问题
+- §39 异步回调必须 try-catch — uni.request fail 回调必须 try-catch
+

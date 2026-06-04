@@ -1,17 +1,8 @@
 import { getHomepageData } from './ScoreCalculator'
-import { today, daysAgo } from '../utils/TimeUtils'
+import { daysAgo } from '../utils/TimeUtils'
 import { callWeekly } from './CloudService'
 import { isNetworkAvailable } from '../utils/NetworkUtils'
 import { WeeklyReport, WeeklyReportStats } from '../models/WeeklyReport'
-
-type WeeklyLLMOutput = {
-  title: string
-  highlight: string
-  improvement: string
-  suggestions: string[]
-  nextWeekGoal: string
-  tone: string
-}
 
 export function generateWeeklyData(): WeeklyReportStats {
   let totalCompleted = 0
@@ -72,61 +63,59 @@ export function generateWeeklyData(): WeeklyReportStats {
   }
 }
 
+function cleanMarkdown(raw: string): string {
+  if (raw == null) return ''
+  let text = raw
+  text = text.replace(/^```[\s\S]*?\n/, '')
+  text = text.replace(/```$/, '')
+  text = text.replace(/^#+\s*/gm, '')
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1')
+  text = text.replace(/\*([^*]+)\*/g, '$1')
+  text = text.replace(/`([^`]+)`/g, '$1')
+  text = text.replace(/[ \t]+\n/g, '\n')
+  text = text.replace(/\n{3,}/g, '\n\n')
+  return text.trim()
+}
+
+function buildLocalReport(stats: WeeklyReportStats): WeeklyReport {
+  const hasData = stats.totalCompleted > 0
+  if (hasData) {
+    const body = '本周完成了 ' + stats.totalCompleted + ' 次微动作，累计守护 ' +
+      Math.round(stats.totalDurationSec / 60) + ' 分钟。\n\n' +
+      '你的平均每日守护时长为 ' + stats.avgGuardMinutes + ' 分钟，整体节奏稳定。' +
+      '表现值得肯定。\n\n' +
+      '下周可以尝试每天固定时间做一个微动作，把守护变成习惯。\n\n' +
+      '目标：每天至少完成 3 次微动作。'
+    return { bodyMarkdown: body, stats: stats }
+  }
+  const body = '本周暂无数据，从今天开始吧。\n\n' +
+    '完成你的第一个微动作，开启健康守护之旅。\n\n' +
+    '开启无障碍服务以自动提醒，设定你的健康偏好。\n\n' +
+    '目标：开始你的第一个微动作。'
+  return { bodyMarkdown: body, stats: stats }
+}
+
 export function generateWeeklyReport(onComplete: (report: WeeklyReport) => void): void {
   const stats = generateWeeklyData()
 
-  function buildLocal(): WeeklyReport {
-    const hasData = stats.totalCompleted > 0
-    if (hasData) {
-      return {
-        title: '本周健康小结',
-        highlight: '本周完成了' + stats.totalCompleted + '次微动作，累计守护' + stats.totalDurationSec + '秒',
-        improvement: '下周可以尝试更多样化的动作组合',
-        suggestions: [
-          '尝试每天固定时间做一个微动作',
-          '关注完成率最低的动作类型',
-          '给自己设定一个小奖励'
-        ],
-        nextWeekGoal: '每天至少完成3次微动作',
-        tone: stats.avgGuardMinutes >= 10 ? 'great' : 'okay',
-        stats: stats
-      }
-    }
-    return {
-      title: '本周健康报告',
-      highlight: '本周暂无数据，从今天开始吧',
-      improvement: '',
-      suggestions: ['完成第一次微动作', '开启无障碍服务以自动提醒', '设置你的健康偏好'],
-      nextWeekGoal: '开始你的第一个微动作',
-      tone: 'needs_care',
-      stats: stats
-    }
-  }
-
   if (!isNetworkAvailable()) {
-    onComplete(buildLocal())
+    onComplete(buildLocalReport(stats))
     return
   }
 
-  callWeekly(stats, (result: any) => {
+  callWeekly(stats, (raw: string): void => {
     try {
-      const jsonStr = JSON.stringify(result)
-      const obj = JSON.parse(jsonStr) as WeeklyLLMOutput
-      if (obj.title != null && obj.title.length > 0) {
-        onComplete({
-          title: obj.title,
-          highlight: obj.highlight,
-          improvement: obj.improvement,
-          suggestions: obj.suggestions,
-          nextWeekGoal: obj.nextWeekGoal,
-          tone: obj.tone,
-          stats: stats
-        })
+      const cleaned = cleanMarkdown(raw)
+      if (cleaned.length > 10) {
+        onComplete({ bodyMarkdown: cleaned, stats: stats })
         return
       }
-    } catch (_) {}
-    onComplete(buildLocal())
+      console.warn('[WeeklyReportService] LLM 返回内容过短, fallback')
+    } catch (e) {
+      console.warn('[WeeklyReportService] 处理失败, fallback: ' + JSON.stringify(e))
+    }
+    onComplete(buildLocalReport(stats))
   }, () => {
-    onComplete(buildLocal())
+    onComplete(buildLocalReport(stats))
   })
 }

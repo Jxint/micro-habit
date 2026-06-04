@@ -1,142 +1,69 @@
-export type DailyData = {
-  totalCompleted: number
-  totalSkipped: number
-  totalDurationSec: number
-  guardMinutes: number
-  guardCount: number
-  penetration: number
-  eyeScore: number
-  postureScore: number
-  vitalityScore: number
-  todayCompletedCount: number
-}
-
+import { DailyData } from '../models/DailySummary'
 import { WeeklyReportStats } from '../models/WeeklyReport'
-import { TriggerRule } from '../models/TriggerRule'
-import { SYSTEM_PROMPT_EVALUATE, buildPreTriggerPrompt, buildPostActionPrompt, PreTriggerContext, PostActionContext } from '../constants/LlmPrompts'
+import {
+  SYSTEM_PROMPT_EVALUATE, buildPreTriggerPrompt, buildPostActionPrompt,
+  SYSTEM_PROMPT_DAILY, buildDailySummaryPrompt,
+  SYSTEM_PROMPT_WEEKLY, buildWeeklyReportPrompt,
+  PreTriggerContext, PostActionContext
+} from '../constants/LlmPrompts'
 
 const MINIMAX_BASE_URL = 'https://api.minimax.chat/v1'
 const MINIMAX_CHAT_PATH = 'text/chatcompletion_v2'
 const MINIMAX_CHAT_MODEL = 'MiniMax-M2.7'
 const MINIMAX_API_KEY = 'sk-cp-Dd2_yFv0hINLsc2fnuWrrde0agYZQCzaRzW0DaK64CAl7Y-plAqRd7R2jSxQTSgSEWbl6teJc2oFL90HPMgyqLXel67OJhufLeLeVauln93DyXmA1277iQw'
 
-type MinimaxBaseResp = {
-  status_code?: number
-  status_msg?: string
-}
-
-type MinimaxMessage = {
-  content?: string
-}
-
-type MinimaxChoice = {
-  message?: MinimaxMessage
-}
-
-type MinimaxChatResp = {
-  base_resp?: MinimaxBaseResp
-  choices?: MinimaxChoice[]
-}
-
-type CloudResponse = {
-  code: number
-  data: any
-  error: string | null
-}
-
-export function callDaily(date: string, data: DailyData, onOK: (result: any) => void, onFail: () => void): void {
-  callCloudFn('llm-daily', {
-    date: date,
-    data: {
-      totalCompleted: data.totalCompleted,
-      totalSkipped: data.totalSkipped,
-      totalDurationSec: data.totalDurationSec,
-      guardMinutes: data.guardMinutes,
-      guardCount: data.guardCount,
-      penetration: data.penetration,
-      eyeScore: data.eyeScore,
-      postureScore: data.postureScore,
-      vitalityScore: data.vitalityScore
-    }
-  }, onOK, onFail)
-}
-
-export function callWeekly(data: WeeklyReportStats, onOK: (result: any) => void, onFail: () => void): void {
-  callCloudFn('llm-weekly', {
-    data: {
-      totalCompleted: data.totalCompleted,
-      totalDurationSec: data.totalDurationSec,
-      avgPenetration: data.avgPenetration,
-      avgGuardMinutes: data.avgGuardMinutes,
-      bestDay: data.bestDay,
-      bestDayCount: data.bestDayCount,
-      worstDay: data.worstDay,
-      worstDayCount: data.worstDayCount
-    }
-  }, onOK, onFail)
-}
-
-export function callRuleSuggest(data: any, onOK: (result: any) => void): void {
-  const r = Math.random()
-  if (r < 0.15) {
-    const rule: TriggerRule = {
-      id: 0,
-      rule_type: 'frequency',
-      trigger_type: 'app_duration',
-      condition_json: '{}',
-      action_weights_json: '{}',
-      enabled: 1,
-      priority: 1,
-      source: 'ai_suggest',
-      expires_at: null,
-      created_at: Math.floor(Date.now() / 1000),
-      updated_at: Math.floor(Date.now() / 1000)
-    }
-    onOK({ shouldSuggest: true, rule: rule })
-  } else {
-    onOK({ shouldSuggest: false, rule: null })
-  }
-}
-
-export function callRuleRefine(data: any, onOK: (result: any) => void): void {
-  onOK({ shouldAdjust: false, insight: '' })
-}
-
-export function callTtsProxy(text: string, onOK: (result: any) => void): void {
-  onOK({ code: -1, error: 'TTS 暂未实现' })
-}
-
 type TtsAdhocOptions = {
   timeout: number
 }
 
-export function callTtsAdhoc(context: any, options: TtsAdhocOptions, onOK: (result: any) => void, onFail: () => void): void {
-  onFail()
-}
+function callMinimaxChat(systemPrompt: string, userPrompt: string, maxTokens: number, onOK: (raw: string) => void, onFail: () => void): void {
+  if (MINIMAX_API_KEY === 'PLACEHOLDER_KEY') {
+    console.warn('[CloudService] MiniMax API key 未配置，走降级路径')
+    onFail()
+    return
+  }
 
-function callCloudFn(name: string, payload: any, onOK: (result: any) => void, onFail: () => void): void {
+  const reqBody = {
+    model: MINIMAX_CHAT_MODEL,
+    messages: [
+      { role: 'system' as const, content: systemPrompt, name: 'MiniMax AI' },
+      { role: 'user' as const, content: userPrompt, name: '用户' }
+    ],
+    temperature: 0.7,
+    max_completion_tokens: maxTokens,
+    reasoning_effort: 'low'
+  }
+
   try {
-    const payloadStr = JSON.stringify(payload)
     uni.request({
-      url: 'https://fc-mp-xxx.bspapp.com/' + name,
+      url: MINIMAX_BASE_URL + '/' + MINIMAX_CHAT_PATH,
       method: 'POST',
-      header: { 'Content-Type': 'application/json' },
-      data: payloadStr,
-      timeout: 15000,
+      header: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + MINIMAX_API_KEY
+      },
+      data: JSON.stringify(reqBody),
+      timeout: 30000,
       success(res) {
         try {
-          const dataJson = JSON.stringify(res.data)
-          const obj = JSON.parse(dataJson) as CloudResponse
-          if (obj.code === 0 && obj.data != null) {
-            onOK(obj.data)
+          const data = res.data
+          const statusCode = (data != null) ? (data as UTSJSONObject).get('base_resp') : null
+          const finishReason = (data != null) ? extractFinishReason(data as UTSJSONObject) : ''
+          console.log('[CloudService] callMinimaxChat response, finishReason=' + finishReason)
+          const content = extractChatContent(data != null ? data : '')
+          if (content.length > 0) {
+            console.log('[CloudService] callMinimaxChat content OK, length=' + content.length)
+            onOK(content)
           } else {
+            console.warn('[CloudService] callMinimaxChat empty content, raw data=' + JSON.stringify(data))
             onFail()
           }
         } catch (_) {
           onFail()
         }
       },
-      fail(err) {
+      fail(_err) {
+        console.warn('[CloudService] callMinimaxChat network fail: ' + JSON.stringify(_err))
         onFail()
       }
     })
@@ -145,18 +72,54 @@ function callCloudFn(name: string, payload: any, onOK: (result: any) => void, on
   }
 }
 
+export function callDaily(date: string, data: DailyData, onOK: (raw: string) => void, onFail: () => void): void {
+  console.log('[CloudService] callDaily start, date=' + date)
+  const userPrompt = buildDailySummaryPrompt(data)
+  callMinimaxChat(SYSTEM_PROMPT_DAILY, userPrompt, 1500, (raw: string): void => {
+    if (raw.length > 0) {
+      console.log('[CloudService] callDaily OK, raw.length=' + raw.length)
+      onOK(raw)
+      return
+    }
+    console.warn('[CloudService] callDaily empty raw')
+    onFail()
+  }, () => {
+    console.warn('[CloudService] callDaily failed, fallback to local')
+    onFail()
+  })
+}
+
+export function callWeekly(data: WeeklyReportStats, onOK: (raw: string) => void, onFail: () => void): void {
+  console.log('[CloudService] callWeekly start, totalCompleted=' + data.totalCompleted)
+  const userPrompt = buildWeeklyReportPrompt(data)
+  callMinimaxChat(SYSTEM_PROMPT_WEEKLY, userPrompt, 2000, (raw: string): void => {
+    if (raw.length > 0) {
+      console.log('[CloudService] callWeekly OK, raw.length=' + raw.length)
+      onOK(raw)
+      return
+    }
+    console.warn('[CloudService] callWeekly empty raw')
+    onFail()
+  }, () => {
+    console.warn('[CloudService] callWeekly failed, fallback to local')
+    onFail()
+  })
+}
+
+export function callTtsProxy(text: string, onOK: (result: any) => void): void {
+  onOK({ code: -1, error: 'TTS 暂未实现' })
+}
+
+export function callTtsAdhoc(context: any, options: TtsAdhocOptions, onOK: (result: any) => void, onFail: () => void): void {
+  onFail()
+}
+
 export function callLlmEvaluate(
   stage: 'pre' | 'post',
   contextJson: string,
   onOK: (raw: string) => void,
   onFail: () => void
 ): void {
-  if (MINIMAX_API_KEY === 'PLACEHOLDER_KEY') {
-    console.warn('[CloudService] MiniMax API key 未配置（仍为 PLACEHOLDER_KEY），走降级路径')
-    onFail()
-    return
-  }
-
   let userPrompt = ''
   try {
     if (stage === 'pre') {
@@ -171,63 +134,87 @@ export function callLlmEvaluate(
     return
   }
 
-  const reqBody = {
-    model: MINIMAX_CHAT_MODEL,
-    messages: [
-      { role: 'system' as const, content: SYSTEM_PROMPT_EVALUATE, name: 'MiniMax AI' },
-      { role: 'user' as const, content: userPrompt, name: '用户' }
-    ],
-    temperature: 0.7,
-    max_completion_tokens: 400
-  }
-
-  try {
-    uni.request({
-      url: MINIMAX_BASE_URL + '/' + MINIMAX_CHAT_PATH,
-      method: 'POST',
-      header: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + MINIMAX_API_KEY
-      },
-      data: JSON.stringify(reqBody),
-      timeout: 8000,
-      success(res) {
-        try {
-          const data = res.data
-          const content = extractChatContent(data != null ? data : '')
-          if (content.length > 0) {
-            onOK(content)
-          } else {
-            onFail()
-          }
-        } catch (_) {
-          onFail()
-        }
-      },
-      fail(_err) {
-        onFail()
-      }
-    })
-  } catch (_) {
-    onFail()
-  }
+  callMinimaxChat(SYSTEM_PROMPT_EVALUATE, userPrompt, 1500, onOK, onFail)
 }
 
 function extractChatContent(data: any): string {
   try {
-    const dataStr = JSON.stringify(data)
-    const obj = JSON.parse(dataStr) as MinimaxChatResp
-    if (obj.base_resp != null && obj.base_resp.status_code != null && obj.base_resp.status_code != 0) {
-      console.warn('[CloudService] MiniMax 返回非 0 状态: ' + (obj.base_resp.status_msg ?? ''))
-      return ''
+    const obj = data as UTSJSONObject
+    if (obj == null) return ''
+    const baseResp = obj.get('base_resp')
+    if (baseResp != null) {
+      const brObj = baseResp as UTSJSONObject
+      const sc = brObj.get('status_code')
+      if (sc != null && sc != 0) {
+        const sm = brObj.get('status_msg')
+        console.warn('[CloudService] MiniMax 返回非 0 状态: ' + (sm != null ? '' + sm : ''))
+        return ''
+      }
     }
-    if (obj.choices != null && obj.choices.length > 0) {
-      const first = obj.choices[0]
-      if (first != null && first.message != null && first.message.content != null) {
-        const c = first.message.content
-        return typeof c === 'string' ? c : ''
+    const choicesRaw = obj.get('choices')
+    if (choicesRaw == null) return ''
+    const choices = choicesRaw as Array<UTSJSONObject>
+    if (choices.length < 1) return ''
+    const first = choices[0]
+    if (first == null) return ''
+    const message = first.get('message')
+    if (message == null) return ''
+    const msgObj = message as UTSJSONObject
+    const content = msgObj.get('content')
+    if (content != null) {
+      const c = '' + content
+      if (c.length > 0) return c
+    }
+    const rc = msgObj.get('reasoning_content')
+    if (rc != null) {
+      const r = '' + rc
+      if (r.length > 0) return r
+    }
+  } catch (e) {
+    console.warn('[CloudService] extractChatContent exception: ' + JSON.stringify(e))
+  }
+  return ''
+}
+
+function extractFinishReason(data: UTSJSONObject): string {
+  try {
+    const choices = data.get('choices')
+    if (choices == null) return ''
+    const arr = choices as Array<UTSJSONObject>
+    if (arr.length < 1) return ''
+    const first = arr[0]
+    if (first == null) return ''
+    const fr = first.get('finish_reason')
+    if (fr == null) return ''
+    return '' + fr
+  } catch (_) {
+    return ''
+  }
+}
+
+function parseJsonThreeLevels(raw: string): UTSJSONObject | null {
+  try {
+    const first = JSON.parse(raw)
+    if (first != null) {
+      if (typeof first === 'string') {
+        try {
+          const second = JSON.parse(first as string)
+          if (second != null && typeof second === 'object') return second as UTSJSONObject
+        } catch (_) {}
+      } else if (typeof first === 'object') {
+        return first as UTSJSONObject
       }
     }
   } catch (_) {}
-  return ''
+  try {
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (match != null) {
+      const m = match[0]
+      if (m != null && m.length > 0) {
+        const second = JSON.parse(m)
+        if (second != null && typeof second === 'object') return second as UTSJSONObject
+      }
+    }
+  } catch (_) {}
+  return null
 }

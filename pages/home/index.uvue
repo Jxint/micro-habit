@@ -56,17 +56,11 @@
 
       <view class="summary-card" v-if="dailySummary != null">
         <text class="summary-eyebrow">✨ 今日小结</text>
-        <text class="summary-oneliner">{{ summaryOneLiner }}</text>
-        <text v-if="summaryBody.length > 0" class="summary-body">{{ summaryBody }}</text>
-        <view v-if="summaryGoal.length > 0" class="summary-goal-row">
-          <text class="summary-goal-label">🎯 明日目标</text>
-          <text class="summary-goal-text">{{ summaryGoal }}</text>
-        </view>
-        <text v-if="summaryEncourage.length > 0" class="summary-encourage">{{ summaryEncourage }}</text>
+        <text class="summary-body">{{ summaryBodyText }}</text>
       </view>
       <view class="summary-card summary-empty" v-else>
         <text class="summary-empty-text">{{ summaryPlaceholder }}</text>
-        <text class="summary-empty-hint">完成更多动作，{{ summaryHour }}:00 后自动生成</text>
+        <text class="summary-empty-hint">完成第一个微动作，自动生成今日小结</text>
       </view>
 
       <view class="recommend-section">
@@ -155,41 +149,19 @@ const allActions = computed<MicroAction[]>(() => getEnabledActions())
 
 const dailySummary = computed<DailyOutput | null>(() : DailyOutput | null => store.dailySummary.value)
 const dailySummaryLoading = computed<boolean>(() : boolean => store.dailySummaryLoading.value)
-function getSummaryOneLiner(): string {
+function getSummaryBodyText(): string {
   const s = dailySummary.value
-  return s != null && s.one_liner.length > 0 ? s.one_liner : '今日小结待生成'
-}
-function getSummaryBody(): string {
-  const s = dailySummary.value
-  return s != null ? s.summary : ''
-}
-function getSummaryGoal(): string {
-  const s = dailySummary.value
-  return s != null ? s.tomorrow_goal : ''
-}
-function getSummaryEncourage(): string {
-  const s = dailySummary.value
-  return s != null ? s.encourage : ''
-}
-function getSummaryHour(): number {
-  const raw = getSetting('daily_summary_time', '21:00')
-  const sep = raw.indexOf(':')
-  const h = parseInt(sep > 0 ? raw.substring(0, sep) : raw)
-  if (h < 0 || h > 23) return 21
-  return h
+  if (s == null) return ''
+  return s.bodyText
 }
 function getSummaryPlaceholder(): string {
   if (dailySummaryLoading.value) return '正在生成今日小结…'
   const cnt = store.todayCompletedCount.value
   if (cnt < 1) return '完成一个微动作，开启今日小结'
-  return '已完成' + cnt + '次，' + getSummaryHour() + ':00 后自动小结'
+  return '已完成' + cnt + '次，正在生成今日小结'
 }
 
-const summaryOneLiner = computed<string>(getSummaryOneLiner)
-const summaryBody = computed<string>(getSummaryBody)
-const summaryGoal = computed<string>(getSummaryGoal)
-const summaryEncourage = computed<string>(getSummaryEncourage)
-const summaryHour = computed<number>(getSummaryHour)
+const summaryBodyText = computed<string>(getSummaryBodyText)
 const summaryPlaceholder = computed<string>(getSummaryPlaceholder)
 
 function getGreeting(): string {
@@ -531,41 +503,12 @@ onLoad((): void => {
   font-weight: bold;
   margin-bottom: 6px;
 }
-.summary-oneliner {
-  font-size: 17px;
-  font-weight: bold;
-  color: #2C3E50;
-  margin-bottom: 8px;
-}
 .summary-body {
   font-size: 14px;
   color: #34495E;
-  line-height: 20px;
+  line-height: 1.6;
+  white-space: pre-wrap;
   margin-bottom: 8px;
-}
-.summary-goal-row {
-  flex-direction: row;
-  align-items: center;
-  background-color: #F8F9FA;
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-}
-.summary-goal-label {
-  font-size: 12px;
-  color: #7F8C8D;
-  margin-right: 8px;
-}
-.summary-goal-text {
-  font-size: 13px;
-  color: #2C3E50;
-  flex: 1;
-}
-.summary-encourage {
-  font-size: 13px;
-  color: #E67E22;
-  font-style: italic;
-  margin-top: 4px;
 }
 .summary-empty-text {
   font-size: 14px;

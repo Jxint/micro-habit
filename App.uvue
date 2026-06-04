@@ -6,6 +6,7 @@ import { shouldTrigger, onActionResolved, onUserAccepted, TriggerDecision, Trigg
 import { insertActionLog, getRecentLogs, getTotalCompletedDurationSec } from './database/ActionLogDao'
 import { insertOrUpdateSnapshot } from './database/AppUsageDao'
 import { getInt, getBool } from './database/SettingsDao'
+import { insertRule } from './database/RuleDao'
 import { getActionById } from './constants/Actions'
 import { getRandomEncourage } from './constants/EncourageTexts'
 import { shortVibrate } from './utils/VibrateUtils'
@@ -25,6 +26,8 @@ import {
 } from './services/LlmTriggerFlow'
 import { speakAdhoc } from './services/TtsService'
 import { PreTriggerContext, PostActionContext, getFallbackAdhoc } from './constants/LlmPrompts'
+import { EffectiveTriggerRule } from './models/EffectiveTriggerRule'
+import { TriggerRule } from './models/TriggerRule'
 import { currentHour } from './utils/TimeUtils'
 
 let firstBackTime = 0
@@ -95,6 +98,42 @@ function emitShowRuleDialog(rule: any, reasoning: string): void {
   } catch (_) {}
 }
 
+function convertEffectiveRuleToTriggerRule(effective: EffectiveTriggerRule): TriggerRule {
+  const nowSec = Math.floor(Date.now() / 1000)
+  let conditionJson = '{}'
+  try {
+    const parts: string[] = []
+    if (effective.timeWindow != null) {
+      parts.push('"timeWindow":{"start":"' + effective.timeWindow!!.start + '","end":"' + effective.timeWindow!!.end + '"}')
+    }
+    if (effective.screenConditions != null) {
+      const sc = effective.screenConditions!!
+      const pkgs = JSON.stringify(sc.appPackages)
+      parts.push('"screenConditions":{"appPackages":' + pkgs + ',"includeHome":' + (sc.includeHome ? 'true' : 'false') + '}')
+    }
+    if (effective.timeThresholdMinutes > 0) {
+      parts.push('"timeThresholdMinutes":' + effective.timeThresholdMinutes)
+    }
+    if (parts.length > 0) {
+      conditionJson = '{' + parts.join(',') + '}'
+    }
+  } catch (_) {}
+  const rule: TriggerRule = {
+    id: 0,
+    rule_type: 'frequency',
+    trigger_type: 'app_duration',
+    condition_json: conditionJson,
+    action_weights_json: '{"' + effective.actionId + '":1}',
+    enabled: 1,
+    priority: 10,
+    source: 'llm',
+    expires_at: null,
+    created_at: nowSec,
+    updated_at: nowSec
+  }
+  return rule
+}
+
 function onActionResolvedLLM(actionId: string, actionName: string, actionCategory: string, durationMs: number): void {
   const llmEnabled = getBool('llm_trigger_enabled', true)
   if (!llmEnabled) {
@@ -121,7 +160,13 @@ function onActionResolvedLLM(actionId: string, actionName: string, actionCategor
             if (askEach) {
               emitShowRuleDialog(rule, postResult.reasoning)
             } else {
-              console.log('[App.uvue] llm_trigger_ask_each_time=false, 静默保存 suggestedRule')
+              try {
+                const triggerRule = convertEffectiveRuleToTriggerRule(rule)
+                const insertId = insertRule(triggerRule)
+                console.log('[App.uvue] 静默保存 suggestedRule, insertId=' + insertId)
+              } catch (e2) {
+                console.warn('[App.uvue] 静默保存 suggestedRule 失败: ' + JSON.stringify(e2))
+              }
             }
           }
         } catch (e) {

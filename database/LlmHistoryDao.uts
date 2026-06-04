@@ -53,8 +53,11 @@ function mapRows(rows: Map<string, any>[]): LlmHistoryEntry[] {
   const result: LlmHistoryEntry[] = []
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]
-    if (r != null) {
+    if (r == null) continue
+    try {
       result.push(mapRow(r))
+    } catch (e) {
+      console.warn('[LlmHistoryDao] mapRow skip dirty row, err: ' + JSON.stringify(e))
     }
   }
   return result
@@ -64,9 +67,10 @@ function mapRow(row: Map<string, any>): LlmHistoryEntry {
   const parsedJson = getStr(row, 'parsed_result_json')
   const ruleJson = getStrOrNull(row, 'suggested_rule_json')
   let parsed: ParsedLlmResult = {}
-  if (parsedJson.length > 0) {
+  if (parsedJson != null && parsedJson.length > 0) {
     try {
-      parsed = JSON.parse(parsedJson) as ParsedLlmResult
+      const p = JSON.parse(parsedJson)
+      if (p != null) parsed = p as ParsedLlmResult
     } catch (_) {
       parsed = {}
     }
@@ -74,7 +78,8 @@ function mapRow(row: Map<string, any>): LlmHistoryEntry {
   let rule: EffectiveTriggerRule | null = null
   if (ruleJson != null && ruleJson.length > 0) {
     try {
-      rule = JSON.parse(ruleJson) as EffectiveTriggerRule
+      const r = JSON.parse(ruleJson)
+      if (r != null) rule = r as EffectiveTriggerRule
     } catch (_) {
       rule = null
     }

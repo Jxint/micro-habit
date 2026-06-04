@@ -77,57 +77,14 @@ open class GenPagesHomeIndex : BasePage {
                 return store.dailySummaryLoading.value
             }
             )
-            fun gen_getSummaryOneLiner_fn(): String {
+            fun gen_getSummaryBodyText_fn(): String {
                 val s = dailySummary.value
-                return if (s != null && s.one_liner.length > 0) {
-                    s.one_liner
-                } else {
-                    "今日小结待生成"
+                if (s == null) {
+                    return ""
                 }
+                return s.bodyText
             }
-            val getSummaryOneLiner = ::gen_getSummaryOneLiner_fn
-            fun gen_getSummaryBody_fn(): String {
-                val s = dailySummary.value
-                return if (s != null) {
-                    s.summary
-                } else {
-                    ""
-                }
-            }
-            val getSummaryBody = ::gen_getSummaryBody_fn
-            fun gen_getSummaryGoal_fn(): String {
-                val s = dailySummary.value
-                return if (s != null) {
-                    s.tomorrow_goal
-                } else {
-                    ""
-                }
-            }
-            val getSummaryGoal = ::gen_getSummaryGoal_fn
-            fun gen_getSummaryEncourage_fn(): String {
-                val s = dailySummary.value
-                return if (s != null) {
-                    s.encourage
-                } else {
-                    ""
-                }
-            }
-            val getSummaryEncourage = ::gen_getSummaryEncourage_fn
-            fun gen_getSummaryHour_fn(): Number {
-                val raw = getSetting("daily_summary_time", "21:00")
-                val sep = raw.indexOf(":")
-                val h = parseInt(if (sep > 0) {
-                    raw.substring(0, sep)
-                } else {
-                    raw
-                }
-                )
-                if (h < 0 || h > 23) {
-                    return 21
-                }
-                return h
-            }
-            val getSummaryHour = ::gen_getSummaryHour_fn
+            val getSummaryBodyText = ::gen_getSummaryBodyText_fn
             fun gen_getSummaryPlaceholder_fn(): String {
                 if (dailySummaryLoading.value) {
                     return "正在生成今日小结…"
@@ -136,14 +93,10 @@ open class GenPagesHomeIndex : BasePage {
                 if (cnt < 1) {
                     return "完成一个微动作，开启今日小结"
                 }
-                return "已完成" + cnt + "次，" + getSummaryHour() + ":00 后自动小结"
+                return "已完成" + cnt + "次，正在生成今日小结"
             }
             val getSummaryPlaceholder = ::gen_getSummaryPlaceholder_fn
-            val summaryOneLiner = computed<String>(getSummaryOneLiner)
-            val summaryBody = computed<String>(getSummaryBody)
-            val summaryGoal = computed<String>(getSummaryGoal)
-            val summaryEncourage = computed<String>(getSummaryEncourage)
-            val summaryHour = computed<Number>(getSummaryHour)
+            val summaryBodyText = computed<String>(getSummaryBodyText)
             val summaryPlaceholder = computed<String>(getSummaryPlaceholder)
             fun gen_getGreeting_fn(): String {
                 val h = currentHour()
@@ -363,7 +316,7 @@ open class GenPagesHomeIndex : BasePage {
                             val ruleRaw = obj["rule"]
                             val reasoningRaw = obj["reasoning"]
                             val ruleStr = JSON.stringify(ruleRaw)
-                            val rule = UTSAndroid.consoleDebugError(JSON.parse(ruleStr), " at pages/home/index.uvue:341") as EffectiveTriggerRule
+                            val rule = UTSAndroid.consoleDebugError(JSON.parse(ruleStr), " at pages/home/index.uvue:313") as EffectiveTriggerRule
                             if (rule == null) {
                                 return
                             }
@@ -377,13 +330,13 @@ open class GenPagesHomeIndex : BasePage {
                             showRuleDialog.value = true
                         }
                          catch (e: Throwable) {
-                            console.warn("[home] showTriggerRuleDialog 处理异常: " + JSON.stringify(e), " at pages/home/index.uvue:348")
+                            console.warn("[home] showTriggerRuleDialog 处理异常: " + JSON.stringify(e), " at pages/home/index.uvue:320")
                         }
                     }
                     )
                 }
                  catch (e: Throwable) {
-                    console.warn("[home] \$on showTriggerRuleDialog 异常: " + JSON.stringify(e), " at pages/home/index.uvue:352")
+                    console.warn("[home] \$on showTriggerRuleDialog 异常: " + JSON.stringify(e), " at pages/home/index.uvue:324")
                 }
             }
             )
@@ -447,30 +400,12 @@ open class GenPagesHomeIndex : BasePage {
                         if (unref(dailySummary) != null) {
                             _cE("view", _uM("key" to 0, "class" to "summary-card"), _uA(
                                 _cE("text", _uM("class" to "summary-eyebrow"), "✨ 今日小结"),
-                                _cE("text", _uM("class" to "summary-oneliner"), _tD(unref(summaryOneLiner)), 1),
-                                if (unref(summaryBody).length > 0) {
-                                    _cE("text", _uM("key" to 0, "class" to "summary-body"), _tD(unref(summaryBody)), 1)
-                                } else {
-                                    _cC("v-if", true)
-                                },
-                                if (unref(summaryGoal).length > 0) {
-                                    _cE("view", _uM("key" to 1, "class" to "summary-goal-row"), _uA(
-                                        _cE("text", _uM("class" to "summary-goal-label"), "🎯 明日目标"),
-                                        _cE("text", _uM("class" to "summary-goal-text"), _tD(unref(summaryGoal)), 1)
-                                    ))
-                                } else {
-                                    _cC("v-if", true)
-                                },
-                                if (unref(summaryEncourage).length > 0) {
-                                    _cE("text", _uM("key" to 2, "class" to "summary-encourage"), _tD(unref(summaryEncourage)), 1)
-                                } else {
-                                    _cC("v-if", true)
-                                }
+                                _cE("text", _uM("class" to "summary-body"), _tD(unref(summaryBodyText)), 1)
                             ))
                         } else {
                             _cE("view", _uM("key" to 1, "class" to "summary-card summary-empty"), _uA(
                                 _cE("text", _uM("class" to "summary-empty-text"), _tD(unref(summaryPlaceholder)), 1),
-                                _cE("text", _uM("class" to "summary-empty-hint"), "完成更多动作，" + _tD(unref(summaryHour)) + ":00 后自动生成", 1)
+                                _cE("text", _uM("class" to "summary-empty-hint"), "完成第一个微动作，自动生成今日小结")
                             ))
                         }
                         ,
@@ -540,7 +475,7 @@ open class GenPagesHomeIndex : BasePage {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "greeting-bar" to _pS(_uM("flexDirection" to "column", "paddingTop" to 56, "paddingRight" to 20, "paddingBottom" to 0, "paddingLeft" to 20, "backgroundColor" to "#2C3E50")), "greeting-header" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingBottom" to 12)), "bg-morning" to _pS(_uM("backgroundColor" to "#A93226")), "bg-noon" to _pS(_uM("backgroundColor" to "#1A5490")), "bg-afternoon" to _pS(_uM("backgroundColor" to "#8B4513")), "bg-evening" to _pS(_uM("backgroundColor" to "#1A237E")), "bg-night" to _pS(_uM("backgroundColor" to "#1B2631")), "greeting-left" to _pS(_uM("flexDirection" to "column")), "greeting-text" to _pS(_uM("fontSize" to 24, "fontWeight" to "bold", "color" to "#FFFFFF")), "greeting-date" to _pS(_uM("fontSize" to 12, "color" to "rgba(255,255,255,0.85)", "marginTop" to 4)), "greeting-right" to _pS(_uM("flexDirection" to "row", "alignItems" to "center")), "emoji-button" to _pS(_uM("width" to 44, "height" to 44, "borderTopLeftRadius" to 22, "borderTopRightRadius" to 22, "borderBottomRightRadius" to 22, "borderBottomLeftRadius" to 22, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center", "marginRight" to 10)), "emoji-button-text" to _pS(_uM("fontSize" to 24)), "settings-icon" to _pS(_uM("width" to 36, "height" to 36, "borderTopLeftRadius" to 18, "borderTopRightRadius" to 18, "borderBottomRightRadius" to 18, "borderBottomLeftRadius" to 18, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center")), "settings-icon-text" to _pS(_uM("fontSize" to 18, "color" to "#FFFFFF")), "phone-usage-hint" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "justifyContent" to "center", "paddingTop" to 10, "paddingRight" to 16, "paddingBottom" to 10, "paddingLeft" to 16, "marginTop" to 0, "marginRight" to -20, "marginBottom" to 0, "marginLeft" to -20, "backgroundColor" to "rgba(0,0,0,0.15)")), "phone-usage-hint-text" to _pS(_uM("fontSize" to 12, "color" to "#FFFFFF", "fontWeight" to 500)), "guard-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "paddingTop" to 18, "paddingRight" to 20, "paddingBottom" to 18, "paddingLeft" to 20, "borderTopLeftRadius" to 16, "borderTopRightRadius" to 16, "borderBottomRightRadius" to 16, "borderBottomLeftRadius" to 16, "flexDirection" to "column", "boxShadow" to "0 4px 12px rgba(0, 0, 0, 0.06)")), "guard-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginBottom" to 4)), "guard-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "flex-end", "marginBottom" to 6)), "guard-number" to _pS(_uM("fontSize" to 36, "fontWeight" to "bold", "color" to "#2ECC71")), "guard-unit" to _pS(_uM("fontSize" to 16, "color" to "#2ECC71", "fontWeight" to "bold", "marginLeft" to 4)), "guard-sub" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "penetration-section" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 12, "borderTopRightRadius" to 12, "borderBottomRightRadius" to 12, "borderBottomLeftRadius" to 12, "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "section-label" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "width" to 80)), "penetration-track" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "height" to 6, "backgroundColor" to "#F0E6F6", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3, "overflow" to "hidden")), "penetration-fill" to _pS(_uM("height" to 6, "backgroundImage" to "linear-gradient(90deg, #9B59B6 0%, #E91E63 100%)", "backgroundColor" to "rgba(0,0,0,0)", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3)), "penetration-value" to _pS(_uM("fontSize" to 13, "color" to "#9B59B6", "fontWeight" to "bold", "width" to 40, "textAlign" to "right")), "summary-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 12, "marginRight" to 16, "marginBottom" to 12, "marginLeft" to 16, "paddingTop" to 16, "paddingRight" to 16, "paddingBottom" to 16, "paddingLeft" to 16, "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "borderLeftWidth" to 4, "borderLeftColor" to "#3498DB", "borderLeftStyle" to "solid", "flexDirection" to "column", "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "summary-empty" to _pS(_uM("borderLeftColor" to "#BDC3C7", "alignItems" to "center")), "summary-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#3498DB", "fontWeight" to "bold", "marginBottom" to 6)), "summary-oneliner" to _pS(_uM("fontSize" to 17, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 8)), "summary-body" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to "20px", "marginBottom" to 8)), "summary-goal-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "backgroundColor" to "#F8F9FA", "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "paddingTop" to 8, "paddingRight" to 10, "paddingBottom" to 8, "paddingLeft" to 10, "marginBottom" to 8)), "summary-goal-label" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginRight" to 8)), "summary-goal-text" to _pS(_uM("fontSize" to 13, "color" to "#2C3E50", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "summary-encourage" to _pS(_uM("fontSize" to 13, "color" to "#E67E22", "fontStyle" to "italic", "marginTop" to 4)), "summary-empty-text" to _pS(_uM("fontSize" to 14, "color" to "#7F8C8D", "marginBottom" to 4)), "summary-empty-hint" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "recommend-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "section-header-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "library-header" to _pS(_uM("flexDirection" to "column", "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "library-item" to _pS(_uM("marginTop" to 0, "marginRight" to 0, "marginBottom" to 8, "marginLeft" to 0)), "section-title" to _pS(_uM("fontSize" to 16, "fontWeight" to "bold", "color" to "#2C3E50")), "empty-recommend" to _pS(_uM("paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "alignItems" to "center")), "empty-text" to _pS(_uM("fontSize" to 14, "color" to "#BDC3C7")), "bottom-spacer" to _pS(_uM("height" to 40)))
+                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "greeting-bar" to _pS(_uM("flexDirection" to "column", "paddingTop" to 56, "paddingRight" to 20, "paddingBottom" to 0, "paddingLeft" to 20, "backgroundColor" to "#2C3E50")), "greeting-header" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingBottom" to 12)), "bg-morning" to _pS(_uM("backgroundColor" to "#A93226")), "bg-noon" to _pS(_uM("backgroundColor" to "#1A5490")), "bg-afternoon" to _pS(_uM("backgroundColor" to "#8B4513")), "bg-evening" to _pS(_uM("backgroundColor" to "#1A237E")), "bg-night" to _pS(_uM("backgroundColor" to "#1B2631")), "greeting-left" to _pS(_uM("flexDirection" to "column")), "greeting-text" to _pS(_uM("fontSize" to 24, "fontWeight" to "bold", "color" to "#FFFFFF")), "greeting-date" to _pS(_uM("fontSize" to 12, "color" to "rgba(255,255,255,0.85)", "marginTop" to 4)), "greeting-right" to _pS(_uM("flexDirection" to "row", "alignItems" to "center")), "emoji-button" to _pS(_uM("width" to 44, "height" to 44, "borderTopLeftRadius" to 22, "borderTopRightRadius" to 22, "borderBottomRightRadius" to 22, "borderBottomLeftRadius" to 22, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center", "marginRight" to 10)), "emoji-button-text" to _pS(_uM("fontSize" to 24)), "settings-icon" to _pS(_uM("width" to 36, "height" to 36, "borderTopLeftRadius" to 18, "borderTopRightRadius" to 18, "borderBottomRightRadius" to 18, "borderBottomLeftRadius" to 18, "backgroundColor" to "rgba(255,255,255,0.25)", "alignItems" to "center", "justifyContent" to "center")), "settings-icon-text" to _pS(_uM("fontSize" to 18, "color" to "#FFFFFF")), "phone-usage-hint" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "justifyContent" to "center", "paddingTop" to 10, "paddingRight" to 16, "paddingBottom" to 10, "paddingLeft" to 16, "marginTop" to 0, "marginRight" to -20, "marginBottom" to 0, "marginLeft" to -20, "backgroundColor" to "rgba(0,0,0,0.15)")), "phone-usage-hint-text" to _pS(_uM("fontSize" to 12, "color" to "#FFFFFF", "fontWeight" to 500)), "guard-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "paddingTop" to 18, "paddingRight" to 20, "paddingBottom" to 18, "paddingLeft" to 20, "borderTopLeftRadius" to 16, "borderTopRightRadius" to 16, "borderBottomRightRadius" to 16, "borderBottomLeftRadius" to 16, "flexDirection" to "column", "boxShadow" to "0 4px 12px rgba(0, 0, 0, 0.06)")), "guard-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#7F8C8D", "marginBottom" to 4)), "guard-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "flex-end", "marginBottom" to 6)), "guard-number" to _pS(_uM("fontSize" to 36, "fontWeight" to "bold", "color" to "#2ECC71")), "guard-unit" to _pS(_uM("fontSize" to 16, "color" to "#2ECC71", "fontWeight" to "bold", "marginLeft" to 4)), "guard-sub" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "penetration-section" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "marginTop" to 8, "marginRight" to 16, "marginBottom" to 8, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 12, "borderTopRightRadius" to 12, "borderBottomRightRadius" to 12, "borderBottomLeftRadius" to 12, "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "section-label" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "width" to 80)), "penetration-track" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "height" to 6, "backgroundColor" to "#F0E6F6", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3, "overflow" to "hidden")), "penetration-fill" to _pS(_uM("height" to 6, "backgroundImage" to "linear-gradient(90deg, #9B59B6 0%, #E91E63 100%)", "backgroundColor" to "rgba(0,0,0,0)", "borderTopLeftRadius" to 3, "borderTopRightRadius" to 3, "borderBottomRightRadius" to 3, "borderBottomLeftRadius" to 3)), "penetration-value" to _pS(_uM("fontSize" to 13, "color" to "#9B59B6", "fontWeight" to "bold", "width" to 40, "textAlign" to "right")), "summary-card" to _pS(_uM("backgroundColor" to "#FFFFFF", "marginTop" to 12, "marginRight" to 16, "marginBottom" to 12, "marginLeft" to 16, "paddingTop" to 16, "paddingRight" to 16, "paddingBottom" to 16, "paddingLeft" to 16, "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "borderLeftWidth" to 4, "borderLeftColor" to "#3498DB", "borderLeftStyle" to "solid", "flexDirection" to "column", "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "summary-empty" to _pS(_uM("borderLeftColor" to "#BDC3C7", "alignItems" to "center")), "summary-eyebrow" to _pS(_uM("fontSize" to 12, "color" to "#3498DB", "fontWeight" to "bold", "marginBottom" to 6)), "summary-body" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to 1.6, "whiteSpace" to "pre-wrap", "marginBottom" to 8)), "summary-empty-text" to _pS(_uM("fontSize" to 14, "color" to "#7F8C8D", "marginBottom" to 4)), "summary-empty-hint" to _pS(_uM("fontSize" to 12, "color" to "#95A5A6")), "recommend-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "section-header-row" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-section" to _pS(_uM("marginTop" to 12, "paddingBottom" to 12)), "library-header" to _pS(_uM("flexDirection" to "column", "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 4, "paddingLeft" to 16)), "library-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "library-item" to _pS(_uM("marginTop" to 0, "marginRight" to 0, "marginBottom" to 8, "marginLeft" to 0)), "section-title" to _pS(_uM("fontSize" to 16, "fontWeight" to "bold", "color" to "#2C3E50")), "empty-recommend" to _pS(_uM("paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "alignItems" to "center")), "empty-text" to _pS(_uM("fontSize" to 14, "color" to "#BDC3C7")), "bottom-spacer" to _pS(_uM("height" to 40)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

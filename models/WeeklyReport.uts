@@ -10,11 +10,6 @@ export type WeeklyReportStats = {
 }
 
 export type WeeklyReport = {
-  title: string
-  highlight: string
-  improvement: string
-  suggestions: string[]
-  nextWeekGoal: string
-  tone: string
+  bodyMarkdown: string
   stats: WeeklyReportStats
 }
