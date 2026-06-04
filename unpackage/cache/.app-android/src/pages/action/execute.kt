@@ -253,7 +253,7 @@ open class GenPagesActionExecute : BasePage {
                 console.log("[execute] onLoad begin", " at pages/action/execute.uvue:243")
                 var aid = takeActionId()
                 console.log("[execute] from helper aid=" + aid, " at pages/action/execute.uvue:245")
-                if (aid.length === 0) {
+                if (aid.length < 1) {
                     aid = getActionIdFromOption(option)
                     console.log("[execute] from option aid=" + aid, " at pages/action/execute.uvue:248")
                 }
@@ -302,7 +302,7 @@ open class GenPagesActionExecute : BasePage {
             return fun(): Any? {
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("view", _uM("class" to "page-bg"), _uA(
-                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/dream-gradient-bg.png", "mode" to "aspectFill"))
+                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/micro-habit-page-bg.png", "mode" to "aspectFill"))
                     )),
                     _cE("view", _uM("class" to "action-container"), _uA(
                         _cE("text", _uM("class" to "action-title"), _tD(unref(actionName)), 1),

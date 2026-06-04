@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="page-bg">
-      <image class="page-bg-img" src="/static/images/dream-gradient-bg.png" mode="aspectFill"></image>
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
     </view>
     <view class="header">
       <view class="header-left" @tap="goBack">
@@ -49,7 +49,7 @@
 
     <scroll-view class="log-scroll" scroll-y="true">
       <view v-if="currentTab === 'trigger'">
-        <view v-if="triggerLogs.length === 0" class="empty">
+        <view v-if="triggerLogs.length < 1" class="empty">
           <text class="empty-text">今日暂无触发记录</text>
           <text class="empty-hint">去使用某个 App 1 分钟以上会触发提醒</text>
         </view>
@@ -77,7 +77,7 @@
       </view>
 
       <view v-if="currentTab === 'action'">
-        <view v-if="actionLogs.length === 0" class="empty">
+        <view v-if="actionLogs.length < 1" class="empty">
           <text class="empty-text">今日暂无动作记录</text>
           <text class="empty-hint">点击首页"全部微动作库"开始第一次动作</text>
         </view>
@@ -135,7 +135,7 @@
         <view class="section-header">
           <text class="section-header-text">用户设置</text>
         </view>
-        <view v-if="configList.length === 0" class="empty">
+        <view v-if="configList.length < 1" class="empty">
           <text class="empty-text">暂无配置数据</text>
         </view>
         <view v-for="(item, idx) in configList" :key="idx" class="config-item">
@@ -201,7 +201,7 @@ function formatDuration(ms: number): string {
 }
 
 function formatStr(s: string | null): string {
-  if (s == null || s.length === 0) return '-'
+  if (s == null || s.length < 1) return '-'
   return s
 }
 
@@ -216,7 +216,7 @@ function formatTriggerType(t: string): string {
 }
 
 function formatActionId(id: string | null): string {
-  if (id == null || id.length === 0) return '-'
+  if (id == null || id.length < 1) return '-'
   return id
 }
 

@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="page-bg">
-      <image class="page-bg-img" src="/static/images/dream-gradient-bg.png" mode="aspectFill"></image>
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
     </view>
     <scroll-view class="scroll-area" scroll-y="true">
       <view class="section">
@@ -42,7 +42,7 @@
               </view>
             </view>
           </view>
-          <view class="empty-hint" v-if="detailCount === 0">
+          <view class="empty-hint" v-if="detailCount < 1">
             <text class="empty-text">今日暂无完成记录</text>
           </view>
         </view>

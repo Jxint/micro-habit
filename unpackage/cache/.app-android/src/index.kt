@@ -139,7 +139,7 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
     )
 }
 fun initRuntimeSocketService(): UTSPromise<Boolean> {
-    val hosts: String = "127.0.0.1,192.168.3.218,172.16.253.1,192.168.238.1"
+    val hosts: String = "127.0.0.1,172.24.27.255,172.16.253.1,192.168.238.1"
     val port: String = "8090"
     val id: String = "app-android_6DhOvg"
     if (hosts == "" || port == "" || id == "") {
@@ -6903,13 +6903,13 @@ open class AchievementProgress (
 }
 val ACHIEVEMENTS = _uA(
     AchievementDef(id = "first_action", name = "初出茅庐", icon = "🌱", description = "完成第 1 次微动作", category = "累计", conditionType = "total_count", threshold = 1, rewardText = "🏅 健康之旅正式启程", historyText = "0 → 1：迈出第一步", actionType = "", startHour = 0, endHour = 0),
-    AchievementDef(id = "streak_3", name = "初见曙光", icon = "🔥", description = "连续 3 天每天完成至少 1 次", category = "坚持", conditionType = "streak_days", threshold = 3, rewardText = "🏅 习惯的种子已发芽", historyText = "连续天数 1 → 2 → 3", actionType = "", startHour = 0, endHour = 0),
+    AchievementDef(id = "streak_3", name = "初见曙光", icon = "✦", description = "连续 3 天每天完成至少 1 次", category = "坚持", conditionType = "streak_days", threshold = 3, rewardText = "🏅 习惯的种子已发芽", historyText = "连续天数 1 → 2 → 3", actionType = "", startHour = 0, endHour = 0),
     AchievementDef(id = "total_10", name = "小有所成", icon = "🌿", description = "累计完成 10 次微动作", category = "累计", conditionType = "total_count", threshold = 10, rewardText = "🏅 健康生活的初学者", historyText = "1 → 5 → 10：稳步前进", actionType = "", startHour = 0, endHour = 0),
     AchievementDef(id = "total_30", name = "习惯养成", icon = "🌳", description = "累计完成 30 次微动作", category = "累计", conditionType = "total_count", threshold = 30, rewardText = "🏅 习惯已成自然", historyText = "10 → 20 → 30：质的飞跃", actionType = "", startHour = 0, endHour = 0),
     AchievementDef(id = "total_100", name = "守护百次", icon = "🏆", description = "累计完成 100 次微动作", category = "累计", conditionType = "total_count", threshold = 100, rewardText = "🏆 健康守护者", historyText = "30 → 60 → 100：百日筑基", actionType = "", startHour = 0, endHour = 0),
-    AchievementDef(id = "eye_score_90", name = "眼明心亮", icon = "👁", description = "单日护眼评分达 90 分以上", category = "评分", conditionType = "eye_score", threshold = 90, rewardText = "👁 护眼小达人", historyText = "70 → 80 → 90：明眸善睐", actionType = "", startHour = 0, endHour = 0),
+    AchievementDef(id = "eye_score_90", name = "眼明心亮", icon = "◐", description = "单日护眼评分达 90 分以上", category = "评分", conditionType = "eye_score", threshold = 90, rewardText = "◐ 护眼小达人", historyText = "70 → 80 → 90：明眸善睐", actionType = "", startHour = 0, endHour = 0),
     AchievementDef(id = "neck_10", name = "颈肩舒畅", icon = "💆", description = "累计完成 10 次肩颈类动作", category = "动作", conditionType = "category_count", threshold = 10, rewardText = "💆 肩颈不再僵硬", historyText = "1 → 5 → 10：肩颈舒展", actionType = "肩颈", startHour = 0, endHour = 0),
-    AchievementDef(id = "breath_10", name = "深呼吸者", icon = "🌬", description = "累计完成 10 次腹式呼吸", category = "动作", conditionType = "category_count", threshold = 10, rewardText = "🌬 调息养神大师", historyText = "1 → 5 → 10：呼吸有度", actionType = "呼吸", startHour = 0, endHour = 0),
+    AchievementDef(id = "breath_10", name = "深呼吸者", icon = "◎", description = "累计完成 10 次腹式呼吸", category = "动作", conditionType = "category_count", threshold = 10, rewardText = "◎ 调息养神大师", historyText = "1 → 5 → 10：呼吸有度", actionType = "呼吸", startHour = 0, endHour = 0),
     AchievementDef(id = "morning_5", name = "晨型人", icon = "🌅", description = "凌晨 5 点至 9 点累计完成 5 次", category = "时段", conditionType = "hour_range_count", threshold = 5, rewardText = "🌅 拥抱清晨第一缕阳光", historyText = "1 → 3 → 5：晨起打卡", actionType = "", startHour = 5, endHour = 9),
     AchievementDef(id = "night_5", name = "夜猫子", icon = "🌙", description = "晚 22 点至凌晨 2 点累计完成 5 次", category = "时段", conditionType = "hour_range_count", threshold = 5, rewardText = "🌙 深夜的健康守护者", historyText = "1 → 3 → 5：夜半灯下", actionType = "", startHour = 22, endHour = 2),
     AchievementDef(id = "daily_30", name = "极限挑战", icon = "🚀", description = "单日完成 30 次微动作", category = "单日", conditionType = "daily_count", threshold = 30, rewardText = "🚀 一天 30 次的硬核玩家", historyText = "10 → 20 → 30：单日极限", actionType = "", startHour = 0, endHour = 0),
@@ -9315,7 +9315,7 @@ val __uniTabBar: Map<String, Any?>? = _uM("list" to _uA(
 val __uniLaunchPage: Map<String, Any?> = _uM("url" to "pages/guide/index", "style" to _uM("navigationStyle" to "custom", "navigationBarTitleText" to ""))
 fun defineAppConfig() {
     __uniConfig.entryPagePath = "/pages/guide/index"
-    __uniConfig.globalStyle = _uM("navigationBarTextStyle" to "black", "navigationBarTitleText" to "", "navigationBarBackgroundColor" to "#F8F8F8", "backgroundColor" to "#F8F8F8")
+    __uniConfig.globalStyle = _uM("navigationBarTextStyle" to "black", "navigationBarTitleText" to "", "navigationBarBackgroundColor" to "#F8F8F8", "backgroundColor" to "#F7FAFF")
     __uniConfig.getTabBarConfig = fun(): Map<String, Any>? {
         return _uM("list" to _uA(
             _uM("pagePath" to "pages/home/index", "text" to "首页"),

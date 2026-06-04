@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="page-bg">
-      <image class="page-bg-img" src="/static/images/dream-gradient-bg.png" mode="aspectFill"></image>
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
     </view>
     <view class="action-container">
       <text class="action-title">{{ actionName }}</text>
@@ -243,7 +243,7 @@ onLoad((option) => {
   console.log('[execute] onLoad begin')
   let aid = takeActionId()
   console.log('[execute] from helper aid=' + aid)
-  if (aid.length === 0) {
+  if (aid.length < 1) {
     aid = getActionIdFromOption(option)
     console.log('[execute] from option aid=' + aid)
   }

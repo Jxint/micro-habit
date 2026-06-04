@@ -32,7 +32,7 @@ open class GenPagesSettingsIndex : BasePage {
             }
             val pad2 = ::gen_pad2_fn
             fun gen_parseHourFromSetting_fn(v: String, def: Number): Number {
-                if (v.length === 0) {
+                if (v.length < 1) {
                     return def
                 }
                 val parts = v.split(":")
@@ -81,7 +81,7 @@ open class GenPagesSettingsIndex : BasePage {
                 if (pkgs.length < 1) {
                     return "任意 App"
                 }
-                if (pkgs.length === 1) {
+                if (pkgs.length == 1) {
                     return pkgs[0] as String
                 }
                 return pkgs.length + " 个应用"
@@ -121,7 +121,7 @@ open class GenPagesSettingsIndex : BasePage {
             }
             val formatSource = ::gen_formatSource_fn
             fun gen_formatCondition_fn(json: String): String {
-                if (json.length === 0) {
+                if (json.length < 1) {
                     return "无条件"
                 }
                 try {
@@ -135,7 +135,7 @@ open class GenPagesSettingsIndex : BasePage {
                     if (apps != null) {
                         val arr = apps as UTSArray<Any>
                         if (arr.length > 0) {
-                            parts.push("包名 " + (if (arr.length === 1) {
+                            parts.push("包名 " + (if (arr.length == 1) {
                                 (arr[0] as String)
                             } else {
                                 (arr.length + " 个")
@@ -151,7 +151,7 @@ open class GenPagesSettingsIndex : BasePage {
                             parts.push("时段 " + s + "-" + e)
                         }
                     }
-                    if (parts.length === 0) {
+                    if (parts.length < 1) {
                         return json.substring(0, 20)
                     }
                     return parts.join(" / ")
@@ -381,7 +381,7 @@ open class GenPagesSettingsIndex : BasePage {
                 val _component_switch = resolveComponent("switch")
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("view", _uM("class" to "page-bg"), _uA(
-                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/dream-gradient-bg.png", "mode" to "aspectFill"))
+                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/micro-habit-page-bg.png", "mode" to "aspectFill"))
                     )),
                     _cE("scroll-view", _uM("class" to "scroll-area", "scroll-y" to "true"), _uA(
                         _cE("view", _uM("class" to "settings-section"), _uA(
@@ -451,7 +451,7 @@ open class GenPagesSettingsIndex : BasePage {
                         )),
                         _cE("view", _uM("class" to "settings-section"), _uA(
                             _cE("text", _uM("class" to "section-title"), "触发规则（" + _tD(unref(rules).length) + " 条）", 1),
-                            if (unref(rules).length === 0) {
+                            if (unref(rules).length < 1) {
                                 _cE("view", _uM("key" to 0, "class" to "empty-rules"), _uA(
                                     _cE("text", _uM("class" to "empty-text"), "暂无启用的触发规则"),
                                     _cE("text", _uM("class" to "empty-hint"), "完成微动作后 AI 会自动建议规则")

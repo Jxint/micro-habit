@@ -77,7 +77,7 @@ open class GenPagesDebugLogs : BasePage {
             }
             val formatDuration = ::gen_formatDuration_fn
             fun gen_formatStr_fn(s: String?): String {
-                if (s == null || s.length === 0) {
+                if (s == null || s.length < 1) {
                     return "-"
                 }
                 return s
@@ -106,7 +106,7 @@ open class GenPagesDebugLogs : BasePage {
             }
             val formatTriggerType = ::gen_formatTriggerType_fn
             fun gen_formatActionId_fn(id: String?): String {
-                if (id == null || id.length === 0) {
+                if (id == null || id.length < 1) {
                     return "-"
                 }
                 return id
@@ -272,7 +272,7 @@ open class GenPagesDebugLogs : BasePage {
             return fun(): Any? {
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("view", _uM("class" to "page-bg"), _uA(
-                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/dream-gradient-bg.png", "mode" to "aspectFill"))
+                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/micro-habit-page-bg.png", "mode" to "aspectFill"))
                     )),
                     _cE("view", _uM("class" to "header"), _uA(
                         _cE("view", _uM("class" to "header-left", "onClick" to goBack), _uA(
@@ -350,7 +350,7 @@ open class GenPagesDebugLogs : BasePage {
                     _cE("scroll-view", _uM("class" to "log-scroll", "scroll-y" to "true"), _uA(
                         if (unref(currentTab) === "trigger") {
                             _cE("view", _uM("key" to 0), _uA(
-                                if (unref(triggerLogs).length === 0) {
+                                if (unref(triggerLogs).length < 1) {
                                     _cE("view", _uM("key" to 0, "class" to "empty"), _uA(
                                         _cE("text", _uM("class" to "empty-text"), "今日暂无触发记录"),
                                         _cE("text", _uM("class" to "empty-hint"), "去使用某个 App 1 分钟以上会触发提醒")
@@ -394,7 +394,7 @@ open class GenPagesDebugLogs : BasePage {
                         ,
                         if (unref(currentTab) === "action") {
                             _cE("view", _uM("key" to 1), _uA(
-                                if (unref(actionLogs).length === 0) {
+                                if (unref(actionLogs).length < 1) {
                                     _cE("view", _uM("key" to 0, "class" to "empty"), _uA(
                                         _cE("text", _uM("class" to "empty-text"), "今日暂无动作记录"),
                                         _cE("text", _uM("class" to "empty-hint"), "点击首页\"全部微动作库\"开始第一次动作")
@@ -483,7 +483,7 @@ open class GenPagesDebugLogs : BasePage {
                                 _cE("view", _uM("class" to "section-header"), _uA(
                                     _cE("text", _uM("class" to "section-header-text"), "用户设置")
                                 )),
-                                if (unref(configList).length === 0) {
+                                if (unref(configList).length < 1) {
                                     _cE("view", _uM("key" to 0, "class" to "empty"), _uA(
                                         _cE("text", _uM("class" to "empty-text"), "暂无配置数据")
                                     ))

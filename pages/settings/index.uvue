@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="page-bg">
-      <image class="page-bg-img" src="/static/images/dream-gradient-bg.png" mode="aspectFill"></image>
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
     </view>
     <scroll-view class="scroll-area" scroll-y="true">
       <view class="settings-section">
@@ -67,7 +67,7 @@
 
       <view class="settings-section">
         <text class="section-title">触发规则（{{ rules.length }} 条）</text>
-        <view v-if="rules.length === 0" class="empty-rules">
+        <view v-if="rules.length < 1" class="empty-rules">
           <text class="empty-text">暂无启用的触发规则</text>
           <text class="empty-hint">完成微动作后 AI 会自动建议规则</text>
         </view>
@@ -204,7 +204,7 @@ function pad2(n: number): string {
 }
 
 function parseHourFromSetting(v: string, def: number): number {
-  if (v.length === 0) return def
+  if (v.length < 1) return def
   const parts = v.split(':')
   const h = parseInt(parts[0] as string)
   if (isNaN(h) || h < 0 || h > 23) return def
@@ -237,7 +237,7 @@ function getActionDisplayName(actionId: string): string {
 
 function formatAppPackages(pkgs: string[]): string {
   if (pkgs.length < 1) return '任意 App'
-  if (pkgs.length === 1) return pkgs[0] as string
+  if (pkgs.length == 1) return pkgs[0] as string
   return pkgs.length + ' 个应用'
 }
 
@@ -261,7 +261,7 @@ function formatSource(s: string): string {
 }
 
 function formatCondition(json: string): string {
-  if (json.length === 0) return '无条件'
+  if (json.length < 1) return '无条件'
   try {
     const obj = JSON.parse(json) as UTSJSONObject
     if (obj == null) return json.substring(0, 20)
@@ -271,7 +271,7 @@ function formatCondition(json: string): string {
     if (apps != null) {
       const arr = apps as Array<any>
       if (arr.length > 0) {
-        parts.push('包名 ' + (arr.length === 1 ? (arr[0] as string) : (arr.length + ' 个')))
+        parts.push('包名 ' + (arr.length == 1 ? (arr[0] as string) : (arr.length + ' 个')))
       }
     }
     if (tw != null) {
@@ -282,7 +282,7 @@ function formatCondition(json: string): string {
         parts.push('时段 ' + s + '-' + e)
       }
     }
-    if (parts.length === 0) return json.substring(0, 20)
+    if (parts.length < 1) return json.substring(0, 20)
     return parts.join(' / ')
   } catch (_) {
     return json.substring(0, 20)

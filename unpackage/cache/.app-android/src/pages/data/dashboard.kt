@@ -213,7 +213,7 @@ open class GenPagesDataDashboard : BasePage {
             return fun(): Any? {
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("view", _uM("class" to "page-bg"), _uA(
-                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/dream-gradient-bg.png", "mode" to "aspectFill"))
+                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/micro-habit-page-bg.png", "mode" to "aspectFill"))
                     )),
                     _cE("scroll-view", _uM("class" to "scroll-area", "scroll-y" to "true"), _uA(
                         _cE("view", _uM("class" to "section"), _uA(
@@ -265,7 +265,7 @@ open class GenPagesDataDashboard : BasePage {
                                     _cC("v-if", true)
                                 }
                                 ,
-                                if (unref(detailCount) === 0) {
+                                if (unref(detailCount) < 1) {
                                     _cE("view", _uM("key" to 1, "class" to "empty-hint"), _uA(
                                         _cE("text", _uM("class" to "empty-text"), "今日暂无完成记录")
                                     ))

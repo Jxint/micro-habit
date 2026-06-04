@@ -49,7 +49,7 @@ open class GenPagesGuideIndex : BasePage {
             return fun(): Any? {
                 return _cE("view", _uM("class" to "page"), _uA(
                     _cE("view", _uM("class" to "page-bg"), _uA(
-                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/dream-gradient-bg.png", "mode" to "aspectFill"))
+                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/micro-habit-page-bg.png", "mode" to "aspectFill"))
                     )),
                     _cE("scroll-view", _uM("class" to "scroll-area", "scroll-y" to "true"), _uA(
                         _cE("view", _uM("class" to "hero-block"), _uA(
