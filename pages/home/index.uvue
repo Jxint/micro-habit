@@ -101,7 +101,7 @@
         <view class="section-header-row">
           <text class="section-title">🎯 今日推荐</text>
         </view>
-        <view v-if="recommendedActions.length === 0" class="empty-recommend">
+        <view v-if="recommendedActions.length < 1" class="empty-recommend">
           <text class="empty-text">暂无推荐</text>
         </view>
         <view v-for="(action, idx) in recommendedActions" :key="'r-' + idx">

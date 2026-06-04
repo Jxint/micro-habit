@@ -795,7 +795,7 @@ open class GenPagesHomeIndex : BasePage {
                             _cE("view", _uM("class" to "section-header-row"), _uA(
                                 _cE("text", _uM("class" to "section-title"), "🎯 今日推荐")
                             )),
-                            if (unref(recommendedActions).length === 0) {
+                            if (unref(recommendedActions).length < 1) {
                                 _cE("view", _uM("key" to 0, "class" to "empty-recommend"), _uA(
                                     _cE("text", _uM("class" to "empty-text"), "暂无推荐")
                                 ))
