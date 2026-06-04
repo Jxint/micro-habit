@@ -659,7 +659,7 @@ onLoad((): void => {
 .greeting-bar {
   flex-direction: column;
   padding: 56px 20px 0 20px;
-  background-color: #2C3E50;
+  background-color: transparent;
 }
 .greeting-header {
   flex-direction: row;
@@ -668,19 +668,19 @@ onLoad((): void => {
   padding-bottom: 12px;
 }
 .bg-morning {
-  background-color: #A93226;
+  background-color: transparent;
 }
 .bg-noon {
-  background-color: #1A5490;
+  background-color: transparent;
 }
 .bg-afternoon {
-  background-color: #8B4513;
+  background-color: transparent;
 }
 .bg-evening {
-  background-color: #1A237E;
+  background-color: transparent;
 }
 .bg-night {
-  background-color: #1B2631;
+  background-color: transparent;
 }
 .greeting-left {
   flex-direction: column;
@@ -688,11 +688,11 @@ onLoad((): void => {
 .greeting-text {
   font-size: 24px;
   font-weight: bold;
-  color: #FFFFFF;
+  color: #1E2A38;
 }
 .greeting-date {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
+  color: #526273;
   margin-top: 4px;
 }
 .greeting-right {
@@ -703,7 +703,7 @@ onLoad((): void => {
   width: 44px;
   height: 44px;
   border-radius: 22px;
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.58);
   align-items: center;
   justify-content: center;
   margin-right: 10px;
@@ -715,13 +715,13 @@ onLoad((): void => {
   width: 36px;
   height: 36px;
   border-radius: 18px;
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.58);
   align-items: center;
   justify-content: center;
 }
 .settings-icon-text {
   font-size: 18px;
-  color: #FFFFFF;
+  color: #1E2A38;
 }
 .phone-usage-hint {
   flex-direction: row;
@@ -729,11 +729,11 @@ onLoad((): void => {
   justify-content: center;
   padding: 10px 16px;
   margin: 0 -20px;
-  background-color: rgba(0, 0, 0, 0.15);
+  background-color: rgba(255, 255, 255, 0.45);
 }
 .phone-usage-hint-text {
   font-size: 12px;
-  color: #FFFFFF;
+  color: #34495E;
   font-weight: 500;
 }
 .guard-card {
@@ -926,18 +926,18 @@ onLoad((): void => {
 .penetration-track {
   flex: 1;
   height: 6px;
-  background-color: #F0E6F6;
+  background-color: rgba(255, 255, 255, 0.65);
   border-radius: 3px;
   overflow: hidden;
 }
 .penetration-fill {
   height: 6px;
-  background: linear-gradient(90deg, #9B59B6 0%, #E91E63 100%);
+  background: linear-gradient(90deg, #58C6D8 0%, #2ECC71 100%);
   border-radius: 3px;
 }
 .penetration-value {
   font-size: 13px;
-  color: #9B59B6;
+  color: #168A9A;
   font-weight: bold;
   width: 40px;
   text-align: right;

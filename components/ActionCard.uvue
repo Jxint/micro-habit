@@ -1,7 +1,7 @@
 <template>
   <view class="action-card" :class="cardClass" @tap="onTap">
     <view class="action-icon-wrap" :class="iconWrapClass">
-      <text class="action-icon">{{ iconEmoji() }}</text>
+      <image class="action-icon-img" :src="actionIconPath()" mode="aspectFit"></image>
     </view>
     <view class="action-info">
       <text class="action-name">{{ props.actionName }}</text>
@@ -27,17 +27,17 @@ const emit = defineEmits<{
   (e: 'actionTap', actionId: string): void
 }>()
 
-function iconEmoji(): string {
-  if (props.actionId === 'eye_blink') return '👁'
-  if (props.actionId === 'eye_rotate') return '👀'
-  if (props.actionId === 'neck_rotate') return '🔄'
-  if (props.actionId === 'shoulder_roll') return '💪'
-  if (props.actionId === 'neck_stretch') return '🧘'
-  if (props.actionId === 'core_tighten') return '🔥'
-  if (props.actionId === 'heel_raise') return '🦶'
-  if (props.actionId === 'deep_breath') return '🌬'
-  if (props.actionId === 'far_gaze') return '🏔'
-  return '✓'
+function actionIconPath(): string {
+  if (props.actionId === 'eye_blink') return '/static/icons/eye_blink.png'
+  if (props.actionId === 'eye_rotate') return '/static/icons/eye_rotate.png'
+  if (props.actionId === 'neck_rotate') return '/static/icons/neck_rotate.png'
+  if (props.actionId === 'shoulder_roll') return '/static/icons/shoulder_roll.png'
+  if (props.actionId === 'neck_stretch') return '/static/icons/neck_stretch.png'
+  if (props.actionId === 'core_tighten') return '/static/icons/core_tighten.png'
+  if (props.actionId === 'heel_raise') return '/static/icons/heel_raise.png'
+  if (props.actionId === 'deep_breath') return '/static/icons/deep_breath.png'
+  if (props.actionId === 'far_gaze') return '/static/icons/far_gaze.png'
+  return '/static/icons/eye_blink.png'
 }
 
 function getCardClass(): string {
@@ -85,9 +85,9 @@ function onTap(): void {
   border-style: solid;
 }
 .action-icon-wrap {
-  width: 40px;
-  height: 40px;
-  border-radius: 20px;
+  width: 46px;
+  height: 46px;
+  border-radius: 23px;
   align-items: center;
   justify-content: center;
   margin-right: 12px;
@@ -98,8 +98,9 @@ function onTap(): void {
 .icon-wrap-library {
   background-color: #F0F3F4;
 }
-.action-icon {
-  font-size: 22px;
+.action-icon-img {
+  width: 42px;
+  height: 42px;
 }
 .action-info {
   flex: 1;

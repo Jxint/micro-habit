@@ -135,13 +135,13 @@ function goHome(): void {
 .hero-block {
   align-items: center;
   padding: 60px 24px 32px 24px;
-  background-color: #1E2A38;
+  background-color: transparent;
 }
 .hero-icon-wrap {
   width: 96px;
   height: 96px;
   border-radius: 48px;
-  background-color: rgba(46, 204, 113, 0.15);
+  background-color: rgba(255, 255, 255, 0.55);
   align-items: center;
   justify-content: center;
   margin-bottom: 20px;
@@ -152,12 +152,12 @@ function goHome(): void {
 .hero-title {
   font-size: 24px;
   font-weight: bold;
-  color: #FFFFFF;
+  color: #1E2A38;
   margin-bottom: 8px;
 }
 .hero-subtitle {
   font-size: 13px;
-  color: #95A5A6;
+  color: #4A5A6A;
   text-align: center;
   line-height: 1.6;
   padding: 0 16px;
@@ -167,14 +167,14 @@ function goHome(): void {
 }
 .step-card {
   flex-direction: row;
-  background-color: #2C3E50;
+  background-color: rgba(255, 255, 255, 0.58);
   border-radius: 14px;
   padding: 16px;
   margin-bottom: 12px;
   align-items: flex-start;
 }
 .step-card-info {
-  background-color: rgba(46, 204, 113, 0.12);
+  background-color: rgba(255, 255, 255, 0.46);
 }
 .step-num-wrap {
   width: 32px;
@@ -190,7 +190,7 @@ function goHome(): void {
   background-color: #3498DB;
 }
 .step-num-2 {
-  background-color: #9B59B6;
+  background-color: #7EC8F2;
 }
 .step-num-3 {
   background-color: #2ECC71;
@@ -207,12 +207,12 @@ function goHome(): void {
 .step-title {
   font-size: 15px;
   font-weight: bold;
-  color: #FFFFFF;
+  color: #1E2A38;
   margin-bottom: 4px;
 }
 .step-desc {
   font-size: 12px;
-  color: #BDC3C7;
+  color: #526273;
   line-height: 1.6;
   margin-bottom: 10px;
 }
@@ -231,8 +231,8 @@ function goHome(): void {
   background-color: rgba(46, 204, 113, 0.15);
 }
 .step-status-off {
-  color: #BDC3C7;
-  background-color: rgba(255, 255, 255, 0.05);
+  color: #7F8C8D;
+  background-color: rgba(255, 255, 255, 0.5);
 }
 .step-action-btn {
   margin-left: 10px;

@@ -7,7 +7,7 @@
       <text class="action-title">{{ actionName }}</text>
 
       <view class="icon-display">
-        <text class="action-icon">{{ iconEmoji }}</text>
+        <image class="action-icon-img" :src="actionIconPath" mode="aspectFit"></image>
       </view>
 
       <text class="tts-text">{{ actionTtsText }}</text>
@@ -90,20 +90,9 @@ const actionDuration = computed<number>((): number => {
   return a != null ? a.defaultDurationMs : 0
 })
 
-const iconEmoji = computed<string>((): string => {
+const actionIconPath = computed<string>((): string => {
   const a = action.value
-  if (a == null) return '?'
-  const id = a.id
-  if (id === 'eye_blink') return '👁'
-  if (id === 'eye_rotate') return '👀'
-  if (id === 'neck_rotate') return '🔄'
-  if (id === 'shoulder_roll') return '💪'
-  if (id === 'neck_stretch') return '🧘'
-  if (id === 'core_tighten') return '🔥'
-  if (id === 'heel_raise') return '🦶'
-  if (id === 'deep_breath') return '🌬'
-  if (id === 'far_gaze') return '🏔'
-  return '?'
+  return a != null ? a.iconPath : '/static/icons/eye_blink.png'
 })
 
 /* ---------- leaf functions (no deps) ---------- */
@@ -327,16 +316,17 @@ onUnload((): void => {
   margin-bottom: 16px;
 }
 .icon-display {
-  width: 100px;
-  height: 100px;
+  width: 118px;
+  height: 118px;
   justify-content: center;
   align-items: center;
   background-color: #F0F3F4;
-  border-radius: 50px;
+  border-radius: 59px;
   margin-bottom: 16px;
 }
-.action-icon {
-  font-size: 48px;
+.action-icon-img {
+  width: 108px;
+  height: 108px;
 }
 .tts-text {
   font-size: 15px;
