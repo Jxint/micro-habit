@@ -86,6 +86,7 @@ open class GenComponentsActionCard : VueComponent {
             val cardClass = computed<String>(getCardClass)
             val iconWrapClass = computed<String>(getIconWrapClass)
             val arrowClass = computed<String>(getArrowClass)
+            val actionIconSrc = computed<String>(actionIconPath)
             fun gen_onTap_fn(): Unit {
                 emit("actionTap", props.actionId)
             }
@@ -99,7 +100,7 @@ open class GenComponentsActionCard : VueComponent {
                         "action-icon-wrap",
                         unref(iconWrapClass)
                     ))), _uA(
-                        _cE("image", _uM("class" to "action-icon-img", "src" to actionIconPath(), "mode" to "aspectFit"), null, 8, _uA(
+                        _cE("image", _uM("class" to "action-icon-img", "src" to unref(actionIconSrc), "mode" to "aspectFit"), null, 8, _uA(
                             "src"
                         ))
                     ), 2),

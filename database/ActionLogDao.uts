@@ -18,6 +18,34 @@ export function insertActionLog(log: ActionLog): number {
   return dbManager.insert('action_logs', row)
 }
 
+export function insertManualActionLog(
+  actionId: string,
+  actionType: string,
+  result: string,
+  skipReason: string | null,
+  durationMs: number,
+  targetMs: number,
+  triggeredAt: number,
+  completedAt: number,
+  createdAt: number
+): number {
+  const log: ActionLog = {
+    id: 0,
+    action_id: actionId,
+    action_type: actionType,
+    result: result as ActionResult,
+    skip_reason: skipReason,
+    trigger_type: 'manual',
+    trigger_level: 'gentle',
+    duration_ms: durationMs,
+    target_ms: targetMs,
+    triggered_at: triggeredAt,
+    completed_at: completedAt,
+    created_at: createdAt
+  }
+  return insertActionLog(log)
+}
+
 export function getTodayLogs(): ActionLog[] {
   const start = getDayStartTimestamp()
   const end = start + 86400

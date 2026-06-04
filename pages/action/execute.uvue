@@ -1,35 +1,68 @@
 <template>
   <view class="page">
-    <view class="page-bg">
-      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
+    <view class="bg-glow glow-purple"></view>
+    <view class="bg-glow glow-blue"></view>
+    <view class="bg-glow glow-pink"></view>
+    <view class="sky-star star-a"></view>
+    <view class="sky-star star-b"></view>
+    <view class="sky-star star-c"></view>
+    <view class="sky-star star-d"></view>
+    <view class="sky-star star-e"></view>
+    <view class="sky-star star-f"></view>
+    <view class="sky-star star-g"></view>
+    <view class="sky-star star-h"></view>
+    <view class="sky-star star-i"></view>
+    <view class="sky-star star-j"></view>
+    <view class="sky-star star-k"></view>
+    <view class="sky-star star-l"></view>
+    <view class="back-button" @tap="goBack">
+      <text class="back-icon">‹</text>
     </view>
     <view class="action-container">
+      <text class="ritual-label">{{ ritualLabel }}</text>
       <text class="action-title">{{ actionName }}</text>
+      <text class="action-subtitle">{{ executeIntro }}</text>
 
-      <view class="icon-display">
-        <image class="action-icon-img" :src="actionIconPath" mode="aspectFit"></image>
+      <view class="lottie-stage" :class="lottiePlaying ? 'lottie-stage-playing' : 'lottie-stage-paused'">
+        <view class="lottie-glow">
+          <view class="lottie-orbit"></view>
+          <view class="icon-display">
+            <text class="action-icon">{{ iconEmoji }}</text>
+          </view>
+        </view>
+        <text class="lottie-placeholder">{{ lottieStateText }}</text>
+        <view class="lottie-controls">
+          <view class="lottie-chip" @tap="toggleLottiePlaying">
+            <text class="lottie-chip-text">{{ lottiePlaying ? '暂停' : '播放' }}</text>
+          </view>
+          <view class="lottie-chip" :class="lottieLoop ? 'lottie-chip-active' : ''" @tap="toggleLottieLoop">
+            <text class="lottie-chip-text" :class="lottieLoop ? 'lottie-chip-text-active' : ''">{{ lottieLoop ? '循环中' : '循环' }}</text>
+          </view>
+        </view>
       </view>
 
-      <text class="tts-text">{{ actionTtsText }}</text>
+      <text v-if="!showCountdown" class="tts-text">{{ actionTtsText }}</text>
+      <text v-if="showCountdown" class="tts-text execute-guide">{{ executeGuide }}</text>
 
       <view v-if="showCountdown">
         <CountdownBar :total="actionDuration" :remaining="remainingMs" />
       </view>
 
       <view v-if="showButtons" class="button-group">
-        <button class="action-btn secondary" @tap="handleSelfReported">我做过了</button>
-        <button class="action-btn secondary" @tap="handleBusy">现在忙，晚点提醒我</button>
-        <button class="action-btn primary" @tap="handleAgree">好啊</button>
+        <button class="action-btn action-primary" @tap="handleAgree">好啊</button>
+        <button class="action-btn action-secondary" @tap="handleSelfReported">我做过了</button>
+        <button class="action-btn action-ghost" @tap="handleBusy">现在忙，晚点提醒我</button>
       </view>
 
       <view v-if="showSkip" class="button-group">
-        <button class="action-btn secondary" @tap="handleSkipDuringExec">跳过</button>
+        <button class="action-btn action-ghost" @tap="handleSkipDuringExec">跳过这次</button>
       </view>
     </view>
 
     <EncourageToast :visible="showEncourage" :text="encourageText" />
 
     <FeedbackDialog :visible="showFeedback" @confirm="onFeedbackConfirm" @cancel="onFeedbackCancel" />
+
   </view>
 </template>
 
@@ -37,15 +70,14 @@
 import CountdownBar from '../../components/CountdownBar.uvue'
 import EncourageToast from '../../components/EncourageToast.uvue'
 import FeedbackDialog from '../../components/FeedbackDialog.uvue'
-import { ActionLog } from '../../models/ActionLog'
 import { MicroAction } from '../../models/MicroAction'
 import { getActionById } from '../../constants/Actions'
 import { getRandomEncourage } from '../../constants/EncourageTexts'
-import { insertActionLog } from '../../database/ActionLogDao'
-import { speakAdhoc as speakAdhocTts, speakFixedGuide as speakFixedGuideTts } from '../../services/TtsService'
-import { getAdhocFromNextPage, takeAdhocText } from '../../utils/NavigationHelper'
+import { insertManualActionLog } from '../../database/ActionLogDao'
 import { onCompleted, onConsecutiveSkip } from '../../services/RuleEngine'
 import { takeActionId } from '../../utils/NavigationHelper'
+import { shortVibrate } from '../../utils/VibrateUtils'
+import { getExecuteGuide, getExecuteIntro } from '../../constants/MicroPlanetCopy'
 
 const actionId = ref<string>('')
 const action = ref<MicroAction | null>(null)
@@ -55,8 +87,9 @@ const showEncourage = ref<boolean>(false)
 const encourageText = ref<string>('')
 const showFeedback = ref<boolean>(false)
 const remainingMs = ref<number>(0)
+const lottiePlaying = ref<boolean>(true)
+const lottieLoop = ref<boolean>(true)
 let countdownTimerId: number | null = null
-let encourageTimerId: number | null = null
 
 const showButtons = computed<boolean>((): boolean => {
   const a = action.value
@@ -90,12 +123,52 @@ const actionDuration = computed<number>((): number => {
   return a != null ? a.defaultDurationMs : 0
 })
 
-const actionIconPath = computed<string>((): string => {
+const iconEmoji = computed<string>((): string => {
   const a = action.value
-  return a != null ? a.iconPath : '/static/icons/eye_blink.png'
+  if (a == null) return '?'
+  const id = a.id
+  if (id === 'eye_blink') return '👁'
+  if (id === 'eye_rotate') return '👀'
+  if (id === 'neck_rotate') return '🔄'
+  if (id === 'shoulder_roll') return '💪'
+  if (id === 'neck_stretch') return '🧘'
+  if (id === 'core_tighten') return '🔥'
+  if (id === 'heel_raise') return '🦶'
+  if (id === 'deep_breath') return '🌬'
+  if (id === 'far_gaze') return '🏔'
+  return '?'
 })
 
+const executeIntro = computed<string>((): string => getExecuteIntro(actionId.value))
+const executeGuide = computed<string>((): string => getExecuteGuide(actionId.value))
+const ritualLabel = computed<string>((): string => isExecuting.value ? '正在点亮小星球' : '10 秒健康仪式')
+function getActionCueText(id: string): string {
+  if (id === 'eye_blink') return '轻闭双眼 2 秒后睁开，重复眨眼，让眼表重新湿润'
+  if (id === 'eye_rotate') return '眼球缓慢画圈，顺时针一圈后再逆时针一圈'
+  if (id === 'neck_rotate') return '肩膀放松，头部慢慢转向一侧，停 3 秒后回正'
+  if (id === 'shoulder_roll') return '双肩向上提起，再向后画圈放下，保持动作缓慢'
+  if (id === 'neck_stretch') return '坐直身体，轻轻侧屈头颈，感受肩颈外侧被拉长'
+  if (id === 'core_tighten') return '收紧腹部和骨盆底，保持自然呼吸，不要憋气'
+  if (id === 'heel_raise') return '双脚踩稳，缓慢踮起脚跟，再控制速度落回地面'
+  if (id === 'deep_breath') return '鼻吸 4 秒让腹部鼓起，口呼 6 秒把气息慢慢送出'
+  if (id === 'far_gaze') return '看向 6 米外的固定目标，放松眉心和眼周肌肉'
+  return '跟随节奏完成这个微动作，保持放松、缓慢和可控'
+}
+const lottieStateText = computed<string>((): string => lottiePlaying.value ? getActionCueText(actionId.value) : '动作已暂停，准备好后继续跟着节奏完成')
+
 /* ---------- leaf functions (no deps) ---------- */
+
+function toggleLottiePlaying(): void {
+  lottiePlaying.value = !lottiePlaying.value
+}
+
+function toggleLottieLoop(): void {
+  lottieLoop.value = !lottieLoop.value
+}
+
+function goBack(): void {
+  uni.navigateBack({})
+}
 
 function getActionIdFromOption(source: any): string {
   if (source == null) return ''
@@ -142,24 +215,22 @@ function recordAction(result: string, skipReason: string = ''): void {
   }
   const nowMs = Date.now()
   const dur = result === 'completed' ? a.defaultDurationMs : Math.floor(a.defaultDurationMs - remainingMs.value)
-  const log: ActionLog = {
-    id: 0,
-    action_id: a.id,
-    action_type: a.category,
-    result: result,
-    skip_reason: skipReason.length > 0 ? skipReason : null,
-    trigger_type: 'manual',
-    trigger_level: 'gentle',
-    duration_ms: dur,
-    target_ms: a.defaultDurationMs,
-    triggered_at: nowMs - 30000,
-    completed_at: nowMs,
-    created_at: Math.floor(nowMs / 1000)
-  }
-  const insertId = insertActionLog(log)
+  const insertId = insertManualActionLog(
+    a.id,
+    a.category,
+    result,
+    skipReason.length > 0 ? skipReason : null,
+    dur,
+    a.defaultDurationMs,
+    nowMs - 30000,
+    nowMs,
+    Math.floor(nowMs / 1000)
+  )
   console.log('[execute] insertActionLog 返回 id=' + insertId)
   emitLlmActionCompleted(a, dur, result)
 }
+
+/* ---------- mid-layer functions ---------- */
 
 function showEncourageNow(): void {
   const a = action.value
@@ -167,14 +238,9 @@ function showEncourageNow(): void {
   encourageText.value = getRandomEncourage(cat)
   showEncourage.value = true
   isCompleted.value = true
-  encourageTimerId = setTimeout((): void => {
-    try {
-      if (isCompleted.value !== true) return
-      showEncourage.value = false
-      uni.navigateBack({})
-    } catch (e) {
-      console.warn('[execute] showEncourageNow 回调异常: ' + JSON.stringify(e))
-    }
+  setTimeout((): void => {
+    showEncourage.value = false
+    uni.navigateBack({})
   }, 1500)
 }
 
@@ -205,7 +271,7 @@ function handleAgree(): void {
   remainingMs.value = a.defaultDurationMs
   console.log('[execute] countdown start, ms=' + a.defaultDurationMs)
   startCountdown()
-  try { uni.vibrateShort({ type: 'light' }) } catch (_) {}
+  shortVibrate(1)
 }
 
 function handleSelfReported(): void {
@@ -255,49 +321,19 @@ onLoad((option) => {
   } else {
     console.log('[execute] no actionId')
   }
-  // 取出 ad-hoc 文本并播报
-  const adhoc = takeAdhocText()
-  console.log('[execute] adhoc len=' + adhoc.length)
-  if (adhoc.length > 0) {
-    try { speakAdhocTts(adhoc) } catch (e) { console.warn('[execute] TTS 失败: ' + ('' + e)) }
-  } else {
-    const tts = actionTtsText.value
-    if (tts.length > 0) {
-      try { speakFixedGuideTts(tts) } catch (e) { console.warn('[execute] TTS 失败: ' + ('' + e)) }
-    }
-  }
 })
 
 onUnload((): void => {
   clearCountdown()
-  const eid = encourageTimerId
-  if (eid != null) {
-    clearTimeout(eid)
-    encourageTimerId = null
-  }
 })
 </script>
 
 <style scoped>
 .page {
   flex: 1;
-  background-color: transparent;
-  position: relative;
-  overflow: hidden;
+  background-color: #F5F6FA;
   justify-content: center;
   align-items: center;
-}
-.page-bg {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-}
-.page-bg-img {
-  width: 100%;
-  height: 100%;
 }
 .action-container {
   width: 85%;
@@ -306,8 +342,6 @@ onUnload((): void => {
   padding: 24px;
   flex-direction: column;
   align-items: center;
-  position: relative;
-  z-index: 1;
 }
 .action-title {
   font-size: 22px;
@@ -316,17 +350,16 @@ onUnload((): void => {
   margin-bottom: 16px;
 }
 .icon-display {
-  width: 118px;
-  height: 118px;
+  width: 100px;
+  height: 100px;
   justify-content: center;
   align-items: center;
   background-color: #F0F3F4;
-  border-radius: 59px;
+  border-radius: 50px;
   margin-bottom: 16px;
 }
-.action-icon-img {
-  width: 108px;
-  height: 108px;
+.action-icon {
+  font-size: 48px;
 }
 .tts-text {
   font-size: 15px;
@@ -349,14 +382,18 @@ onUnload((): void => {
   margin-bottom: 8px;
   border-width: 0;
 }
-.action-btn.primary {
-  background-color: #3498DB;
-  color: #FFFFFF;
+.action-primary {
+  background-color: #DBC8ED;
+  color: #161A33;
   font-weight: bold;
 }
-.action-btn.secondary {
-  background-color: #F0F3F4;
-  color: #7F8C8D;
+.action-secondary {
+  background-color: rgba(219, 200, 237, 0.16);
+  color: rgba(255, 255, 255, 0.72);
+}
+.action-ghost {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
 }
 .dialog-overlay {
   position: fixed;
@@ -410,10 +447,453 @@ onUnload((): void => {
   margin-left: 8px;
   padding: 10px;
   border-radius: 8px;
-  background-color: #3498DB;
-  color: #FFFFFF;
+  background-color: #DBC8ED;
+  color: #161A33;
   font-size: 14px;
   text-align: center;
   border-width: 0;
+}
+
+.page {
+  background-color: #F4F8FB;
+  justify-content: flex-start;
+  align-items: center;
+  padding-top: 24px;
+}
+.action-container {
+  width: 88%;
+  background-color: #FFFFFF;
+  border-radius: 28px;
+  padding: 26px 22px 22px 22px;
+  box-shadow: 0 14px 36px rgba(88, 122, 139, 0.12);
+}
+.ritual-label {
+  font-size: 12px;
+  color: #8E7DD6;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.action-title {
+  font-size: 25px;
+  color: #243642;
+  margin-bottom: 8px;
+}
+.action-subtitle {
+  font-size: 14px;
+  color: #6F8490;
+  text-align: center;
+  line-height: 20px;
+  margin-bottom: 18px;
+  padding: 0 10px;
+}
+.icon-display {
+  width: 128px;
+  height: 128px;
+  border-radius: 64px;
+  background-color: #EAF8F1;
+  box-shadow: 0 12px 26px rgba(138, 217, 182, 0.24);
+  margin-bottom: 18px;
+}
+.action-icon {
+  font-size: 56px;
+}
+.tts-text {
+  font-size: 14px;
+  color: #6F8490;
+  line-height: 21px;
+  margin-bottom: 18px;
+  padding: 0 10px;
+}
+.execute-guide {
+  color: #4E6370;
+}
+.button-group {
+  margin-top: 14px;
+}
+.action-btn {
+  border-radius: 18px;
+  margin-bottom: 10px;
+  border-width: 0;
+  font-size: 15px;
+}
+.primary {
+  background-color: #8C6FFF;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.secondary {
+  background-color: #F1F8F5;
+  color: #4A9B7B;
+}
+.ghost {
+  background-color: #F4F8FB;
+  color: #6F8490;
+}
+.dialog-content {
+  border-radius: 24px;
+  box-shadow: 0 14px 36px rgba(88, 122, 139, 0.18);
+}
+.dialog-title {
+  color: #243642;
+}
+.dialog-body-text {
+  color: #6F8490;
+}
+.cancel-btn {
+  border-radius: 14px;
+  background-color: #F1F6F7;
+  color: #6F8490;
+}
+.confirm-btn {
+  border-radius: 14px;
+  background-color: #8C6FFF;
+}
+
+.page {
+  background-color: #F6F2FF;
+  background-image: linear-gradient(180deg, #EFE8FF 0%, #F4FAFF 100%);
+}
+.action-container {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.78);
+  border-style: solid;
+  box-shadow: 0 20px 46px rgba(96, 84, 172, 0.22);
+}
+.ritual-label {
+  color: #8C6FFF;
+}
+.action-title {
+  color: #25223D;
+  font-size: 28px;
+}
+.action-subtitle {
+  color: #706A97;
+}
+.lottie-stage {
+  width: 100%;
+  min-height: 196px;
+  border-radius: 30px;
+  background-color: #F1EEFF;
+  background-image: linear-gradient(135deg, #F5EDFF 0%, #EAF5FF 100%);
+  align-items: center;
+  justify-content: center;
+  padding: 18px 14px;
+  margin-bottom: 18px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.75);
+  border-style: solid;
+}
+.lottie-stage-playing {
+  box-shadow: 0 16px 34px rgba(110, 90, 232, 0.2);
+}
+.lottie-stage-paused {
+  opacity: 0.86;
+}
+.lottie-glow {
+  width: 128px;
+  height: 128px;
+  border-radius: 64px;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(201, 182, 255, 0.34);
+  margin-bottom: 10px;
+}
+.lottie-orbit {
+  position: absolute;
+  width: 122px;
+  height: 48px;
+  border-radius: 61px;
+  border-width: 2px;
+  border-color: rgba(110, 90, 232, 0.42);
+  border-style: solid;
+}
+.icon-display {
+  width: 90px;
+  height: 90px;
+  border-radius: 45px;
+  background-color: #BFD5FF;
+  background-image: linear-gradient(135deg, #8C6FFF 0%, #6FB8FF 100%);
+  box-shadow: 0 14px 28px rgba(96, 84, 172, 0.24);
+}
+.action-icon {
+  font-size: 46px;
+}
+.lottie-placeholder {
+  font-size: 11px;
+  color: #8A80B3;
+  text-align: center;
+}
+.lottie-controls {
+  flex-direction: row;
+  margin-top: 10px;
+}
+.lottie-chip {
+  padding: 6px 12px;
+  border-radius: 15px;
+  background-color: rgba(255, 255, 255, 0.7);
+  margin: 0 4px;
+}
+.lottie-chip-active {
+  background-color: #25223D;
+}
+.lottie-chip-text {
+  font-size: 11px;
+  color: #8C6FFF;
+}
+.lottie-chip-text-active {
+  color: #FFFFFF;
+}
+.tts-text {
+  color: #706A97;
+}
+.action-btn {
+  border-radius: 20px;
+}
+.primary {
+  background-color: #25223D;
+  color: #FFFFFF;
+}
+.secondary {
+  background-color: #EEE9FF;
+  color: #8C6FFF;
+}
+.ghost {
+  background-color: #F4F7FF;
+  color: #706A97;
+}
+.confirm-btn {
+  background-color: #25223D;
+}
+
+.page {
+  background-color: #F8F7FC;
+  background-image: none;
+  position: relative;
+  overflow: hidden;
+}
+.bg-glow {
+  position: absolute;
+  border-radius: 999px;
+  opacity: 0.48;
+  z-index: 0;
+}
+.glow-purple {
+  width: 190px;
+  height: 190px;
+  left: -70px;
+  top: -54px;
+  background-color: #CBB8FF;
+}
+.glow-blue {
+  width: 136px;
+  height: 136px;
+  right: -46px;
+  top: 72px;
+  background-color: #CFE7FF;
+}
+.glow-pink {
+  width: 150px;
+  height: 150px;
+  left: 38px;
+  bottom: 72px;
+  background-color: #FFE7F1;
+  opacity: 0.34;
+}
+.action-container {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: #EEEAF6;
+  box-shadow: 0 18px 42px rgba(44, 35, 80, 0.1);
+  z-index: 1;
+}
+.ritual-label,
+.lottie-chip-text,
+.lottie-chip-text-active {
+  color: #8D6BFF;
+}
+.action-title {
+  color: #191528;
+}
+.action-subtitle,
+.tts-text,
+.lottie-placeholder {
+  color: #7B758C;
+}
+.lottie-stage {
+  background-color: rgba(255, 255, 255, 0.74);
+  background-image: none;
+  border-color: #EEEAF6;
+  box-shadow: 0 14px 34px rgba(44, 35, 80, 0.08);
+}
+.lottie-glow {
+  background-color: rgba(203, 184, 255, 0.28);
+}
+.icon-display {
+  background-image: linear-gradient(135deg, #CBB8FF 0%, #CFE7FF 100%);
+}
+.lottie-orbit {
+  border-color: rgba(141, 107, 255, 0.32);
+}
+.primary,
+.lottie-chip-active,
+.confirm-btn {
+  background-color: #1F1933;
+}
+.secondary,
+.ghost {
+  background-color: #FFFFFF;
+  color: #7B758C;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.back-button {
+  position: absolute;
+  left: 18px;
+  top: 28px;
+  width: 38px;
+  height: 38px;
+  border-radius: 19px;
+  background-color: rgba(255, 255, 255, 0.86);
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(44, 35, 80, 0.08);
+  z-index: 2;
+}
+.back-icon {
+  color: #1F1933;
+  font-size: 30px;
+  line-height: 34px;
+  font-weight: bold;
+}
+
+.page {
+  background-color: #162038;
+  background-image: linear-gradient(180deg, #131832 0%, #283252 45%, #4F587D 100%);
+}
+.glow-purple {
+  background-color: #776B97;
+  opacity: 0.5;
+}
+.glow-blue {
+  background-color: #C2E0EE;
+  opacity: 0.24;
+}
+.glow-pink {
+  background-color: #C68DC0;
+  opacity: 0.18;
+}
+.action-container {
+  background-color: rgba(29, 25, 62, 0.82);
+  background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.92) 0%, rgba(84, 65, 124, 0.72) 56%, rgba(198, 141, 192, 0.18) 100%);
+  border-color: rgba(219, 200, 237, 0.18);
+  box-shadow: 0 18px 42px rgba(5, 6, 20, 0.34);
+}
+.ritual-label,
+.lottie-chip-text {
+  color: #DBC8ED;
+}
+.action-title {
+  color: #FFFFFF;
+}
+.action-subtitle,
+.tts-text,
+.lottie-placeholder {
+  color: rgba(255, 255, 255, 0.72);
+}
+.lottie-stage {
+  background-color: rgba(255, 255, 255, 0.1);
+  background-image: linear-gradient(135deg, rgba(79, 88, 125, 0.28) 0%, rgba(219, 200, 237, 0.12) 100%);
+  border-color: rgba(219, 200, 237, 0.16);
+  box-shadow: 0 14px 34px rgba(5, 6, 20, 0.24);
+}
+.lottie-glow {
+  background-color: rgba(219, 200, 237, 0.16);
+}
+.icon-display {
+  background-color: rgba(219, 200, 237, 0.18);
+  background-image: linear-gradient(135deg, #DBC8ED 0%, #C68DC0 42%, #4F587D 100%);
+}
+.lottie-orbit {
+  border-color: rgba(219, 200, 237, 0.38);
+}
+.lottie-chip {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.primary,
+.lottie-chip-active,
+.confirm-btn {
+  background-color: #DBC8ED;
+  color: #161A33;
+}
+.secondary,
+.ghost,
+.action-secondary,
+.action-ghost {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(219, 200, 237, 0.16);
+}
+.action-primary {
+  background-color: #DBC8ED;
+  color: #161A33;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.16);
+  border-style: solid;
+}
+.action-secondary {
+  background-color: rgba(219, 200, 237, 0.16);
+}
+.action-ghost {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.back-button {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(219, 200, 237, 0.16);
+}
+.back-icon {
+  color: #FFFFFF;
+}
+.sky-star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background-color: rgba(255, 255, 255, 0.86);
+  z-index: 0;
+}
+.star-a { left: 36px; top: 88px; }
+.star-b { left: 118px; top: 144px; width: 4px; height: 4px; border-radius: 2px; }
+.star-c { right: 52px; top: 116px; }
+.star-d { right: 26px; top: 310px; width: 5px; height: 5px; border-radius: 3px; }
+.star-e { left: 54px; top: 520px; }
+.star-f { right: 86px; top: 420px; width: 4px; height: 4px; border-radius: 2px; }
+.star-g { left: 138px; top: 610px; }
+.star-h { right: 36px; top: 720px; width: 4px; height: 4px; border-radius: 2px; }
+.star-i { left: 76px; top: 214px; width: 2px; height: 2px; border-radius: 1px; }
+.star-j { right: 148px; top: 276px; width: 3px; height: 3px; border-radius: 2px; }
+.star-k { left: 178px; top: 392px; width: 2px; height: 2px; border-radius: 1px; }
+.star-l { right: 64px; top: 560px; width: 3px; height: 3px; border-radius: 2px; }
+.dialog-content {
+  background-color: rgba(29, 25, 62, 0.94);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.18);
+  border-style: solid;
+}
+.dialog-title {
+  color: #FFFFFF;
+}
+.dialog-body-text {
+  color: rgba(255, 255, 255, 0.72);
+}
+.cancel-btn {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+}
+.page {
+  background-color: #F7FAFF;
 }
 </style>

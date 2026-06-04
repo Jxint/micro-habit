@@ -1,25 +1,106 @@
 <template>
   <view class="page">
-    <view class="page-bg">
-      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
-    </view>
+    <view class="bg-glow glow-purple"></view>
+    <view class="bg-glow glow-blue"></view>
+    <view class="bg-glow glow-pink"></view>
+    <view class="sky-star star-a"></view>
+    <view class="sky-star star-b"></view>
+    <view class="sky-star star-c"></view>
+    <view class="sky-star star-d"></view>
+    <view class="sky-star star-e"></view>
+    <view class="sky-star star-f"></view>
+    <view class="sky-star star-g"></view>
+    <view class="sky-star star-h"></view>
+    <view class="sky-star star-i"></view>
+    <view class="sky-star star-j"></view>
+    <view class="sky-star star-k"></view>
+    <view class="sky-star star-l"></view>
     <scroll-view class="scroll-area" scroll-y="true">
       <view class="hero-block">
-        <view class="hero-icon-wrap">
-          <text class="hero-icon">🌿</text>
+        <view class="hero-copy">
+          <text class="hero-brand">微憩星球</text>
+          <text class="hero-title">轻轻守护，从 10 秒开始</text>
+          <text class="hero-subtitle">它会观察你的使用节奏，在合适的时候提醒你眨眨眼、松松肩、慢慢呼吸。</text>
         </view>
-        <text class="hero-title">微习惯健康伴侣</text>
-        <text class="hero-subtitle">一个在你不经意间，悄悄改善健康的 AI 微习惯伙伴</text>
+        <view class="hero-planet-card">
+          <view class="hero-orbit"></view>
+          <view class="hero-icon-wrap">
+            <text class="hero-icon">◐</text>
+          </view>
+          <text class="hero-chip">不说教 · 不打扰</text>
+        </view>
+      </view>
+
+      <view class="value-block">
+        <text class="block-title">AI 健康大脑在做什么</text>
+        <text class="block-subtitle">不是催你打卡，而是把使用节奏、完成反馈和健康状态一起看懂。</text>
+        <view class="ai-core-card">
+          <view class="ai-core-icon">
+            <text class="ai-core-icon-text">AI</text>
+          </view>
+          <view class="ai-core-copy">
+            <text class="ai-core-title">先判断，再轻轻提醒</text>
+            <text class="ai-core-text">本地规则引擎实时看连续使用时长，推荐算法选择当下更适合的护眼、体态或呼吸动作。</text>
+          </view>
+        </view>
+        <view class="value-grid">
+          <view class="value-card">
+            <text class="value-icon value-icon-blue">◌</text>
+            <text class="value-title">解决忘休息</text>
+            <text class="value-text">刷久了才提醒，不靠你自己想起来</text>
+          </view>
+          <view class="value-card value-card-even">
+            <text class="value-icon value-icon-purple">✦</text>
+            <text class="value-title">推荐做什么</text>
+            <text class="value-text">按时间段和历史完成情况选微动作</text>
+          </view>
+          <view class="value-card">
+            <text class="value-icon value-icon-pink">⌁</text>
+            <text class="value-title">AI 小结报告</text>
+            <text class="value-text">每日一句话、每周建议和下周小目标</text>
+          </view>
+          <view class="value-card value-card-even">
+            <text class="value-icon value-icon-blue">◐</text>
+            <text class="value-title">越用越懂你</text>
+            <text class="value-text">完成、跳过、忙一下，都会帮助调节频率</text>
+          </view>
+        </view>
+        <text class="value-privacy">只识别你正在使用哪个 App 和连续用了多久，不读取聊天内容、密码或屏幕文字。</text>
+      </view>
+
+      <view class="focus-block">
+        <text class="block-title">选择守护重点</text>
+        <text class="block-subtitle">之后可以随时修改，现在先选一个你最想照顾的方向。</text>
+        <view class="focus-grid">
+          <view class="focus-card" :class="selectedFocus === 'eye' ? 'focus-active' : ''" @tap="selectFocus('eye')">
+            <text class="focus-icon">◐</text>
+            <text class="focus-title">护眼优先</text>
+          </view>
+          <view class="focus-card" :class="selectedFocus === 'posture' ? 'focus-active' : ''" @tap="selectFocus('posture')">
+            <text class="focus-icon">◌</text>
+            <text class="focus-title">肩颈优先</text>
+          </view>
+          <view class="focus-card" :class="selectedFocus === 'breath' ? 'focus-active' : ''" @tap="selectFocus('breath')">
+            <text class="focus-icon">⌁</text>
+            <text class="focus-title">减压呼吸</text>
+          </view>
+          <view class="focus-card" :class="selectedFocus === 'balance' ? 'focus-active' : ''" @tap="selectFocus('balance')">
+            <text class="focus-icon">✧</text>
+            <text class="focus-title">均衡发展</text>
+          </view>
+        </view>
       </view>
 
       <view class="steps-block">
+        <text class="block-title">开启轻轻守护</text>
+        <text class="block-subtitle">权限只用于识别 App 和连续使用时长，不读取聊天内容、密码或屏幕文字。</text>
         <view class="step-card">
           <view class="step-num-wrap step-num-1">
             <text class="step-num">1</text>
           </view>
           <view class="step-content">
-            <text class="step-title">开启使用情况访问权限</text>
-            <text class="step-desc">用于检测你正在使用的应用，在恰当时提醒休息</text>
+            <text class="step-title">开启使用情况权限</text>
+            <text class="step-desc">用来检测你正在使用哪个 App，以及连续使用了多久</text>
             <view class="step-status-row">
               <text class="step-status" :class="usageEnabled ? 'step-status-on' : 'step-status-off'">
                 {{ usageEnabled ? '✅ 已开启' : '⚪ 未开启' }}
@@ -37,7 +118,7 @@
           </view>
           <view class="step-content">
             <text class="step-title">开启悬浮窗权限</text>
-            <text class="step-desc">在其他应用上方显示微动作提醒</text>
+            <text class="step-desc">用来在其他 App 上方显示微动作提醒</text>
             <view class="step-status-row">
               <text class="step-status" :class="overlayEnabled ? 'step-status-on' : 'step-status-off'">
                 {{ overlayEnabled ? '✅ 已开启' : '⚪ 未开启' }}
@@ -54,23 +135,70 @@
             <text class="step-num">3</text>
           </view>
           <view class="step-content">
-            <text class="step-title">完成自动守护</text>
-            <text class="step-desc">检测到长时间使用 App，会自动弹出微动作提醒（眨眼、转颈、远眺）</text>
+            <text class="step-title">后台守护</text>
+            <text class="step-desc">用来保持提醒服务稳定运行，不打扰你的正常使用</text>
           </view>
         </view>
       </view>
 
-      <view class="cta-block">
-        <view class="cta-btn-primary" @tap="goHome">
-          <text class="cta-btn-primary-text">开始使用</text>
+      <view class="demo-block">
+        <text class="block-title">演示一次</text>
+        <text class="block-subtitle">假设你刷屏久了一点，小星球会这样提醒你。</text>
+        <view class="demo-card">
+          <view class="demo-planet">
+            <text class="demo-planet-text">◐</text>
+          </view>
+          <view class="demo-copy">
+            <text class="demo-title">星球信号提醒</text>
+            <text class="demo-text">检测到眼睛电量有点低，要不要眨眼 10 秒？</text>
+          </view>
+          <view class="demo-action" @tap="startDemo">
+            <text class="demo-action-text">{{ demoStarted ? '演示中' : '好啊' }}</text>
+          </view>
         </view>
-        <view class="cta-btn-secondary" @tap="goHome">
+        <view v-if="demoStarted" class="demo-flow">
+          <view class="demo-stage">
+            <view class="demo-stage-planet">
+              <view class="demo-stage-orbit"></view>
+              <text class="demo-stage-icon">◐</text>
+            </view>
+            <view class="demo-stage-copy">
+              <text class="demo-stage-title">进入 10 秒微动作</text>
+              <text class="demo-stage-text">真实使用时会进入动作页，显示引导文案、倒计时和跳过按钮。</text>
+            </view>
+          </view>
+          <view class="demo-progress">
+            <view class="demo-progress-fill"></view>
+          </view>
+          <view class="demo-steps">
+            <view class="demo-step">
+              <text class="demo-step-num">1</text>
+              <text class="demo-step-text">收到提醒</text>
+            </view>
+            <view class="demo-step">
+              <text class="demo-step-num">2</text>
+              <text class="demo-step-text">点“好啊”</text>
+            </view>
+            <view class="demo-step">
+              <text class="demo-step-num">3</text>
+              <text class="demo-step-text">跟着倒计时做完</text>
+            </view>
+          </view>
+          <text class="demo-result">完成后，小星球会点亮一次，并把这次照顾记录进健康轨迹。</text>
+        </view>
+      </view>
+
+      <view class="cta-block">
+        <view class="cta-btn-primary" @tap="startApp">
+          <text class="cta-btn-primary-text">开始我的小星球</text>
+        </view>
+        <view class="cta-btn-secondary" @tap="skipGuide">
           <text class="cta-btn-secondary-text">先逛逛</text>
         </view>
       </view>
 
       <view class="footer-block">
-        <text class="footer-text">v1.0.0 · 守护你的每一次专注</text>
+        <text class="footer-text">v1.0.0 · 守护你的每一次温柔停顿</text>
       </view>
     </scroll-view>
   </view>
@@ -83,22 +211,37 @@ import { hasOverlayPermission, requestOverlayPermission } from '../../uni_module
 
 const usageEnabled = ref<boolean>(isUsagePermissionGranted())
 const overlayEnabled = ref<boolean>(hasOverlayPermission())
+const selectedFocus = ref<string>('balance')
+const demoStarted = ref<boolean>(false)
+
+function selectFocus(v: string): void {
+  selectedFocus.value = v
+}
+
+function startDemo(): void {
+  demoStarted.value = true
+}
+
+function refreshPermissionStates(): void {
+  usageEnabled.value = isUsagePermissionGranted()
+  overlayEnabled.value = hasOverlayPermission()
+}
 
 function openUsageAccess(): void {
   openUsageAccessSettings()
   setTimeout(() : void => {
-    usageEnabled.value = isUsagePermissionGranted()
-  }, 1500)
+    refreshPermissionStates()
+  }, 800)
 }
 
 function openOverlay(): void {
   requestOverlayPermission()
   setTimeout(() : void => {
-    overlayEnabled.value = hasOverlayPermission()
+    refreshPermissionStates()
   }, 800)
 }
 
-function goHome(): void {
+function completeGuide(): void {
   putInt('guide_completed', 1)
   const now = Math.floor(Date.now() / 1000)
   putInt('newbie_start_date', now)
@@ -106,42 +249,53 @@ function goHome(): void {
     url: '/pages/home/index'
   })
 }
+
+function startApp(): void {
+  refreshPermissionStates()
+  if (!usageEnabled.value) {
+    uni.showToast({
+      title: '请先开启使用情况权限',
+      icon: 'none'
+    })
+    return
+  }
+  if (!overlayEnabled.value) {
+    uni.showToast({
+      title: '请先开启悬浮窗权限',
+      icon: 'none'
+    })
+    return
+  }
+  completeGuide()
+}
+
+function skipGuide(): void {
+  completeGuide()
+}
+
+onShow((): void => {
+  refreshPermissionStates()
+})
 </script>
 
 <style scoped>
 .page {
   flex: 1;
-  background-color: transparent;
-  position: relative;
-  overflow: hidden;
-}
-.page-bg {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-}
-.page-bg-img {
-  width: 100%;
-  height: 100%;
+  background-color: #1E2A38;
 }
 .scroll-area {
   flex: 1;
-  position: relative;
-  z-index: 1;
 }
 .hero-block {
   align-items: center;
   padding: 60px 24px 32px 24px;
-  background-color: transparent;
+  background-color: #1E2A38;
 }
 .hero-icon-wrap {
   width: 96px;
   height: 96px;
   border-radius: 48px;
-  background-color: rgba(255, 255, 255, 0.55);
+  background-color: rgba(46, 204, 113, 0.15);
   align-items: center;
   justify-content: center;
   margin-bottom: 20px;
@@ -152,12 +306,12 @@ function goHome(): void {
 .hero-title {
   font-size: 24px;
   font-weight: bold;
-  color: #1E2A38;
+  color: #FFFFFF;
   margin-bottom: 8px;
 }
 .hero-subtitle {
   font-size: 13px;
-  color: #4A5A6A;
+  color: #95A5A6;
   text-align: center;
   line-height: 1.6;
   padding: 0 16px;
@@ -167,14 +321,14 @@ function goHome(): void {
 }
 .step-card {
   flex-direction: row;
-  background-color: rgba(255, 255, 255, 0.58);
+  background-color: #2C3E50;
   border-radius: 14px;
   padding: 16px;
   margin-bottom: 12px;
   align-items: flex-start;
 }
 .step-card-info {
-  background-color: rgba(255, 255, 255, 0.46);
+  background-color: rgba(46, 204, 113, 0.12);
 }
 .step-num-wrap {
   width: 32px;
@@ -190,7 +344,7 @@ function goHome(): void {
   background-color: #3498DB;
 }
 .step-num-2 {
-  background-color: #7EC8F2;
+  background-color: #9B59B6;
 }
 .step-num-3 {
   background-color: #2ECC71;
@@ -207,12 +361,12 @@ function goHome(): void {
 .step-title {
   font-size: 15px;
   font-weight: bold;
-  color: #1E2A38;
+  color: #FFFFFF;
   margin-bottom: 4px;
 }
 .step-desc {
   font-size: 12px;
-  color: #526273;
+  color: #BDC3C7;
   line-height: 1.6;
   margin-bottom: 10px;
 }
@@ -231,8 +385,8 @@ function goHome(): void {
   background-color: rgba(46, 204, 113, 0.15);
 }
 .step-status-off {
-  color: #7F8C8D;
-  background-color: rgba(255, 255, 255, 0.5);
+  color: #BDC3C7;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 .step-action-btn {
   margin-left: 10px;
@@ -278,5 +432,1208 @@ function goHome(): void {
 .footer-text {
   font-size: 11px;
   color: #4A5A6A;
+}
+
+.page {
+  background-color: #F4F8FB;
+}
+.hero-block {
+  padding: 58px 24px 28px 24px;
+  background-color: #EAF6F5;
+  border-bottom-left-radius: 28px;
+  border-bottom-right-radius: 28px;
+}
+.hero-icon-wrap {
+  background-color: #FFFFFF;
+  box-shadow: 0 12px 28px rgba(88, 122, 139, 0.12);
+}
+.hero-icon {
+  color: #8E7DD6;
+}
+.hero-title {
+  color: #243642;
+  font-size: 25px;
+}
+.hero-subtitle {
+  color: #6F8490;
+  font-size: 14px;
+  line-height: 21px;
+}
+.focus-block {
+  margin: 14px 16px;
+  padding: 18px;
+  border-radius: 24px;
+  background-color: #FFFFFF;
+  box-shadow: 0 8px 22px rgba(88, 122, 139, 0.08);
+}
+.block-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #243642;
+}
+.block-subtitle {
+  font-size: 12px;
+  color: #6F8490;
+  line-height: 19px;
+  margin-top: 6px;
+}
+.focus-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.focus-card {
+  width: 47%;
+  margin-right: 3%;
+  margin-bottom: 10px;
+  padding: 14px 10px;
+  border-radius: 18px;
+  background-color: #F8FBFA;
+  border-width: 1px;
+  border-color: #E5EEF1;
+  border-style: solid;
+  align-items: center;
+}
+.focus-active {
+  background-color: #EAF8F1;
+  border-color: #8C6FFF;
+}
+.focus-icon {
+  font-size: 24px;
+  color: #8E7DD6;
+}
+.focus-title {
+  font-size: 13px;
+  color: #243642;
+  font-weight: bold;
+  margin-top: 6px;
+}
+.steps-block {
+  padding: 0 16px;
+}
+.step-card {
+  background-color: #FFFFFF;
+  border-radius: 22px;
+  box-shadow: 0 8px 22px rgba(88, 122, 139, 0.08);
+}
+.step-card-info {
+  background-color: #F8FBFA;
+}
+.step-num-1 {
+  background-color: #8DBBEF;
+}
+.step-num-2 {
+  background-color: #C7B7F2;
+}
+.step-num-3 {
+  background-color: #8C6FFF;
+}
+.step-title {
+  color: #243642;
+}
+.step-desc {
+  color: #6F8490;
+}
+.step-status-on {
+  color: #4A9B7B;
+  background-color: #EAF8F1;
+}
+.step-status-off {
+  color: #9AAEB8;
+  background-color: #F4F8FB;
+}
+.step-action-btn {
+  background-color: #8C6FFF;
+  border-radius: 14px;
+}
+.demo-block {
+  margin: 14px 16px;
+  padding: 18px;
+  border-radius: 24px;
+  background-color: #FFFFFF;
+  box-shadow: 0 8px 22px rgba(88, 122, 139, 0.08);
+}
+.demo-card {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 20px;
+  background-color: #F8FBFA;
+}
+.demo-planet {
+  width: 46px;
+  height: 46px;
+  border-radius: 23px;
+  background-color: #EAF8F1;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+.demo-planet-text {
+  color: #4A9B7B;
+  font-size: 22px;
+}
+.demo-copy {
+  flex: 1;
+  flex-direction: column;
+}
+.demo-title {
+  font-size: 14px;
+  color: #243642;
+  font-weight: bold;
+}
+.demo-text {
+  font-size: 12px;
+  color: #6F8490;
+  line-height: 18px;
+  margin-top: 3px;
+}
+.demo-action {
+  font-size: 12px;
+  color: #4A9B7B;
+  background-color: #EAF8F1;
+  border-radius: 14px;
+  padding: 6px 10px;
+  margin-left: 8px;
+}
+.cta-btn-primary {
+  background-color: #8C6FFF;
+  border-radius: 20px;
+}
+.cta-btn-secondary {
+  background-color: #FFFFFF;
+  border-radius: 20px;
+}
+.cta-btn-secondary-text {
+  color: #6F8490;
+}
+.footer-text {
+  color: #9AAEB8;
+}
+
+.page {
+  background-color: #F6F2FF;
+}
+.hero-block {
+  margin: 12px 14px 0 14px;
+  border-radius: 30px;
+  background-color: #8C6FFF;
+  background-image: linear-gradient(135deg, #8C6FFF 0%, #6FB8FF 100%);
+  box-shadow: 0 18px 40px rgba(111, 92, 180, 0.22);
+}
+.hero-title {
+  color: #FFFFFF;
+}
+.hero-subtitle {
+  color: rgba(255, 255, 255, 0.88);
+}
+.hero-icon-wrap {
+  background-color: rgba(255, 255, 255, 0.86);
+}
+.hero-icon {
+  color: #8C6FFF;
+}
+.focus-block,
+.demo-block,
+.step-card {
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.78);
+  border-style: solid;
+  box-shadow: 0 16px 34px rgba(111, 92, 180, 0.14);
+}
+.focus-active {
+  background-color: #EEE9FF;
+  border-color: #8C6FFF;
+}
+.focus-icon,
+.demo-planet-text {
+  color: #8C6FFF;
+}
+.demo-planet {
+  background-color: #EEE9FF;
+}
+.demo-action {
+  color: #FFFFFF;
+  background-color: #25223D;
+}
+.cta-btn-primary {
+  background-color: #25223D;
+  box-shadow: 0 10px 26px rgba(37, 34, 61, 0.24);
+}
+.step-action-btn {
+  background-color: #25223D;
+}
+
+.page {
+  background-color: #F8F7FC;
+}
+.hero-block {
+  margin: 14px 14px 0 14px;
+  padding: 24px 18px 22px 18px;
+  border-radius: 30px;
+  background-color: #FFFFFF;
+  background-image: linear-gradient(135deg, #FFFFFF 0%, #FFF7FB 45%, #F3F7FF 100%);
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  box-shadow: 0 18px 38px rgba(44, 35, 80, 0.08);
+  flex-direction: row;
+  align-items: center;
+}
+.hero-copy {
+  flex: 1;
+  flex-direction: column;
+  padding-right: 12px;
+}
+.hero-brand {
+  font-size: 13px;
+  color: #8D6BFF;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.hero-title {
+  color: #191528;
+  font-size: 25px;
+  line-height: 31px;
+  margin-bottom: 8px;
+}
+.hero-subtitle {
+  color: #7B758C;
+  font-size: 13px;
+  line-height: 21px;
+  text-align: left;
+  padding: 0;
+}
+.hero-planet-card {
+  position: relative;
+  width: 118px;
+  height: 142px;
+  border-radius: 28px;
+  background-color: rgba(255, 255, 255, 0.72);
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.hero-orbit {
+  position: absolute;
+  width: 86px;
+  height: 34px;
+  border-radius: 43px;
+  border-width: 2px;
+  border-color: rgba(141, 107, 255, 0.32);
+  border-style: solid;
+  transform: rotate(-20deg);
+}
+.hero-icon-wrap {
+  width: 70px;
+  height: 70px;
+  border-radius: 35px;
+  background-color: #EEF7FF;
+  box-shadow: 0 16px 30px rgba(109, 174, 255, 0.22);
+  margin-bottom: 12px;
+}
+.hero-icon {
+  color: #8D6BFF;
+  font-size: 34px;
+}
+.hero-chip {
+  font-size: 11px;
+  color: #7B758C;
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  padding: 5px 9px;
+}
+.value-block {
+  margin: 14px 16px;
+  padding: 18px;
+  border-radius: 24px;
+  background-color: #FFFFFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  box-shadow: 0 14px 30px rgba(44, 35, 80, 0.06);
+}
+.ai-core-card {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: #F7F4FF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.ai-core-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: #1F1933;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+.ai-core-icon-text {
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: bold;
+}
+.ai-core-copy {
+  flex: 1;
+  flex-direction: column;
+}
+.ai-core-title {
+  color: #191528;
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.ai-core-text {
+  color: #7B758C;
+  font-size: 12px;
+  line-height: 18px;
+}
+.value-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.value-card {
+  width: 47%;
+  min-height: 126px;
+  margin-right: 3%;
+  margin-bottom: 10px;
+  padding: 13px 11px;
+  border-radius: 20px;
+  background-color: #FBFAFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.value-card-even {
+  margin-right: 0;
+}
+.value-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 17px;
+  text-align: center;
+  line-height: 34px;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+.value-icon-blue {
+  color: #6DAEFF;
+  background-color: #EEF7FF;
+}
+.value-icon-purple {
+  color: #8D6BFF;
+  background-color: #F1ECFF;
+}
+.value-icon-pink {
+  color: #D880A3;
+  background-color: #FFF0F6;
+}
+.value-title {
+  color: #191528;
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.value-text {
+  color: #7B758C;
+  font-size: 11px;
+  line-height: 17px;
+}
+.value-privacy {
+  color: #A9A3B8;
+  font-size: 11px;
+  line-height: 17px;
+  margin-top: 2px;
+}
+.focus-block,
+.demo-block,
+.step-card {
+  border-color: #EEEAF6;
+  box-shadow: 0 14px 30px rgba(44, 35, 80, 0.06);
+}
+.block-title {
+  color: #191528;
+  font-size: 18px;
+}
+.block-subtitle {
+  color: #7B758C;
+}
+.focus-card {
+  background-color: #FBFAFF;
+  border-color: #EEEAF6;
+}
+.focus-active {
+  background-color: #F1ECFF;
+  border-color: #CBB8FF;
+}
+.steps-block {
+  padding: 0 16px;
+}
+.step-card {
+  border-radius: 24px;
+  padding: 17px;
+}
+.step-title {
+  color: #191528;
+  font-size: 16px;
+}
+.step-desc {
+  color: #7B758C;
+}
+.step-status-off {
+  color: #A9A3B8;
+  background-color: #F4F2FA;
+}
+.step-action-btn {
+  background-color: #1F1933;
+  border-radius: 16px;
+}
+.step-card-info {
+  background-color: #F7FBFA;
+}
+.demo-block {
+  background-color: #FFFFFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.demo-card {
+  background-color: #F7FBFA;
+  border-width: 1px;
+  border-color: #EEF4F2;
+  border-style: solid;
+}
+.demo-action {
+  background-color: #1F1933;
+  border-radius: 18px;
+  padding: 8px 12px;
+  margin-left: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.demo-action-text {
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: bold;
+}
+.demo-flow {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: #FBFAFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.demo-stage {
+  flex-direction: row;
+  align-items: center;
+}
+.demo-stage-planet {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 34px;
+  background-color: #EEF7FF;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  box-shadow: 0 14px 26px rgba(109, 174, 255, 0.18);
+}
+.demo-stage-orbit {
+  position: absolute;
+  width: 78px;
+  height: 28px;
+  border-radius: 39px;
+  border-width: 2px;
+  border-color: rgba(141, 107, 255, 0.28);
+  border-style: solid;
+  transform: rotate(-19deg);
+}
+.demo-stage-icon {
+  color: #8D6BFF;
+  font-size: 29px;
+}
+.demo-stage-copy {
+  flex: 1;
+  flex-direction: column;
+}
+.demo-stage-title {
+  color: #191528;
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.demo-stage-text {
+  color: #7B758C;
+  font-size: 12px;
+  line-height: 18px;
+}
+.demo-progress {
+  height: 9px;
+  border-radius: 5px;
+  background-color: #F1ECFF;
+  margin-top: 14px;
+  overflow: hidden;
+}
+.demo-progress-fill {
+  width: 64%;
+  height: 9px;
+  border-radius: 5px;
+  background-color: #CBB8FF;
+}
+.demo-steps {
+  flex-direction: row;
+  margin-top: 12px;
+}
+.demo-step {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 6px;
+}
+.demo-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background-color: #1F1933;
+  color: #FFFFFF;
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+  margin-right: 5px;
+}
+.demo-step-text {
+  color: #7B758C;
+  font-size: 11px;
+}
+.demo-result {
+  color: #8D6BFF;
+  font-size: 12px;
+  line-height: 18px;
+  margin-top: 12px;
+}
+.cta-btn-primary {
+  background-color: #1F1933;
+  border-radius: 26px;
+  box-shadow: 0 12px 26px rgba(31, 25, 51, 0.22);
+}
+.cta-btn-secondary {
+  background-color: #FFFFFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+
+.page {
+  background-color: #F8F7FC;
+  position: relative;
+  overflow: hidden;
+}
+.scroll-area {
+  position: relative;
+  z-index: 1;
+}
+.bg-glow {
+  position: absolute;
+  border-radius: 999px;
+  z-index: 0;
+}
+.glow-purple {
+  width: 210px;
+  height: 210px;
+  left: -86px;
+  top: -54px;
+  background-color: #CBB8FF;
+  opacity: 0.34;
+}
+.glow-blue {
+  width: 166px;
+  height: 166px;
+  right: -62px;
+  top: 116px;
+  background-color: #CFE7FF;
+  opacity: 0.44;
+}
+.glow-pink {
+  width: 178px;
+  height: 178px;
+  left: 42px;
+  bottom: 92px;
+  background-color: #FFE7F1;
+  opacity: 0.52;
+}
+.sky-star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background-color: #FFFFFF;
+  opacity: 0.64;
+  z-index: 0;
+}
+.star-a {
+  left: 36px;
+  top: 88px;
+}
+.star-b {
+  left: 118px;
+  top: 144px;
+}
+.star-c {
+  right: 52px;
+  top: 116px;
+}
+.star-d {
+  right: 26px;
+  top: 310px;
+}
+.star-e {
+  left: 54px;
+  top: 520px;
+}
+.star-f {
+  right: 86px;
+  top: 420px;
+}
+.star-g {
+  left: 138px;
+  top: 610px;
+}
+.star-h {
+  right: 36px;
+  top: 720px;
+}
+.star-i {
+  left: 76px;
+  top: 214px;
+}
+.star-j {
+  right: 148px;
+  top: 276px;
+}
+.star-k {
+  left: 178px;
+  top: 392px;
+}
+.star-l {
+  right: 64px;
+  top: 560px;
+}
+.hero-block {
+  margin: 18px 16px 0 16px;
+  padding: 22px 18px;
+  border-radius: 30px;
+  background-color: #FFFFFF;
+  background-image: linear-gradient(135deg, #FFFFFF 0%, #FFF7FB 44%, #F1F7FF 100%);
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  box-shadow: 0 18px 38px rgba(44, 35, 80, 0.08);
+  flex-direction: row;
+  align-items: center;
+}
+.hero-copy {
+  flex: 1;
+  flex-direction: column;
+  padding-right: 12px;
+}
+.hero-brand {
+  color: #8D6BFF;
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.hero-title {
+  color: #191528;
+  font-size: 25px;
+  font-weight: bold;
+  line-height: 31px;
+  margin-bottom: 8px;
+}
+.hero-subtitle {
+  color: #7B758C;
+  font-size: 13px;
+  line-height: 21px;
+  text-align: left;
+  padding: 0;
+}
+.hero-planet-card {
+  position: relative;
+  width: 112px;
+  height: 136px;
+  border-radius: 28px;
+  background-color: rgba(255, 255, 255, 0.78);
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  align-items: center;
+  justify-content: center;
+}
+.hero-orbit {
+  position: absolute;
+  width: 86px;
+  height: 34px;
+  border-radius: 43px;
+  border-width: 2px;
+  border-color: rgba(141, 107, 255, 0.32);
+  border-style: solid;
+  transform: rotate(-20deg);
+}
+.hero-icon-wrap {
+  width: 68px;
+  height: 68px;
+  border-radius: 34px;
+  background-color: #EEF7FF;
+  box-shadow: 0 14px 26px rgba(109, 174, 255, 0.2);
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.hero-icon {
+  color: #8D6BFF;
+  font-size: 34px;
+}
+.hero-chip {
+  color: #7B758C;
+  background-color: #FFFFFF;
+  font-size: 11px;
+  border-radius: 13px;
+  padding: 5px 9px;
+}
+.value-block,
+.focus-block,
+.demo-block {
+  margin: 14px 16px;
+  padding: 18px;
+  border-radius: 26px;
+  background-color: #FFFFFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  box-shadow: 0 14px 30px rgba(44, 35, 80, 0.06);
+}
+.block-title {
+  color: #191528;
+  font-size: 19px;
+  font-weight: bold;
+}
+.block-subtitle {
+  color: #7B758C;
+  font-size: 12px;
+  line-height: 19px;
+  margin-top: 6px;
+}
+.ai-core-card {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: #F7F4FF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.ai-core-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 25px;
+  background-color: #1F1933;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+.ai-core-icon-text {
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: bold;
+}
+.ai-core-copy {
+  flex: 1;
+  flex-direction: column;
+}
+.ai-core-title {
+  color: #191528;
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.ai-core-text {
+  color: #7B758C;
+  font-size: 12px;
+  line-height: 18px;
+}
+.value-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.value-card {
+  width: 48%;
+  min-height: 120px;
+  margin-right: 2%;
+  margin-bottom: 10px;
+  padding: 13px 11px;
+  border-radius: 20px;
+  background-color: #FBFAFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.value-card-even {
+  margin-right: 0;
+}
+.value-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  text-align: center;
+  line-height: 36px;
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+.value-icon-blue {
+  color: #6DAEFF;
+  background-color: #EEF7FF;
+}
+.value-icon-purple {
+  color: #8D6BFF;
+  background-color: #F1ECFF;
+}
+.value-icon-pink {
+  color: #D880A3;
+  background-color: #FFF0F6;
+}
+.value-title {
+  color: #191528;
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.value-text {
+  color: #7B758C;
+  font-size: 11px;
+  line-height: 17px;
+}
+.value-privacy {
+  color: #A9A3B8;
+  font-size: 11px;
+  line-height: 17px;
+  margin-top: 2px;
+}
+.focus-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.focus-card {
+  width: 48%;
+  margin-right: 2%;
+  margin-bottom: 10px;
+  padding: 14px 10px;
+  border-radius: 20px;
+  background-color: #FBFAFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  align-items: center;
+}
+.focus-active {
+  background-color: #F1ECFF;
+  border-color: #CBB8FF;
+}
+.focus-icon {
+  color: #8D6BFF;
+  font-size: 24px;
+}
+.focus-title {
+  color: #191528;
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 6px;
+}
+.steps-block {
+  padding: 0 16px;
+}
+.step-card {
+  flex-direction: row;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding: 17px;
+  border-radius: 24px;
+  background-color: #FFFFFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+  box-shadow: 0 14px 30px rgba(44, 35, 80, 0.06);
+}
+.step-card-info {
+  background-color: #F7FBFA;
+}
+.step-num-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  margin-top: 2px;
+}
+.step-num-1 {
+  background-color: #CFE7FF;
+}
+.step-num-2 {
+  background-color: #CBB8FF;
+}
+.step-num-3 {
+  background-color: #1F1933;
+}
+.step-num {
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: bold;
+}
+.step-content {
+  flex: 1;
+  flex-direction: column;
+}
+.step-title {
+  color: #191528;
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.step-desc {
+  color: #7B758C;
+  font-size: 12px;
+  line-height: 18px;
+  margin-bottom: 10px;
+}
+.step-status-row {
+  flex-direction: row;
+  align-items: center;
+}
+.step-status {
+  font-size: 12px;
+  font-weight: bold;
+  padding: 5px 10px;
+  border-radius: 12px;
+}
+.step-status-on {
+  color: #4FCB8D;
+  background-color: #EAF8F1;
+}
+.step-status-off {
+  color: #A9A3B8;
+  background-color: #F4F2FA;
+}
+.step-action-btn {
+  margin-left: 10px;
+  padding: 6px 13px;
+  background-color: #1F1933;
+  border-radius: 16px;
+}
+.step-action-btn-text {
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: bold;
+}
+.demo-card {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: #F7FBFA;
+  border-width: 1px;
+  border-color: #EEF4F2;
+  border-style: solid;
+}
+.demo-planet {
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: #F1ECFF;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+.demo-planet-text {
+  color: #8D6BFF;
+  font-size: 22px;
+}
+.demo-copy {
+  flex: 1;
+  flex-direction: column;
+}
+.demo-title {
+  color: #191528;
+  font-size: 14px;
+  font-weight: bold;
+}
+.demo-text {
+  color: #7B758C;
+  font-size: 12px;
+  line-height: 18px;
+  margin-top: 3px;
+}
+.demo-action {
+  background-color: #1F1933;
+  border-radius: 18px;
+  padding: 8px 12px;
+  margin-left: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.demo-action-text {
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: bold;
+}
+.demo-flow {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: #FBFAFF;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.demo-stage {
+  flex-direction: row;
+  align-items: center;
+}
+.demo-stage-planet {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 34px;
+  background-color: #EEF7FF;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  box-shadow: 0 14px 26px rgba(109, 174, 255, 0.18);
+}
+.demo-stage-orbit {
+  position: absolute;
+  width: 78px;
+  height: 28px;
+  border-radius: 39px;
+  border-width: 2px;
+  border-color: rgba(141, 107, 255, 0.28);
+  border-style: solid;
+  transform: rotate(-19deg);
+}
+.demo-stage-icon {
+  color: #8D6BFF;
+  font-size: 29px;
+}
+.demo-stage-copy {
+  flex: 1;
+  flex-direction: column;
+}
+.demo-stage-title {
+  color: #191528;
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.demo-stage-text {
+  color: #7B758C;
+  font-size: 12px;
+  line-height: 18px;
+}
+.demo-progress {
+  height: 9px;
+  border-radius: 5px;
+  background-color: #F1ECFF;
+  margin-top: 14px;
+  overflow: hidden;
+}
+.demo-progress-fill {
+  width: 64%;
+  height: 9px;
+  border-radius: 5px;
+  background-color: #CBB8FF;
+}
+.demo-steps {
+  flex-direction: row;
+  margin-top: 12px;
+}
+.demo-step {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 6px;
+}
+.demo-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background-color: #1F1933;
+  color: #FFFFFF;
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+  margin-right: 5px;
+}
+.demo-step-text {
+  color: #7B758C;
+  font-size: 11px;
+}
+.demo-result {
+  color: #8D6BFF;
+  font-size: 12px;
+  line-height: 18px;
+  margin-top: 12px;
+}
+.cta-block {
+  padding: 20px 24px 0 24px;
+  align-items: center;
+}
+.cta-btn-primary {
+  width: 100%;
+  padding: 14px;
+  background-color: #1F1933;
+  border-radius: 26px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 26px rgba(31, 25, 51, 0.22);
+  margin-bottom: 10px;
+}
+.cta-btn-primary-text {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: bold;
+}
+.cta-btn-secondary {
+  padding: 9px 18px;
+  background-color: #FFFFFF;
+  border-radius: 20px;
+  border-width: 1px;
+  border-color: #EEEAF6;
+  border-style: solid;
+}
+.cta-btn-secondary-text {
+  color: #7B758C;
+  font-size: 13px;
+}
+.footer-block {
+  align-items: center;
+  padding: 24px 0 32px 0;
+}
+.footer-text {
+  color: #A9A3B8;
+  font-size: 11px;
 }
 </style>

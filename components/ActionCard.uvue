@@ -1,7 +1,7 @@
 <template>
   <view class="action-card" :class="cardClass" @tap="onTap">
     <view class="action-icon-wrap" :class="iconWrapClass">
-      <image class="action-icon-img" :src="actionIconPath()" mode="aspectFit"></image>
+      <image class="action-icon-img" :src="actionIconSrc" mode="aspectFit"></image>
     </view>
     <view class="action-info">
       <text class="action-name">{{ props.actionName }}</text>
@@ -55,6 +55,7 @@ function getArrowClass(): string {
 const cardClass = computed<string>(getCardClass)
 const iconWrapClass = computed<string>(getIconWrapClass)
 const arrowClass = computed<string>(getArrowClass)
+const actionIconSrc = computed<string>(actionIconPath)
 
 function onTap(): void {
   emit('actionTap', props.actionId)

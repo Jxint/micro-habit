@@ -147,6 +147,9 @@ export function buildPreTriggerPrompt(context: PreTriggerContext): string {
 }
 
 export function buildPostActionPrompt(context: PostActionContext): string {
+  if (context == null) {
+    return '用户刚完成微动作。请直接输出 {"decision": "no_change", "targetRuleId": 0, "suggestedRule": null, "reasoning": "数据缺失", "confidence": 0.5, "alternatives": []}'
+  }
   const recentArr = context.recentActions != null ? context.recentActions : []
   const recentStr = recentArr.length > 0 ? recentArr.join('、') : '无'
   const rulesArr = context.currentRules != null ? context.currentRules : []
@@ -166,12 +169,10 @@ export function buildPostActionPrompt(context: PostActionContext): string {
     histLines.push('- 该 App 接受率 ' + (accept * 100).toFixed(0) + '%，趋势 ' + trend)
     histLines.push('- 该 App 平均连续使用 ' + typical + ' 分钟')
   }
+  const defaultPref: UserPreferenceInfo = { healthFocus: 'balanced', bodyLimit: 'none' }
   const pref: UserPreferenceInfo = context.userPreference != null
     ? context.userPreference
-    : { healthFocus: 'balanced' as const, bodyLimit: 'none' as const }
-  if (context == null) {
-    return '用户刚完成微动作。请直接输出 {"decision": "no_change", "targetRuleId": 0, "suggestedRule": null, "reasoning": "数据缺失", "confidence": 0.5, "alternatives": []}'
-  }
+    : defaultPref
   const aName = context.actionName != null ? context.actionName : '未知动作'
   const aCat = context.actionCategory != null ? context.actionCategory : 'other'
   const durMs = context.durationMs != null ? context.durationMs : 0

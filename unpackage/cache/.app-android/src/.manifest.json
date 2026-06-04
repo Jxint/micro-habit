@@ -1,1 +1,112 @@
-{"version":"1","env":{"compiler_version":"5.07"},"files":{}}
+{
+  "version": "1",
+  "env": {
+    "compiler_version": "5.07"
+  },
+  "files": {
+    "components/NumberPickerDialog.kt": {
+      "md5": "803a0ce639824461b102e86d90086c2da960b4cc",
+      "class": "GenComponentsNumberPickerDialog"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmDaily.kt": {
+      "md5": "0c3cd1a85a1135e443a8557d9edbfc4ce3f51e7f",
+      "class": "GenCloudObjLlmDaily"
+    },
+    "pages/settings/app-categories/index.kt": {
+      "md5": "1ec67b305dc5eff9c7d8a042eb70d42a0cb59fb1",
+      "class": "GenPagesSettingsAppCategoriesIndex"
+    },
+    "pages/settings/index.kt": {
+      "class": "GenPagesSettingsIndex",
+      "md5": "376355a50897467fabb7d5d237bad7398e3d9a26"
+    },
+    "pages/home/index.kt": {
+      "class": "GenPagesHomeIndex",
+      "md5": "a0e2147a1706afcbce2f4ce6d322595cb15420b0"
+    },
+    "components/ActionCard.kt": {
+      "md5": "eab81dd0553f322a85dbbdfe6bcc71ad7db385f6",
+      "class": "GenComponentsActionCard"
+    },
+    "index.kt": {
+      "md5": "ce3a8e40c6be2b3da6f60608a3834188ee55d118",
+      "class": ""
+    },
+    "components/EncourageToast.kt": {
+      "md5": "a98481b3a473d9578e42e5732d74fdf4962f1703",
+      "class": "GenComponentsEncourageToast"
+    },
+    "components/LlmHistoryCard.kt": {
+      "class": "GenComponentsLlmHistoryCard",
+      "md5": "9c666c6fde930cd1e4667e7352b2cdae284d536f"
+    },
+    "components/FeedbackDialog.kt": {
+      "class": "GenComponentsFeedbackDialog",
+      "md5": "20c966cdce079d9cf855c094e9f8ae0b985bd1bd"
+    },
+    "components/TimeRangePickerDialog.kt": {
+      "md5": "b5a0a169ed7997054c0aa8192932e9bb8ace701b",
+      "class": "GenComponentsTimeRangePickerDialog"
+    },
+    "components/CountdownBar.kt": {
+      "md5": "89d459eb6c6ad5d58f0568ea8928dc86d718f06e",
+      "class": "GenComponentsCountdownBar"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmWeekly.kt": {
+      "md5": "d8372e5bea68f528e3c9ea0a754b2cc8f209e6ce",
+      "class": "GenCloudObjLlmWeekly"
+    },
+    "components/StatusIndicator.kt": {
+      "class": "GenComponentsStatusIndicator",
+      "md5": "3a645e1ff357981330bfa1f5d2494272687bbeee"
+    },
+    "components/BarChart.kt": {
+      "class": "GenComponentsBarChart",
+      "md5": "f33a3d008627366c374df7d0de7c641c7b6b030b"
+    },
+    "pages/data/dashboard.kt": {
+      "md5": "da049e3ee2634358b3d0d98b71612ce4128909f8",
+      "class": "GenPagesDataDashboard"
+    },
+    "pages/action/execute.kt": {
+      "md5": "c0fdf6c2cb79f050dbcc8281aff79184f4364f85",
+      "class": "GenPagesActionExecute"
+    },
+    "components/PhoneUsageDialog.kt": {
+      "class": "GenComponentsPhoneUsageDialog",
+      "md5": "638b9e9ddbb59fcaa04466c4295112e0cc4eb69f"
+    },
+    "components/LineChart.kt": {
+      "md5": "ca85062c01a3f54119c1de208b2aed2c9d63a272",
+      "class": "GenComponentsLineChart"
+    },
+    "components/AchievementDetailDialog.kt": {
+      "class": "GenComponentsAchievementDetailDialog",
+      "md5": "4ffcf86dde7fffe3490e8b0364abd5fd141f2d69"
+    },
+    "components/AchievementUnlockDialog.kt": {
+      "class": "GenComponentsAchievementUnlockDialog",
+      "md5": "1d9489fa2f9c6d8e1336c06bc88fef76d6e827db"
+    },
+    "components/TriggerRuleDialog.kt": {
+      "md5": "0ae1a350671bb7ddc86c3766f46559898fd6557e",
+      "class": "GenComponentsTriggerRuleDialog"
+    },
+    "pages/debug/logs.kt": {
+      "class": "GenPagesDebugLogs",
+      "md5": "77503b1642b9630349c9faec181ea12b01483b43"
+    },
+    "components/HeatmapCalendar.kt": {
+      "class": "GenComponentsHeatmapCalendar",
+      "md5": "d4c65fb3887b60abd8d801075a531dd9e7292aeb"
+    },
+    "pages/guide/index.kt": {
+      "md5": "da759fa3946d628488959c5deba06aeac1d795db",
+      "class": "GenPagesGuideIndex"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmRuleSuggest.kt": {
+      "class": "GenCloudObjLlmRuleSuggest",
+      "md5": "f069c8e8edba1b5ccf1d6e3f3ddc808d82feee48"
+    }
+  }
+}

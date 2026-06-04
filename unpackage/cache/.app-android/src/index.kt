@@ -54,7 +54,6 @@ import io.dcloud.uniapp.extapi.getFileSystemManager as uni_getFileSystemManager
 import io.dcloud.uniapp.extapi.navigateTo as uni_navigateTo
 import io.dcloud.uniapp.extapi.request as uni_request
 import io.dcloud.uniapp.extapi.showToast as uni_showToast
-import io.dcloud.uniapp.extapi.vibrateShort as uni_vibrateShort
 val runBlock1 = run {
     __uniConfig.getAppStyles = fun(): Map<String, Map<String, Map<String, Any>>> {
         return GenApp.styles
@@ -141,7 +140,7 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
 fun initRuntimeSocketService(): UTSPromise<Boolean> {
     val hosts: String = "127.0.0.1,172.24.27.255,172.16.253.1,192.168.238.1"
     val port: String = "8090"
-    val id: String = "app-android_6DhOvg"
+    val id: String = "app-android_TYg9h5"
     if (hosts == "" || port == "" || id == "") {
         return UTSPromise.resolve(false)
     }
@@ -911,6 +910,9 @@ fun buildPreTriggerPrompt(context: PreTriggerContext): String {
     ) + "\n请基于以上状态生成：\n" + "1. adhocText：一句 10-30 字的 TTS 即兴文案，温暖+轻度幽默，要提到当前 app 和时长\n" + "2. stateDescription：用 5-15 字概括当前状态（用于\"为什么提醒我\"展示）\n\n" + "严格按 JSON 格式输出：{\"adhocText\": \"...\", \"stateDescription\": \"...\"}"
 }
 fun buildPostActionPrompt(context: PostActionContext): String {
+    if (context == null) {
+        return "用户刚完成微动作。请直接输出 {\"decision\": \"no_change\", \"targetRuleId\": 0, \"suggestedRule\": null, \"reasoning\": \"数据缺失\", \"confidence\": 0.5, \"alternatives\": []}"
+    }
     val recentArr = if (context.recentActions != null) {
         context.recentActions
     } else {
@@ -966,13 +968,11 @@ fun buildPostActionPrompt(context: PostActionContext): String {
         histLines.push("- 该 App 接受率 " + (accept * 100).toFixed(0) + "%，趋势 " + trend)
         histLines.push("- 该 App 平均连续使用 " + typical + " 分钟")
     }
+    val defaultPref = UserPreferenceInfo(healthFocus = "balanced", bodyLimit = "none")
     val pref: UserPreferenceInfo = if (context.userPreference != null) {
         context.userPreference
     } else {
-        UserPreferenceInfo(healthFocus = "balanced" as const, bodyLimit = "none" as const)
-    }
-    if (context == null) {
-        return "用户刚完成微动作。请直接输出 {\"decision\": \"no_change\", \"targetRuleId\": 0, \"suggestedRule\": null, \"reasoning\": \"数据缺失\", \"confidence\": 0.5, \"alternatives\": []}"
+        defaultPref
     }
     val aName = if (context.actionName != null) {
         context.actionName
@@ -1932,6 +1932,10 @@ fun insertActionLog(log: ActionLog): Number {
     ))
     return dbManager.insert("action_logs", row)
 }
+fun insertManualActionLog(actionId: String, actionType: String, result: String, skipReason: String?, durationMs: Number, targetMs: Number, triggeredAt: Number, completedAt: Number, createdAt: Number): Number {
+    val log = ActionLog(id = 0, action_id = actionId, action_type = actionType, result = result as ActionResult, skip_reason = skipReason, trigger_type = "manual", trigger_level = "gentle", duration_ms = durationMs, target_ms = targetMs, triggered_at = triggeredAt, completed_at = completedAt, created_at = createdAt)
+    return insertActionLog(log)
+}
 fun getTodayLogs(): UTSArray<ActionLog> {
     val start = getDayStartTimestamp()
     val end = start + 86400
@@ -2036,7 +2040,7 @@ open class BarItem (
     open var value: Number,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("BarItem", "database/ActionLogDao.uts", 83, 13)
+        return UTSSourceMapPosition("BarItem", "database/ActionLogDao.uts", 100, 13)
     }
 }
 fun getHourlyCompletionData(date: String): UTSArray<BarItem> {
@@ -3806,16 +3810,9 @@ fun getRandomEncourage(category: String): String {
     return pool[idx]
 }
 fun shortVibrate(times: Number = 1): Unit {
-    try {
-        run {
-            var i: Number = 0
-            while(i < times){
-                uni_vibrateShort(VibrateShortOptions(type = "medium"))
-                i++
-            }
-        }
+    if (times < 1) {
+        return
     }
-     catch (_: Throwable) {}
 }
 var ttsInstance: TextToSpeech? = null
 var ttsReady: Boolean = false
@@ -4843,7 +4840,6 @@ open class FloatingOverlayManager : IUTSSourceMap {
     }
 }
 var pendingActionId: String = ""
-var pendingAdhocText: String = ""
 fun setActionIdForNextPage(id: String): Unit {
     pendingActionId = id
 }
@@ -4853,12 +4849,7 @@ fun takeActionId(): String {
     return id
 }
 fun setAdhocForNextPage(text: String): Unit {
-    pendingAdhocText = text
-}
-fun takeAdhocText(): String {
-    val t = pendingAdhocText
-    pendingAdhocText = ""
-    return t
+    text
 }
 val MINIMAX_BASE_URL = "https://api.minimax.chat/v1"
 val MINIMAX_CHAT_PATH = "text/chatcompletion_v2"
@@ -4871,8 +4862,8 @@ fun callMinimaxChat(systemPrompt: String, userPrompt: String, maxTokens: Number,
         return
     }
     val reqBody: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("reqBody", "services/CloudService.uts", 17, 11), "model" to MINIMAX_CHAT_MODEL, "messages" to _uA(
-        _uO("role" to "system" as const, "content" to systemPrompt, "name" to "MiniMax AI"),
-        _uO("role" to "user" as const, "content" to userPrompt, "name" to "用户")
+        _uO("role" to "system", "content" to systemPrompt, "name" to "MiniMax AI"),
+        _uO("role" to "user", "content" to userPrompt, "name" to "用户")
     ), "temperature" to 0.7, "max_completion_tokens" to maxTokens, "reasoning_effort" to "low")
     try {
         uni_request<Any>(RequestOptions(url = MINIMAX_BASE_URL + "/" + MINIMAX_CHAT_PATH, method = "POST", header = _uO("Content-Type" to "application/json", "Authorization" to ("Bearer " + MINIMAX_API_KEY)), data = JSON.stringify(reqBody), timeout = 30000, success = fun(res) {
@@ -8501,6 +8492,25 @@ val GenComponentsTriggerRuleDialogClass = CreateVueComponent(GenComponentsTrigge
     return GenComponentsTriggerRuleDialog(instance)
 }
 )
+open class CellInfo (
+    open var day: Number? = null,
+    @JsonNotNull
+    open var count: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("CellInfo", "components/HeatmapCalendar.uvue", 42, 6)
+    }
+}
+val GenComponentsHeatmapCalendarClass = CreateVueComponent(GenComponentsHeatmapCalendar::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsHeatmapCalendar.inheritAttrs, inject = GenComponentsHeatmapCalendar.inject, props = GenComponentsHeatmapCalendar.props, propsNeedCastKeys = GenComponentsHeatmapCalendar.propsNeedCastKeys, emits = GenComponentsHeatmapCalendar.emits, components = GenComponentsHeatmapCalendar.components, styles = GenComponentsHeatmapCalendar.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsHeatmapCalendar.setup(props as GenComponentsHeatmapCalendar)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsHeatmapCalendar {
+    return GenComponentsHeatmapCalendar(instance)
+}
+)
 open class ScoredItem (
     @JsonNotNull
     open var action: MicroAction,
@@ -9007,6 +9017,87 @@ fun generateDailySummary(date: String, onComplete: (summary: DailyOutput) -> Uni
     }
     )
 }
+fun getGreetingHint(hour: Number): String {
+    if (hour < 6) {
+        return "夜深了，小星球建议把屏幕放远一点，给眼睛留条回家的路"
+    }
+    if (hour < 9) {
+        return "早晨先慢慢亮起来，今天也从一个很小的照顾开始"
+    }
+    if (hour < 12) {
+        return "上午专注力在线，也记得偶尔眨眨眼、松松肩"
+    }
+    if (hour < 14) {
+        return "午间适合轻轻重启一下，别让身体一直待机"
+    }
+    if (hour < 18) {
+        return "下午的小疲惫很正常，做个 10 秒动作就能缓一缓"
+    }
+    if (hour < 22) {
+        return "晚上别和屏幕硬撑，给眼睛和肩颈一点余地"
+    }
+    return "夜深了，小星球会轻一点提醒，也希望你早点休息"
+}
+fun getExecuteIntro(actionId: String): String {
+    if (actionId == "eye_blink") {
+        return "给眼睛补一点水分，轻轻眨几下就好"
+    }
+    if (actionId == "eye_rotate") {
+        return "让眼球慢慢活动一圈，别急着用力"
+    }
+    if (actionId == "neck_rotate") {
+        return "把脖子从固定姿势里慢慢请出来"
+    }
+    if (actionId == "shoulder_roll") {
+        return "肩膀向后画个小圈，把紧绷放下"
+    }
+    if (actionId == "neck_stretch") {
+        return "坐直一点，给肩颈一段温柔拉伸"
+    }
+    if (actionId == "core_tighten") {
+        return "唤醒核心肌群，像给身体按下稳定键"
+    }
+    if (actionId == "heel_raise") {
+        return "让小腿和脚踝动起来，顺便叫醒循环"
+    }
+    if (actionId == "deep_breath") {
+        return "慢慢吸气，再慢慢呼出，把节奏降下来"
+    }
+    if (actionId == "far_gaze") {
+        return "看向远处，让眼睛从近距离里松一口气"
+    }
+    return "跟着小星球做一个短短的微动作"
+}
+fun getExecuteGuide(actionId: String): String {
+    if (actionId == "eye_blink") {
+        return "轻闭双眼 2 秒再睁开，重复几次，保持自然呼吸"
+    }
+    if (actionId == "eye_rotate") {
+        return "眼球缓慢顺时针转一圈，再逆时针转一圈"
+    }
+    if (actionId == "neck_rotate") {
+        return "肩膀放松，头慢慢转向一侧，停一下再回正"
+    }
+    if (actionId == "shoulder_roll") {
+        return "双肩向上提起，再向后画圈放下，动作放慢"
+    }
+    if (actionId == "neck_stretch") {
+        return "头轻轻侧向一边，感受肩颈外侧被拉长"
+    }
+    if (actionId == "core_tighten") {
+        return "收紧腹部和骨盆底，保持自然呼吸，不要憋气"
+    }
+    if (actionId == "heel_raise") {
+        return "双脚踩稳，慢慢踮起脚跟，再控制速度落回"
+    }
+    if (actionId == "deep_breath") {
+        return "鼻吸 4 秒，让腹部鼓起；口呼 6 秒，慢慢送出"
+    }
+    if (actionId == "far_gaze") {
+        return "看向 6 米外的固定目标，放松眉心和眼周"
+    }
+    return "保持放松、缓慢和可控，跟随倒计时完成动作"
+}
 val GenComponentsAchievementDetailDialogClass = CreateVueComponent(GenComponentsAchievementDetailDialog::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsAchievementDetailDialog.inheritAttrs, inject = GenComponentsAchievementDetailDialog.inject, props = GenComponentsAchievementDetailDialog.props, propsNeedCastKeys = GenComponentsAchievementDetailDialog.propsNeedCastKeys, emits = GenComponentsAchievementDetailDialog.emits, components = GenComponentsAchievementDetailDialog.components, styles = GenComponentsAchievementDetailDialog.styles, setup = fun(props: ComponentPublicInstance): Any? {
         return GenComponentsAchievementDetailDialog.setup(props as GenComponentsAchievementDetailDialog)
@@ -9095,25 +9186,6 @@ val GenComponentsLineChartClass = CreateVueComponent(GenComponentsLineChart::cla
 }
 , fun(instance, renderer): GenComponentsLineChart {
     return GenComponentsLineChart(instance)
-}
-)
-open class CellInfo (
-    open var day: Number? = null,
-    @JsonNotNull
-    open var count: Number,
-) : UTSObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("CellInfo", "components/HeatmapCalendar.uvue", 42, 6)
-    }
-}
-val GenComponentsHeatmapCalendarClass = CreateVueComponent(GenComponentsHeatmapCalendar::class.java, fun(): VueComponentOptions {
-    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsHeatmapCalendar.inheritAttrs, inject = GenComponentsHeatmapCalendar.inject, props = GenComponentsHeatmapCalendar.props, propsNeedCastKeys = GenComponentsHeatmapCalendar.propsNeedCastKeys, emits = GenComponentsHeatmapCalendar.emits, components = GenComponentsHeatmapCalendar.components, styles = GenComponentsHeatmapCalendar.styles, setup = fun(props: ComponentPublicInstance): Any? {
-        return GenComponentsHeatmapCalendar.setup(props as GenComponentsHeatmapCalendar)
-    }
-    )
-}
-, fun(instance, renderer): GenComponentsHeatmapCalendar {
-    return GenComponentsHeatmapCalendar(instance)
 }
 )
 val GenPagesDataDashboardClass = CreateVueComponent(GenPagesDataDashboard::class.java, fun(): VueComponentOptions {
