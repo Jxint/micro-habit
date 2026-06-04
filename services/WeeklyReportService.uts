@@ -38,7 +38,7 @@ export function generateWeeklyData(): WeeklyReportStats {
     }
   }
 
-  if (daysWithData === 0) {
+  if (daysWithData < 1) {
     return {
       totalCompleted: 0,
       totalDurationSec: 0,

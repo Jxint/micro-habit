@@ -5,9 +5,9 @@ const NEWBIE_INTERVAL_MS = 120 * 60 * 1000
 
 export function isNewbie(): boolean {
   const newbieMode = getInt('newbie_mode', 1)
-  if (newbieMode === 0) return false
+  if (newbieMode < 1) return false
   const startDate = getInt('newbie_start_date', 0)
-  if (startDate === 0) return false
+  if (startDate < 1) return false
   const daysSince = Math.floor((Date.now() - startDate) / (24 * 3600 * 1000))
   return daysSince < 3
 }
@@ -23,7 +23,7 @@ export function getNewbieTriggerLevel(originalLevel: string): string {
 export function checkGraduation(): void {
   const startDate = getInt('newbie_start_date', 0)
   const daysSince = Math.floor((Date.now() - startDate) / (24 * 3600 * 1000))
-  if (daysSince >= 3 && getInt('newbie_mode', 1) === 1) {
+  if (daysSince >= 3 && getInt('newbie_mode', 1) == 1) {
     putInt('newbie_mode', 0)
   }
 }

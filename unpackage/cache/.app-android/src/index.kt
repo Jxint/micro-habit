@@ -1297,7 +1297,7 @@ open class SqliteStore : IUTSSourceMap {
         if (d == null) {
             return
         }
-        if (params.length.toInt() === 0) {
+        if (params.length.toInt() < 1) {
             d.execSQL(sql)
             return
         }
@@ -1375,7 +1375,7 @@ open class SqliteStore : IUTSSourceMap {
         val columns: UTSArray<String> = row.columns
         val values: UTSArray<Any?> = row.values
         val n: Number = columns.length
-        if (n.toInt() === 0) {
+        if (n.toInt() < 1) {
             return -1
         }
         if (values.length !== n) {
@@ -1414,7 +1414,7 @@ open class SqliteStore : IUTSSourceMap {
         val columns: UTSArray<String> = row.columns
         val values: UTSArray<Any?> = row.values
         val n: Number = columns.length
-        if (n.toInt() === 0) {
+        if (n.toInt() < 1) {
             return 0
         }
         if (values.length !== n) {
@@ -3438,11 +3438,11 @@ val NORMAL_INTERVAL_MS: Number = 3600000
 val NEWBIE_INTERVAL_MS: Number = 7200000
 fun isNewbie(): Boolean {
     val newbieMode = getInt("newbie_mode", 1)
-    if (newbieMode === 0) {
+    if (newbieMode < 1) {
         return false
     }
     val startDate = getInt("newbie_start_date", 0)
-    if (startDate === 0) {
+    if (startDate < 1) {
         return false
     }
     val daysSince = Math.floor((Date.now() - startDate) / 86400000)
@@ -5766,13 +5766,14 @@ fun normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule? {
     val sc = raw["screenConditions"]
     if (sc != null && UTSAndroid.`typeof`(sc) === "object") {
         val scObj = sc as UTSJSONObject
-        val includeHome = scObj["includeHome"] === true
+        val includeHomeRaw = scObj["includeHome"]
+        val includeHome = UTSAndroid.`typeof`(includeHomeRaw) === "boolean" && (includeHomeRaw as Boolean)
         val appPackagesRaw = scObj["appPackages"]
         val pkgs: UTSArray<String> = _uA()
         if (appPackagesRaw != null) {
             try {
                 val arrStr = JSON.stringify(appPackagesRaw)
-                val arr = UTSAndroid.consoleDebugError(JSON.parse(arrStr), " at services/LlmTriggerFlow.uts:290") as UTSArray<Any>
+                val arr = UTSAndroid.consoleDebugError(JSON.parse(arrStr), " at services/LlmTriggerFlow.uts:291") as UTSArray<Any>
                 run {
                     var i: Number = 0
                     while(i < arr.length){
@@ -5819,7 +5820,7 @@ fun parseJsonThreeLevels(raw: String): UTSJSONObject? {
         }
     }
     try {
-        return UTSAndroid.consoleDebugError(JSON.parse(cleaned), " at services/LlmTriggerFlow.uts:338") as UTSJSONObject
+        return UTSAndroid.consoleDebugError(JSON.parse(cleaned), " at services/LlmTriggerFlow.uts:339") as UTSJSONObject
     }
      catch (_: Throwable) {}
     try {
@@ -5827,7 +5828,7 @@ fun parseJsonThreeLevels(raw: String): UTSJSONObject? {
         if (match != null) {
             val m = match[0]
             if (m != null && m.length > 0) {
-                return UTSAndroid.consoleDebugError(JSON.parse(m), " at services/LlmTriggerFlow.uts:346") as UTSJSONObject
+                return UTSAndroid.consoleDebugError(JSON.parse(m), " at services/LlmTriggerFlow.uts:347") as UTSJSONObject
             }
         }
     }
@@ -8523,7 +8524,7 @@ open class ScoredItem (
 }
 fun getRecommendedActions(): UTSArray<MicroAction> {
     val enabledActions = getEnabledActions()
-    if (enabledActions.length.toInt() === 0) {
+    if (enabledActions.length.toInt() < 1) {
         return _uA()
     }
     val hour = currentHour()
@@ -8694,7 +8695,7 @@ fun generateWeeklyData(): WeeklyReportStats {
             i--
         }
     }
-    if (daysWithData === 0) {
+    if (daysWithData < 1) {
         return WeeklyReportStats(totalCompleted = 0, totalDurationSec = 0, avgPenetration = 0, avgGuardMinutes = 0, bestDay = "", bestDayCount = 0, worstDay = "", worstDayCount = 0)
     }
     return WeeklyReportStats(totalCompleted = totalCompleted, totalDurationSec = totalDurationSec, avgPenetration = Math.round(totalPenetration / 7 * 100) / 100, avgGuardMinutes = Math.round(totalGuardMinutes / 7), bestDay = bestDay, bestDayCount = bestDayCount, worstDay = worstDay, worstDayCount = worstDayCount)

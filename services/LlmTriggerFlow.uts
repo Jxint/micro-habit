@@ -317,7 +317,8 @@ function normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule | null {
   const sc = raw['screenConditions']
   if (sc != null && typeof sc === 'object') {
     const scObj = sc as UTSJSONObject
-    const includeHome = scObj['includeHome'] === true
+    const includeHomeRaw = scObj['includeHome']
+    const includeHome = typeof includeHomeRaw === 'boolean' && (includeHomeRaw as boolean)
     const appPackagesRaw = scObj['appPackages']
     const pkgs: string[] = []
     if (appPackagesRaw != null) {
