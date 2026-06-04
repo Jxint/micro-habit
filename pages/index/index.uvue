@@ -15,7 +15,7 @@
 <style>
 	.page {
 		flex: 1;
-		background-color: #D8C8FF;
+		background-color: transparent;
 		position: relative;
 		overflow: hidden;
 		justify-content: center;
