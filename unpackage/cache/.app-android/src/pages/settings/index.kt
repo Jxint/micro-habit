@@ -12,7 +12,9 @@ import io.dcloud.uts.Map
 import io.dcloud.uts.Set
 import io.dcloud.uts.UTSAndroid
 import kotlin.properties.Delegates
+import io.dcloud.uniapp.extapi.`$emit` as uni__emit
 import io.dcloud.uniapp.extapi.navigateTo as uni_navigateTo
+import io.dcloud.uniapp.extapi.showModal as uni_showModal
 import io.dcloud.uniapp.extapi.showToast as uni_showToast
 open class GenPagesSettingsIndex : BasePage {
     constructor(__ins: ComponentInternalInstance, __renderer: String?) : super(__ins, __renderer) {}
@@ -46,7 +48,8 @@ open class GenPagesSettingsIndex : BasePage {
             val dndEndHour = ref<Number>(parseHourFromSetting(getSetting("dnd_end", "07:00"), 7))
             val durationPref = ref<Number>(getInt("action_duration_pref", 15))
             val targetCount = ref<Number>(getInt("category_target_count", 3))
-            val rules = ref(_uA<TriggerRule>())
+            val rules = ref(_uA<PersistedEffectiveRule>())
+            val triggerEnabled = ref<Boolean>(getBool("trigger_enabled", true))
             val llmEnabled = ref<Boolean>(getBool("llm_trigger_enabled", true))
             val askEachTime = ref<Boolean>(getBool("llm_trigger_ask_each_time", true))
             val dndStart = computed<String>(fun(): String {
@@ -65,15 +68,28 @@ open class GenPagesSettingsIndex : BasePage {
                 return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes())
             }
             val formatTime = ::gen_formatTime_fn
+            fun gen_getActionDisplayName_fn(actionId: String): String {
+                val a = getActionById(actionId)
+                return if (a != null) {
+                    a.name
+                } else {
+                    actionId
+                }
+            }
+            val getActionDisplayName = ::gen_getActionDisplayName_fn
+            fun gen_formatAppPackages_fn(pkgs: UTSArray<String>): String {
+                if (pkgs.length < 1) {
+                    return "任意 App"
+                }
+                if (pkgs.length === 1) {
+                    return pkgs[0] as String
+                }
+                return pkgs.length + " 个应用"
+            }
+            val formatAppPackages = ::gen_formatAppPackages_fn
             fun gen_formatRuleType_fn(t: String): String {
-                if (t === "frequency") {
-                    return "频率控制"
-                }
-                if (t === "duration") {
+                if (t.length < 1) {
                     return "时长控制"
-                }
-                if (t === "time_window") {
-                    return "时间窗口"
                 }
                 return t
             }
@@ -92,33 +108,53 @@ open class GenPagesSettingsIndex : BasePage {
             }
             val formatTriggerLabel = ::gen_formatTriggerLabel_fn
             fun gen_formatSource_fn(s: String): String {
-                if (s === "ai_suggest") {
-                    return "🤖 AI建议"
+                if (s === "llm") {
+                    return "🤖 LLM建议"
                 }
-                if (s === "default") {
-                    return "📦 默认"
+                if (s === "user") {
+                    return "👤 用户"
                 }
-                if (s === "manual") {
-                    return "👤 手动"
+                if (s === "system") {
+                    return "📦 系统"
                 }
                 return s
             }
             val formatSource = ::gen_formatSource_fn
             fun gen_formatCondition_fn(json: String): String {
-                if (json === "{}" || json.length === 0) {
+                if (json.length === 0) {
                     return "无条件"
                 }
                 try {
-                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:220") as UTSJSONObject
+                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:266") as UTSJSONObject
                     if (obj == null) {
                         return json.substring(0, 20)
                     }
-                    val hourMin = obj.get("hour_min")
-                    val hourMax = obj.get("hour_max")
-                    if (hourMin != null && hourMax != null) {
-                        return "时段 " + hourMin + ":00-" + hourMax + ":00"
+                    val apps = obj.get("appPackages")
+                    val tw = obj.get("timeWindow")
+                    val parts: UTSArray<String> = _uA()
+                    if (apps != null) {
+                        val arr = apps as UTSArray<Any>
+                        if (arr.length > 0) {
+                            parts.push("包名 " + (if (arr.length === 1) {
+                                (arr[0] as String)
+                            } else {
+                                (arr.length + " 个")
+                            }
+                            ))
+                        }
                     }
-                    return json.substring(0, 20)
+                    if (tw != null) {
+                        val twObj = tw as UTSJSONObject
+                        val s = twObj.get("start") as String
+                        val e = twObj.get("end") as String
+                        if (s != null && e != null) {
+                            parts.push("时段 " + s + "-" + e)
+                        }
+                    }
+                    if (parts.length === 0) {
+                        return json.substring(0, 20)
+                    }
+                    return parts.join(" / ")
                 }
                  catch (_: Throwable) {
                     return json.substring(0, 20)
@@ -183,6 +219,44 @@ open class GenPagesSettingsIndex : BasePage {
                 uni_navigateTo(NavigateToOptions(url = "/pages/debug/logs"))
             }
             val goDebugDB = ::gen_goDebugDB_fn
+            fun gen_resetAchievements_fn(): Unit {
+                try {
+                    uni_showModal(ShowModalOptions(title = "确认重置", content = "清空所有成就解锁记录，重新开始统计。", success = fun(res){
+                        try {
+                            if (res == null) {
+                                return
+                            }
+                            val obj = res as UTSJSONObject
+                            if (obj == null) {
+                                return
+                            }
+                            val confirm = obj["confirm"]
+                            if (confirm !== true) {
+                                return
+                            }
+                            clearAchievements()
+                            putSetting("seen_achievements", "[]")
+                            try {
+                                useAppStore().refreshAchievements()
+                            }
+                             catch (_: Throwable) {}
+                            uni_showToast(ShowToastOptions(title = "已重置成就", icon = "none"))
+                        }
+                         catch (e: Throwable) {
+                            console.warn("[settings] resetAchievements 回调异常: " + JSON.stringify(e), " at pages/settings/index.uvue:357")
+                        }
+                    }
+                    ))
+                }
+                 catch (e: Throwable) {
+                    console.warn("[settings] resetAchievements 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:362")
+                }
+            }
+            val resetAchievements = ::gen_resetAchievements_fn
+            fun gen_goAppCategories_fn(): Unit {
+                uni_navigateTo(NavigateToOptions(url = "/pages/settings/app-categories/index"))
+            }
+            val goAppCategories = ::gen_goAppCategories_fn
             var debugTapCount: Number = 0
             var debugTapTimer: Number? = null
             fun gen_handleDebugTap_fn(): Unit {
@@ -202,63 +276,93 @@ open class GenPagesSettingsIndex : BasePage {
                 }
             }
             val handleDebugTap = ::gen_handleDebugTap_fn
-            fun gen_onLlmEnabledChange_fn(e: Any): Unit {
+            fun gen_onManualTrigger_fn(): Unit {
+                try {
+                    uni__emit("manualTriggerCheck", _uO())
+                    uni_showToast(ShowToastOptions(title = "正在检查...", icon = "none", position = "bottom"))
+                }
+                 catch (e: Throwable) {
+                    console.warn("[settings] manualTrigger 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:390")
+                }
+            }
+            val onManualTrigger = ::gen_onManualTrigger_fn
+            fun gen_extractBoolFromSwitch_fn(e: Any): Boolean? {
                 try {
                     val obj = e as UTSJSONObject
                     if (obj == null) {
-                        return
+                        return null
                     }
                     val v = obj["detail"]
                     if (v == null) {
-                        return
+                        return null
                     }
                     val detail = v as UTSJSONObject
                     if (detail == null) {
-                        return
+                        return null
                     }
                     val valRaw = detail["value"]
                     if (valRaw == null) {
+                        return null
+                    }
+                    if (UTSAndroid.`typeof`(valRaw) === "boolean") {
+                        return valRaw as Boolean
+                    }
+                    if (UTSAndroid.`typeof`(valRaw) === "number") {
+                        return (valRaw as Number) != 0
+                    }
+                    return null
+                }
+                 catch (_: Throwable) {
+                    return null
+                }
+            }
+            val extractBoolFromSwitch = ::gen_extractBoolFromSwitch_fn
+            fun gen_onTriggerEnabledChange_fn(e: Any): Unit {
+                try {
+                    val enabled = extractBoolFromSwitch(e)
+                    if (enabled == null) {
                         return
                     }
-                    val enabled = valRaw as Boolean
-                    llmEnabled.value = enabled === true
-                    putBool("llm_trigger_enabled", enabled === true)
+                    triggerEnabled.value = enabled
+                    putBool("trigger_enabled", enabled)
+                    setTriggerEnabled(enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onLlmEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:310")
+                    console.warn("[settings] onTriggerEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:420")
+                }
+            }
+            val onTriggerEnabledChange = ::gen_onTriggerEnabledChange_fn
+            fun gen_onLlmEnabledChange_fn(e: Any): Unit {
+                try {
+                    val enabled = extractBoolFromSwitch(e)
+                    if (enabled == null) {
+                        return
+                    }
+                    llmEnabled.value = enabled
+                    putBool("llm_trigger_enabled", enabled)
+                }
+                 catch (err: Throwable) {
+                    console.warn("[settings] onLlmEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:431")
                 }
             }
             val onLlmEnabledChange = ::gen_onLlmEnabledChange_fn
             fun gen_onAskEachTimeChange_fn(e: Any): Unit {
                 try {
-                    val obj = e as UTSJSONObject
-                    if (obj == null) {
+                    val enabled = extractBoolFromSwitch(e)
+                    if (enabled == null) {
                         return
                     }
-                    val v = obj["detail"]
-                    if (v == null) {
-                        return
-                    }
-                    val detail = v as UTSJSONObject
-                    if (detail == null) {
-                        return
-                    }
-                    val valRaw = detail["value"]
-                    if (valRaw == null) {
-                        return
-                    }
-                    val v2 = valRaw as Boolean
-                    askEachTime.value = v2 === true
-                    putBool("llm_trigger_ask_each_time", v2 === true)
+                    askEachTime.value = enabled
+                    putBool("llm_trigger_ask_each_time", enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onAskEachTimeChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:328")
+                    console.warn("[settings] onAskEachTimeChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:442")
                 }
             }
             val onAskEachTimeChange = ::gen_onAskEachTimeChange_fn
             onPageShow(fun(){
                 try {
-                    rules.value = getAllEnabledRules()
+                    rules.value = getActiveRules()
                 }
                  catch (_: Throwable) {
                     rules.value = _uA()
@@ -270,21 +374,37 @@ open class GenPagesSettingsIndex : BasePage {
                 dndEndHour.value = parseHourFromSetting(getSetting("dnd_end", "07:00"), 7)
                 llmEnabled.value = getBool("llm_trigger_enabled", true)
                 askEachTime.value = getBool("llm_trigger_ask_each_time", true)
+                triggerEnabled.value = getBool("trigger_enabled", true)
             }
             )
             return fun(): Any? {
                 val _component_switch = resolveComponent("switch")
                 return _cE("view", _uM("class" to "page"), _uA(
+                    _cE("view", _uM("class" to "page-bg"), _uA(
+                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/dream-gradient-bg.png", "mode" to "aspectFill"))
+                    )),
                     _cE("scroll-view", _uM("class" to "scroll-area", "scroll-y" to "true"), _uA(
                         _cE("view", _uM("class" to "settings-section"), _uA(
                             _cE("text", _uM("class" to "section-title"), "触发设置"),
-                            _cE("view", _uM("class" to "setting-item", "onClick" to openThresholdPicker), _uA(
+                            _cE("view", _uM("class" to "setting-item"), _uA(
                                 _cE("view", _uM("class" to "setting-left"), _uA(
-                                    _cE("text", _uM("class" to "setting-label"), "连续使用提醒阈值"),
-                                    _cE("text", _uM("class" to "setting-hint"), "同一 App 连续使用多久后提醒")
+                                    _cE("text", _uM("class" to "setting-label"), "自动触发"),
+                                    _cE("text", _uM("class" to "setting-hint"), "开启后才会根据应用使用时长自动弹出微动作提醒")
                                 )),
-                                _cE("text", _uM("class" to "setting-value"), _tD(unref(durationThreshold)) + " 分钟 ›", 1)
+                                _cV(_component_switch, _uM("checked" to unref(triggerEnabled), "onChange" to onTriggerEnabledChange), null, 8, _uA(
+                                    "checked"
+                                ))
                             )),
+                            _cE("view", _uM("class" to "setting-item", "onClick" to onManualTrigger), _uA(
+                                _cE("view", _uM("class" to "setting-left"), _uA(
+                                    _cE("text", _uM("class" to "setting-label"), "立即检查一次"),
+                                    _cE("text", _uM("class" to "setting-hint"), "主动查询当前 App 使用时长并判断是否触发微动作提醒")
+                                )),
+                                _cE("text", _uM("class" to "setting-value"), "检查 ›")
+                            ))
+                        )),
+                        _cE("view", _uM("class" to "settings-section"), _uA(
+                            _cE("text", _uM("class" to "section-title"), "通知设置"),
                             _cE("view", _uM("class" to "setting-item", "onClick" to openDndPicker), _uA(
                                 _cE("view", _uM("class" to "setting-left"), _uA(
                                     _cE("text", _uM("class" to "setting-label"), "免打扰时段"),
@@ -333,30 +453,45 @@ open class GenPagesSettingsIndex : BasePage {
                             _cE("text", _uM("class" to "section-title"), "触发规则（" + _tD(unref(rules).length) + " 条）", 1),
                             if (unref(rules).length === 0) {
                                 _cE("view", _uM("key" to 0, "class" to "empty-rules"), _uA(
-                                    _cE("text", _uM("class" to "empty-text"), "暂无启用的触发规则")
+                                    _cE("text", _uM("class" to "empty-text"), "暂无启用的触发规则"),
+                                    _cE("text", _uM("class" to "empty-hint"), "完成微动作后 AI 会自动建议规则")
                                 ))
                             } else {
                                 _cC("v-if", true)
                             }
                             ,
                             _cE(Fragment, null, RenderHelpers.renderList(unref(rules), fun(rule, idx, __index, _cached): Any {
-                                return _cE("view", _uM("key" to rule.id, "class" to "rule-card"), _uA(
+                                return _cE("view", _uM("key" to ("r-" + idx), "class" to "rule-card"), _uA(
                                     _cE("view", _uM("class" to "rule-row1"), _uA(
-                                        _cE("text", _uM("class" to "rule-type"), _tD(formatRuleType(rule.rule_type)), 1),
-                                        _cE("text", _uM("class" to "rule-trigger"), _tD(formatTriggerLabel(rule.trigger_type)), 1),
-                                        _cE("text", _uM("class" to "rule-priority"), "优先级 " + _tD(rule.priority), 1)
+                                        _cE("text", _uM("class" to "rule-type"), _tD(getActionDisplayName(rule.actionId)), 1),
+                                        _cE("text", _uM("class" to "rule-trigger"), "≥ " + _tD(rule.timeThresholdMinutes) + " 分钟", 1),
+                                        _cE("text", _uM("class" to "rule-priority"), _tD(rule.triggerLevel), 1)
                                     )),
                                     _cE("view", _uM("class" to "rule-row2"), _uA(
                                         _cE("text", _uM("class" to "rule-source"), _tD(formatSource(rule.source)), 1),
-                                        _cE("text", _uM("class" to "rule-cond"), _tD(formatCondition(rule.condition_json)), 1)
+                                        _cE("text", _uM("class" to "rule-cond"), _tD(formatAppPackages(rule.appPackages)) + _tD(if (rule.timeWindow != null) {
+                                            " · " + rule.timeWindow!!.start + "-" + rule.timeWindow!!.end
+                                        } else {
+                                            ""
+                                        }
+                                        ), 1)
                                     )),
                                     _cE("view", _uM("class" to "rule-row3"), _uA(
-                                        _cE("text", _uM("class" to "rule-time"), "创建 " + _tD(formatTime(rule.created_at)), 1),
-                                        _cE("text", _uM("class" to "rule-time"), "更新 " + _tD(formatTime(rule.updated_at)), 1)
+                                        _cE("text", _uM("class" to "rule-time"), "创建 " + _tD(formatTime(rule.createdAt)), 1)
                                     ))
                                 ))
                             }
                             ), 128)
+                        )),
+                        _cE("view", _uM("class" to "settings-section"), _uA(
+                            _cE("text", _uM("class" to "section-title"), "App 分类"),
+                            _cE("view", _uM("class" to "setting-item", "onClick" to goAppCategories), _uA(
+                                _cE("view", _uM("class" to "setting-left"), _uA(
+                                    _cE("text", _uM("class" to "setting-label"), "App 分类管理"),
+                                    _cE("text", _uM("class" to "setting-hint"), "手动调整每个 App 的分类，锁定后 LLM 不会覆盖")
+                                )),
+                                _cE("text", _uM("class" to "setting-value"), "›")
+                            ))
                         )),
                         _cE("view", _uM("class" to "settings-section"), _uA(
                             _cE("text", _uM("class" to "section-title"), "调试"),
@@ -369,6 +504,13 @@ open class GenPagesSettingsIndex : BasePage {
                             _cE("view", _uM("class" to "setting-item", "onClick" to goDebugDB), _uA(
                                 _cE("view", _uM("class" to "setting-left"), _uA(
                                     _cE("text", _uM("class" to "setting-label"), "数据库巡检 & 配置")
+                                )),
+                                _cE("text", _uM("class" to "setting-value"), "›")
+                            )),
+                            _cE("view", _uM("class" to "setting-item", "onClick" to resetAchievements), _uA(
+                                _cE("view", _uM("class" to "setting-left"), _uA(
+                                    _cE("text", _uM("class" to "setting-label"), "重置成就进度"),
+                                    _cE("text", _uM("class" to "setting-hint"), "清空所有已解锁成就，可重新触发")
                                 )),
                                 _cE("text", _uM("class" to "setting-value"), "›")
                             ))
@@ -448,7 +590,7 @@ open class GenPagesSettingsIndex : BasePage {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "settings-section" to _pS(_uM("marginTop" to 12, "backgroundColor" to "#FFFFFF")), "section-title" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "fontWeight" to "bold", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 6, "paddingLeft" to 16)), "setting-item" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 14, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "setting-left" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "flexDirection" to "column")), "setting-label" to _pS(_uM("fontSize" to 15, "color" to "#2C3E50")), "setting-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "setting-value" to _pS(_uM("fontSize" to 14, "color" to "#3498DB", "fontWeight" to 500)), "empty-rules" to _pS(_uM("alignItems" to "center", "paddingTop" to 20, "paddingRight" to 0, "paddingBottom" to 20, "paddingLeft" to 0)), "empty-text" to _pS(_uM("fontSize" to 13, "color" to "#BDC3C7")), "rule-card" to _pS(_uM("paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "rule-row1" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginBottom" to 4)), "rule-type" to _pS(_uM("fontSize" to 13, "fontWeight" to "bold", "color" to "#2C3E50", "backgroundColor" to "#EBF5FB", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6, "marginRight" to 6)), "rule-trigger" to _pS(_uM("fontSize" to 11, "color" to "#7F8C8D", "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6)), "rule-priority" to _pS(_uM("fontSize" to 11, "color" to "#3498DB", "marginLeft" to "auto")), "rule-row2" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginTop" to 4)), "rule-source" to _pS(_uM("fontSize" to 11, "color" to "#27AE60", "marginRight" to 8)), "rule-cond" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "rule-row3" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "marginTop" to 4)), "rule-time" to _pS(_uM("fontSize" to 10, "color" to "#BDC3C7", "fontFamily" to "monospace")), "bottom-spacer" to _pS(_uM("height" to 80)))
+                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#D8C8FF", "position" to "relative", "overflow" to "hidden")), "page-bg" to _pS(_uM("position" to "absolute", "left" to 0, "top" to 0, "width" to "100%", "height" to "100%", "zIndex" to 0)), "page-bg-img" to _pS(_uM("width" to "100%", "height" to "100%")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "position" to "relative", "zIndex" to 1)), "settings-section" to _pS(_uM("marginTop" to 12, "backgroundColor" to "#FFFFFF")), "section-title" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "fontWeight" to "bold", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 6, "paddingLeft" to 16)), "setting-item" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 14, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "setting-left" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "flexDirection" to "column")), "setting-label" to _pS(_uM("fontSize" to 15, "color" to "#2C3E50")), "setting-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "setting-value" to _pS(_uM("fontSize" to 14, "color" to "#3498DB", "fontWeight" to "500")), "empty-rules" to _pS(_uM("alignItems" to "center", "paddingTop" to 20, "paddingRight" to 0, "paddingBottom" to 20, "paddingLeft" to 0)), "empty-text" to _pS(_uM("fontSize" to 13, "color" to "#BDC3C7")), "rule-card" to _pS(_uM("paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "rule-row1" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginBottom" to 4)), "rule-type" to _pS(_uM("fontSize" to 13, "fontWeight" to "bold", "color" to "#2C3E50", "backgroundColor" to "#EBF5FB", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6, "marginRight" to 6)), "rule-trigger" to _pS(_uM("fontSize" to 11, "color" to "#7F8C8D", "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6)), "rule-priority" to _pS(_uM("fontSize" to 11, "color" to "#3498DB", "marginLeft" to "auto")), "rule-row2" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginTop" to 4)), "rule-source" to _pS(_uM("fontSize" to 11, "color" to "#27AE60", "marginRight" to 8)), "rule-cond" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "rule-row3" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "marginTop" to 4)), "rule-time" to _pS(_uM("fontSize" to 10, "color" to "#BDC3C7", "fontFamily" to "monospace")), "bottom-spacer" to _pS(_uM("height" to 80)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

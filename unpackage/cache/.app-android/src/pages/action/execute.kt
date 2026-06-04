@@ -33,6 +33,7 @@ open class GenPagesActionExecute : BasePage {
             val showFeedback = ref<Boolean>(false)
             val remainingMs = ref<Number>(0)
             var countdownTimerId: Number? = null
+            var encourageTimerId: Number? = null
             val showButtons = computed<Boolean>(fun(): Boolean {
                 val a = action.value
                 val exec = isExecuting.value
@@ -147,15 +148,15 @@ open class GenPagesActionExecute : BasePage {
                     uni__emit("llmActionCompleted", _uO("actionId" to a.id, "actionName" to a.name, "actionCategory" to a.category, "durationMs" to durationMs, "result" to result))
                 }
                  catch (e: Throwable) {
-                    console.warn("[execute] emitLlmActionCompleted 失败: " + JSON.stringify(e), " at pages/action/execute.uvue:141")
+                    console.warn("[execute] emitLlmActionCompleted 失败: " + JSON.stringify(e), " at pages/action/execute.uvue:143")
                 }
             }
             val emitLlmActionCompleted = ::gen_emitLlmActionCompleted_fn
             fun recordAction(result: String, skipReason: String = ""): Unit {
-                console.log("[execute] recordAction enter, result=" + result, " at pages/action/execute.uvue:146")
+                console.log("[execute] recordAction enter, result=" + result, " at pages/action/execute.uvue:148")
                 val a = action.value
                 if (a == null) {
-                    console.log("[execute] recordAction SKIP: action.value is null", " at pages/action/execute.uvue:149")
+                    console.log("[execute] recordAction SKIP: action.value is null", " at pages/action/execute.uvue:151")
                     return
                 }
                 val nowMs = Date.now()
@@ -171,7 +172,7 @@ open class GenPagesActionExecute : BasePage {
                 }
                 , trigger_type = "manual", trigger_level = "gentle", duration_ms = dur, target_ms = a.defaultDurationMs, triggered_at = nowMs - 30000, completed_at = nowMs, created_at = Math.floor(nowMs / 1000))
                 val insertId = insertActionLog(log)
-                console.log("[execute] insertActionLog 返回 id=" + insertId, " at pages/action/execute.uvue:169")
+                console.log("[execute] insertActionLog 返回 id=" + insertId, " at pages/action/execute.uvue:171")
                 emitLlmActionCompleted(a, dur, result)
             }
             fun gen_showEncourageNow_fn(): Unit {
@@ -184,16 +185,24 @@ open class GenPagesActionExecute : BasePage {
                 encourageText.value = getRandomEncourage(cat)
                 showEncourage.value = true
                 isCompleted.value = true
-                setTimeout(fun(): Unit {
-                    showEncourage.value = false
-                    uni_navigateBack(NavigateBackOptions())
+                encourageTimerId = setTimeout(fun(): Unit {
+                    try {
+                        if (isCompleted.value !== true) {
+                            return
+                        }
+                        showEncourage.value = false
+                        uni_navigateBack(NavigateBackOptions())
+                    }
+                     catch (e: Throwable) {
+                        console.warn("[execute] showEncourageNow 回调异常: " + JSON.stringify(e), " at pages/action/execute.uvue:187")
+                    }
                 }
                 , 1500)
             }
             val showEncourageNow = ::gen_showEncourageNow_fn
             fun gen_startCountdown_fn(): Unit {
                 val interval: Number = 100
-                console.log("[execute] startCountdown total=" + remainingMs.value + "ms", " at pages/action/execute.uvue:187")
+                console.log("[execute] startCountdown total=" + remainingMs.value + "ms", " at pages/action/execute.uvue:194")
                 countdownTimerId = setInterval(fun(): Unit {
                     remainingMs.value -= interval
                     if (remainingMs.value <= 0) {
@@ -214,7 +223,7 @@ open class GenPagesActionExecute : BasePage {
             }
             val startCountdown = ::gen_startCountdown_fn
             fun gen_handleAgree_fn(): Unit {
-                console.log("[execute] handleAgree", " at pages/action/execute.uvue:202")
+                console.log("[execute] handleAgree", " at pages/action/execute.uvue:209")
                 val a = action.value
                 if (a == null) {
                     uni_showToast(ShowToastOptions(title = "未找到动作", icon = "none"))
@@ -222,7 +231,7 @@ open class GenPagesActionExecute : BasePage {
                 }
                 isExecuting.value = true
                 remainingMs.value = a.defaultDurationMs
-                console.log("[execute] countdown start, ms=" + a.defaultDurationMs, " at pages/action/execute.uvue:210")
+                console.log("[execute] countdown start, ms=" + a.defaultDurationMs, " at pages/action/execute.uvue:217")
                 startCountdown()
                 try {
                     uni_vibrateShort(VibrateShortOptions(type = "light"))
@@ -268,12 +277,12 @@ open class GenPagesActionExecute : BasePage {
             }
             val onFeedbackCancel = ::gen_onFeedbackCancel_fn
             onLoad(fun(option){
-                console.log("[execute] onLoad begin", " at pages/action/execute.uvue:247")
+                console.log("[execute] onLoad begin", " at pages/action/execute.uvue:254")
                 var aid = takeActionId()
-                console.log("[execute] from helper aid=" + aid, " at pages/action/execute.uvue:249")
+                console.log("[execute] from helper aid=" + aid, " at pages/action/execute.uvue:256")
                 if (aid.length === 0) {
                     aid = getActionIdFromOption(option)
-                    console.log("[execute] from option aid=" + aid, " at pages/action/execute.uvue:252")
+                    console.log("[execute] from option aid=" + aid, " at pages/action/execute.uvue:259")
                 }
                 actionId.value = aid
                 if (aid.length > 0) {
@@ -283,20 +292,44 @@ open class GenPagesActionExecute : BasePage {
                         found.name
                     } else {
                         "null"
-                    }), " at pages/action/execute.uvue:258")
+                    }), " at pages/action/execute.uvue:265")
                 } else {
-                    console.log("[execute] no actionId", " at pages/action/execute.uvue:260")
+                    console.log("[execute] no actionId", " at pages/action/execute.uvue:267")
+                }
+                val adhoc = takeAdhocText()
+                console.log("[execute] adhoc len=" + adhoc.length, " at pages/action/execute.uvue:271")
+                if (adhoc.length > 0) {
+                    try {
+                        speakAdhoc(adhoc)
+                    } catch (e: Throwable) {
+                        console.warn("[execute] TTS 失败: " + ("" + e), " at pages/action/execute.uvue:273")
+                    }
+                } else {
+                    val tts = actionTtsText.value
+                    if (tts.length > 0) {
+                        try {
+                            speakFixedGuide(tts)
+                        }
+                         catch (e: Throwable) {
+                            console.warn("[execute] TTS 失败: " + ("" + e), " at pages/action/execute.uvue:277")
+                        }
+                    }
                 }
             }
             )
             onUnload(fun(): Unit {
                 clearCountdown()
+                val eid = encourageTimerId
+                if (eid != null) {
+                    clearTimeout(eid)
+                    encourageTimerId = null
+                }
             }
             )
             return fun(): Any? {
                 return _cE("view", _uM("class" to "page"), _uA(
-                    _cE("view", _uM("class" to "debug-bar"), _uA(
-                        _cE("text", _uM("class" to "debug-text"), "aid=" + _tD(unref(actionId)) + " | act=" + _tD(unref(actionName)) + " | exec=" + _tD(unref(isExecuting)) + " | done=" + _tD(unref(isCompleted)) + " | ms=" + _tD(unref(remainingMs)), 1)
+                    _cE("view", _uM("class" to "page-bg"), _uA(
+                        _cE("image", _uM("class" to "page-bg-img", "src" to "/static/images/dream-gradient-bg.png", "mode" to "aspectFill"))
                     )),
                     _cE("view", _uM("class" to "action-container"), _uA(
                         _cE("text", _uM("class" to "action-title"), _tD(unref(actionName)), 1),
@@ -350,7 +383,7 @@ open class GenPagesActionExecute : BasePage {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#F5F6FA", "justifyContent" to "center", "alignItems" to "center")), "action-container" to _pS(_uM("width" to "85%", "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 16, "borderTopRightRadius" to 16, "borderBottomRightRadius" to 16, "borderBottomLeftRadius" to 16, "paddingTop" to 24, "paddingRight" to 24, "paddingBottom" to 24, "paddingLeft" to 24, "flexDirection" to "column", "alignItems" to "center")), "action-title" to _pS(_uM("fontSize" to 22, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 16)), "icon-display" to _pS(_uM("width" to 100, "height" to 100, "justifyContent" to "center", "alignItems" to "center", "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 50, "borderTopRightRadius" to 50, "borderBottomRightRadius" to 50, "borderBottomLeftRadius" to 50, "marginBottom" to 16)), "action-icon" to _pS(_uM("fontSize" to 48)), "tts-text" to _pS(_uM("fontSize" to 15, "color" to "#7F8C8D", "textAlign" to "center", "marginBottom" to 20, "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 0, "paddingLeft" to 16)), "button-group" to _pS(_uM("width" to "100%", "flexDirection" to "column", "marginTop" to 16)), "action-btn" to _uM("" to _uM("width" to "100%", "paddingTop" to 14, "paddingRight" to 14, "paddingBottom" to 14, "paddingLeft" to 14, "borderTopLeftRadius" to 10, "borderTopRightRadius" to 10, "borderBottomRightRadius" to 10, "borderBottomLeftRadius" to 10, "fontSize" to 16, "textAlign" to "center", "marginBottom" to 8, "borderTopWidth" to 0, "borderRightWidth" to 0, "borderBottomWidth" to 0, "borderLeftWidth" to 0), ".primary" to _uM("backgroundColor" to "#3498DB", "color" to "#FFFFFF", "fontWeight" to "bold"), ".secondary" to _uM("backgroundColor" to "#F0F3F4", "color" to "#7F8C8D")), "debug-bar" to _pS(_uM("width" to "100%", "paddingTop" to 4, "paddingRight" to 8, "paddingBottom" to 4, "paddingLeft" to 8, "backgroundColor" to "#FFE9A8")), "debug-text" to _pS(_uM("fontSize" to 10, "color" to "#8B6914", "fontFamily" to "monospace")), "dialog-overlay" to _pS(_uM("position" to "fixed", "top" to 0, "left" to 0, "right" to 0, "bottom" to 0, "justifyContent" to "center", "alignItems" to "center", "backgroundColor" to "rgba(0,0,0,0.4)", "zIndex" to 999)), "dialog-content" to _pS(_uM("width" to 280, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "flexDirection" to "column")), "dialog-title" to _pS(_uM("fontSize" to 17, "fontWeight" to "bold", "color" to "#2C3E50", "textAlign" to "center", "marginBottom" to 12)), "dialog-body-text" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to "20px", "textAlign" to "center", "marginBottom" to 16)), "dialog-actions" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between")), "cancel-btn" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "marginRight" to 8, "paddingTop" to 10, "paddingRight" to 10, "paddingBottom" to 10, "paddingLeft" to 10, "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "backgroundColor" to "#ECF0F1", "color" to "#7F8C8D", "fontSize" to 14, "textAlign" to "center", "borderTopWidth" to 0, "borderRightWidth" to 0, "borderBottomWidth" to 0, "borderLeftWidth" to 0)), "confirm-btn" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "marginLeft" to 8, "paddingTop" to 10, "paddingRight" to 10, "paddingBottom" to 10, "paddingLeft" to 10, "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "backgroundColor" to "#3498DB", "color" to "#FFFFFF", "fontSize" to 14, "textAlign" to "center", "borderTopWidth" to 0, "borderRightWidth" to 0, "borderBottomWidth" to 0, "borderLeftWidth" to 0)))
+                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "#D8C8FF", "position" to "relative", "overflow" to "hidden", "justifyContent" to "center", "alignItems" to "center")), "page-bg" to _pS(_uM("position" to "absolute", "left" to 0, "top" to 0, "width" to "100%", "height" to "100%", "zIndex" to 0)), "page-bg-img" to _pS(_uM("width" to "100%", "height" to "100%")), "action-container" to _pS(_uM("width" to "85%", "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 16, "borderTopRightRadius" to 16, "borderBottomRightRadius" to 16, "borderBottomLeftRadius" to 16, "paddingTop" to 24, "paddingRight" to 24, "paddingBottom" to 24, "paddingLeft" to 24, "flexDirection" to "column", "alignItems" to "center", "position" to "relative", "zIndex" to 1)), "action-title" to _pS(_uM("fontSize" to 22, "fontWeight" to "bold", "color" to "#2C3E50", "marginBottom" to 16)), "icon-display" to _pS(_uM("width" to 100, "height" to 100, "justifyContent" to "center", "alignItems" to "center", "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 50, "borderTopRightRadius" to 50, "borderBottomRightRadius" to 50, "borderBottomLeftRadius" to 50, "marginBottom" to 16)), "action-icon" to _pS(_uM("fontSize" to 48)), "tts-text" to _pS(_uM("fontSize" to 15, "color" to "#7F8C8D", "textAlign" to "center", "marginBottom" to 20, "paddingTop" to 0, "paddingRight" to 16, "paddingBottom" to 0, "paddingLeft" to 16)), "button-group" to _pS(_uM("width" to "100%", "flexDirection" to "column", "marginTop" to 16)), "action-btn" to _uM("" to _uM("width" to "100%", "paddingTop" to 14, "paddingRight" to 14, "paddingBottom" to 14, "paddingLeft" to 14, "borderTopLeftRadius" to 10, "borderTopRightRadius" to 10, "borderBottomRightRadius" to 10, "borderBottomLeftRadius" to 10, "fontSize" to 16, "textAlign" to "center", "marginBottom" to 8, "borderTopWidth" to 0, "borderRightWidth" to 0, "borderBottomWidth" to 0, "borderLeftWidth" to 0), ".primary" to _uM("backgroundColor" to "#3498DB", "color" to "#FFFFFF", "fontWeight" to "bold"), ".secondary" to _uM("backgroundColor" to "#F0F3F4", "color" to "#7F8C8D")), "dialog-overlay" to _pS(_uM("position" to "fixed", "top" to 0, "left" to 0, "right" to 0, "bottom" to 0, "justifyContent" to "center", "alignItems" to "center", "backgroundColor" to "rgba(0,0,0,0.4)", "zIndex" to 999)), "dialog-content" to _pS(_uM("width" to 280, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "paddingTop" to 20, "paddingRight" to 20, "paddingBottom" to 20, "paddingLeft" to 20, "flexDirection" to "column")), "dialog-title" to _pS(_uM("fontSize" to 17, "fontWeight" to "bold", "color" to "#2C3E50", "textAlign" to "center", "marginBottom" to 12)), "dialog-body-text" to _pS(_uM("fontSize" to 14, "color" to "#34495E", "lineHeight" to "20px", "textAlign" to "center", "marginBottom" to 16)), "dialog-actions" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between")), "cancel-btn" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "marginRight" to 8, "paddingTop" to 10, "paddingRight" to 10, "paddingBottom" to 10, "paddingLeft" to 10, "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "backgroundColor" to "#ECF0F1", "color" to "#7F8C8D", "fontSize" to 14, "textAlign" to "center", "borderTopWidth" to 0, "borderRightWidth" to 0, "borderBottomWidth" to 0, "borderLeftWidth" to 0)), "confirm-btn" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "marginLeft" to 8, "paddingTop" to 10, "paddingRight" to 10, "paddingBottom" to 10, "paddingLeft" to 10, "borderTopLeftRadius" to 8, "borderTopRightRadius" to 8, "borderBottomRightRadius" to 8, "borderBottomLeftRadius" to 8, "backgroundColor" to "#3498DB", "color" to "#FFFFFF", "fontSize" to 14, "textAlign" to "center", "borderTopWidth" to 0, "borderRightWidth" to 0, "borderBottomWidth" to 0, "borderLeftWidth" to 0)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

@@ -48,6 +48,23 @@ open class GenComponentsPhoneUsageDialog : VueComponent {
                     console.error("PhoneUsageDialog refresh segments: " + JSON.stringify(e), " at components/PhoneUsageDialog.uvue:110")
                     segments.value = _uA()
                 }
+                if (summary.value.totalSeconds < 1) {
+                    try {
+                        val fromSystem = getPhoneUsageFromSystem()
+                        if (fromSystem != null && fromSystem.summary.totalSeconds > 0) {
+                            summary.value = fromSystem.summary
+                            segments.value = if (fromSystem.segments != null) {
+                                fromSystem.segments
+                            } else {
+                                _uA()
+                            }
+                            console.log("[PhoneUsageDialog] fallback to system data, totalSec=" + fromSystem.summary.totalSeconds, " at components/PhoneUsageDialog.uvue:120")
+                        }
+                    }
+                     catch (e: Throwable) {
+                        console.error("PhoneUsageDialog system fallback: " + JSON.stringify(e), " at components/PhoneUsageDialog.uvue:123")
+                    }
+                }
             }
             val refresh = ::gen_refresh_fn
             fun gen_close_fn(): Unit {
@@ -76,7 +93,7 @@ open class GenComponentsPhoneUsageDialog : VueComponent {
                     )
                 }
                  catch (e: Throwable) {
-                    console.error("AI evaluate error: " + JSON.stringify(e), " at components/PhoneUsageDialog.uvue:133")
+                    console.error("AI evaluate error: " + JSON.stringify(e), " at components/PhoneUsageDialog.uvue:146")
                     aiLoading.value = false
                 }
             }
