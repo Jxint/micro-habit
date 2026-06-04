@@ -1,9 +1,5 @@
 <template>
   <view class="page">
-    <view class="debug-bar">
-      <text class="debug-text">aid={{ actionId }} | act={{ actionName }} | exec={{ isExecuting }} | done={{ isCompleted }} | ms={{ remainingMs }}</text>
-    </view>
-
     <view class="action-container">
       <text class="action-title">{{ actionName }}</text>
 
@@ -352,16 +348,6 @@ onUnload((): void => {
 .action-btn.secondary {
   background-color: #F0F3F4;
   color: #7F8C8D;
-}
-.debug-bar {
-  width: 100%;
-  padding: 4px 8px;
-  background-color: #FFE9A8;
-}
-.debug-text {
-  font-size: 10px;
-  color: #8B6914;
-  font-family: monospace;
 }
 .dialog-overlay {
   position: fixed;
