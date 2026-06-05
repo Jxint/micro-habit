@@ -122,7 +122,7 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
         )
         socket.onMessage(fun(result){
             if (UTSAndroid.`typeof`(result["data"]) == "string") {
-                val message = UTSAndroid.consoleDebugError(JSON.parse<UTSJSONObject>(result["data"] as String), " at ../../../../../../../../../../../../../../../../../../Applications/HBuilderX.app/Contents/HBuilderX/plugins/uniapp-cli-vite/node_modules/@dcloudio/uni-console/src/runtime/app/socket.ts:67")!!
+                val message = UTSAndroid.consoleDebugError(JSON.parse<UTSJSONObject>(result["data"] as String), " at ../../../../../../../../../../../../D:/Program Files (x86)/HBuilderX/plugins/uniapp-cli-vite/node_modules/@dcloudio/uni-console/src/runtime/app/socket.ts:67")!!
                 if ((message["type"] as String) == "screencap") {
                     val id = message["id"] as String
                     currentPageCaptureScreenshot(message["fullPage"] as Boolean, fun(base64: String, error: String){
@@ -138,9 +138,9 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
     )
 }
 fun initRuntimeSocketService(): UTSPromise<Boolean> {
-    val hosts: String = "127.0.0.1,172.24.27.255,172.16.253.1,192.168.238.1"
+    val hosts: String = "172.24.25.140,127.0.0.1"
     val port: String = "8090"
-    val id: String = "app-android_TYg9h5"
+    val id: String = "app-android_Gn-q0K"
     if (hosts == "" || port == "" || id == "") {
         return UTSPromise.resolve(false)
     }
@@ -3298,6 +3298,54 @@ fun insertRule(rule: PersistedEffectiveRule): Number {
     ))
     return dbManager.insert("effective_rules", row)
 }
+fun updateRule(rule: PersistedEffectiveRule): Unit {
+    val pkgJson = JSON.stringify(rule.appPackages)
+    val twJson = if (rule.timeWindow == null) {
+        null
+    } else {
+        JSON.stringify(rule.timeWindow)
+    }
+    val row = SqlRow(columns = _uA(
+        "action_id",
+        "app_packages_json",
+        "time_window_json",
+        "time_threshold_minutes",
+        "trigger_level",
+        "category_filter",
+        "source",
+        "source_history_id",
+        "expires_at",
+        "enabled",
+        "priority",
+        "updated_at"
+    ), values = _uA(
+        rule.actionId,
+        pkgJson,
+        twJson,
+        rule.timeThresholdMinutes,
+        rule.triggerLevel,
+        rule.categoryFilter,
+        rule.source,
+        rule.sourceHistoryId,
+        rule.expiresAt,
+        if (rule.enabled) {
+            1
+        } else {
+            0
+        }
+        ,
+        rule.priority,
+        rule.updatedAt
+    ))
+    dbManager.update("effective_rules", row, "id = ?", _uA(
+        rule.id
+    ))
+}
+fun deleteRule(id: Number): Unit {
+    dbManager.`delete`("effective_rules", "id = ?", _uA(
+        id
+    ))
+}
 fun getActiveRules(): UTSArray<PersistedEffectiveRule> {
     val rows = dbManager.query("SELECT * FROM effective_rules WHERE enabled = 1 ORDER BY priority DESC, time_threshold_minutes ASC")
     val result: UTSArray<PersistedEffectiveRule> = _uA()
@@ -3389,13 +3437,16 @@ fun isFrequencyReduced(actionType: String): Boolean {
 }
 fun selectAction(triggerType: String): String? {
     val enabled = getEnabledActions()
+    console.log("[RuleEngine] selectAction: enabled.length=" + enabled.length + " triggerType=" + triggerType, " at services/RuleEngine.uts:54")
     if (enabled.length < 1) {
+        console.log("[RuleEngine] selectAction: no enabled actions", " at services/RuleEngine.uts:56")
         return null
     }
     val candidates = enabled.filter(fun(a: MicroAction): Boolean {
         return isSuitableForContext(a, triggerType)
     }
     )
+    console.log("[RuleEngine] selectAction: candidates.length=" + candidates.length, " at services/RuleEngine.uts:61")
     if (candidates.length < 1) {
         return enabled[0].id
     }
@@ -3519,6 +3570,7 @@ val COOL_DOWN_MS: Number = 300000
 fun evaluate(ctx: TriggerContext): EffectiveRuleMatch? {
     var candidates: UTSArray<PersistedEffectiveRule> = _uA()
     val all = getActiveRules()
+    console.log("[EffectiveRuleEngine] all rules=" + all.length + " pkg=" + ctx.appPackage + " mins=" + ctx.continuousMinutes, " at services/EffectiveRuleEngine.uts:17")
     val nowSec = Math.floor(Date.now() / 1000)
     run {
         var i: Number = 0
@@ -3548,6 +3600,7 @@ fun evaluate(ctx: TriggerContext): EffectiveRuleMatch? {
             i++
         }
     }
+    console.log("[EffectiveRuleEngine] candidates=" + candidates.length, " at services/EffectiveRuleEngine.uts:28")
     if (candidates.length < 1) {
         return null
     }
@@ -9219,6 +9272,16 @@ val GenComponentsTimeRangePickerDialogClass = CreateVueComponent(GenComponentsTi
     return GenComponentsTimeRangePickerDialog(instance)
 }
 )
+val GenComponentsRuleEditDialogClass = CreateVueComponent(GenComponentsRuleEditDialog::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsRuleEditDialog.inheritAttrs, inject = GenComponentsRuleEditDialog.inject, props = GenComponentsRuleEditDialog.props, propsNeedCastKeys = GenComponentsRuleEditDialog.propsNeedCastKeys, emits = GenComponentsRuleEditDialog.emits, components = GenComponentsRuleEditDialog.components, styles = GenComponentsRuleEditDialog.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsRuleEditDialog.setup(props as GenComponentsRuleEditDialog)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsRuleEditDialog {
+    return GenComponentsRuleEditDialog(instance)
+}
+)
 val GenPagesSettingsIndexClass = CreateVueComponent(GenPagesSettingsIndex::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesSettingsIndex.inheritAttrs, inject = GenPagesSettingsIndex.inject, props = GenPagesSettingsIndex.props, propsNeedCastKeys = GenPagesSettingsIndex.propsNeedCastKeys, emits = GenPagesSettingsIndex.emits, components = GenPagesSettingsIndex.components, styles = GenPagesSettingsIndex.styles, setup = fun(props: ComponentPublicInstance): Any? {
         return GenPagesSettingsIndex.setup(props as GenPagesSettingsIndex)
@@ -9368,7 +9431,7 @@ open class UniAppConfig : io.dcloud.uniapp.appframe.AppConfig {
     override var appid: String = "__UNI__B805CE2"
     override var versionName: String = "1.0.4"
     override var versionCode: String = "104"
-    override var uniCompilerVersion: String = "5.07"
+    override var uniCompilerVersion: String = "5.11"
     constructor() : super() {}
 }
 fun definePageRoutes() {
@@ -9400,6 +9463,17 @@ fun defineAppConfig() {
     __uniConfig.conditionUrl = ""
     __uniConfig.uniIdRouter = Map()
     __uniConfig.ready = true
+}
+open class UniCloudConfig : io.dcloud.unicloud.InternalUniCloudConfig, IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("UniCloudConfig", "main.uts", 51, 14)
+    }
+    override var isDev: Boolean = true
+    override var spaceList: String = "[{\"provider\":\"aliyun\",\"spaceName\":\"trial-w7onvxzrxrp2h087561\",\"spaceId\":\"mp-76d188c8-df1a-4535-9cee-3bb94b3a694d\",\"clientSecret\":\"b94cO0f6Qv3WwtDVDIwHFw==\",\"endpoint\":\"https://api.next.bspapp.com\"}]"
+    override var debuggerInfo: String? = "{\"address\":[\"127.0.0.1\",\"172.24.25.140\"],\"servePort\":7000,\"debugPort\":9000,\"initialLaunchType\":\"local\",\"skipFiles\":[\"<node_internals>/**\",\"D:/Program Files (x86)/HBuilderX/plugins/unicloud/**/*.js\"]}"
+    override var secureNetworkEnable: Boolean = false
+    override var secureNetworkConfig: String? = "[]"
+    constructor() : super() {}
 }
 open class GenUniApp : UniAppImpl() {
     open val vm: GenApp?

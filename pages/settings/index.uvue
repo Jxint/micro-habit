@@ -71,7 +71,7 @@
           <text class="empty-text">暂无启用的触发规则</text>
           <text class="empty-hint">完成微动作后 AI 会自动建议规则</text>
         </view>
-        <view v-for="(rule, idx) in rules" :key="'r-' + idx" class="rule-card">
+        <view v-for="(rule, idx) in rules" :key="'r-' + idx" class="rule-card" @tap="onEditRule(rule)">
           <view class="rule-row1">
             <text class="rule-type">{{ getActionDisplayName(rule.actionId) }}</text>
             <text class="rule-trigger">≥ {{ rule.timeThresholdMinutes }} 分钟</text>
@@ -184,16 +184,25 @@
       @close="showTargetCountPicker = false"
       @confirm="onTargetCountConfirm"
     />
+
+    <RuleEditDialog
+      :visible="showRuleEditor"
+      :rule-json="editingRuleJson"
+      @close="onRuleEditorClose"
+      @save="onRuleSave"
+      @delete="onRuleDelete"
+    />
   </view>
 </template>
 
 <script setup lang="uts">
 import NumberPickerDialog from '../../components/NumberPickerDialog.uvue'
 import TimeRangePickerDialog from '../../components/TimeRangePickerDialog.uvue'
+import RuleEditDialog from '../../components/RuleEditDialog.uvue'
 import { getInt, putInt, getBool, putBool, getSetting, putSetting } from '../../database/SettingsDao'
 import { clearAchievements } from '../../database/DatabaseHelper'
 import { useAppStore } from '../../stores/appStore'
-import { getActiveRules } from '../../database/EffectiveRuleDao'
+import { getActiveRules, updateRule, deleteRule, insertRule } from '../../database/EffectiveRuleDao'
 import { PersistedEffectiveRule } from '../../models/PersistedEffectiveRule'
 import { getActionById } from '../../constants/Actions'
 import { setTriggerEnabled } from '../../uni_modules/uts-usage-stats/utssdk/app-android/index'
@@ -365,6 +374,52 @@ function resetAchievements(): void {
 
 function goAppCategories(): void {
   uni.navigateTo({ url: '/pages/settings/app-categories/index' })
+}
+
+const showRuleEditor = ref<boolean>(false)
+const editingRuleJson = ref<string>('')
+
+function onEditRule(r: PersistedEffectiveRule): void {
+  // 序列化为字符串传给子组件（避免对象 prop reactive 包装，AGENTS §13/§49）
+  const ruleJson: string = JSON.stringify(r) as string
+  editingRuleJson.value = ruleJson
+  showRuleEditor.value = true
+}
+
+function onRuleEditorClose(): void {
+  showRuleEditor.value = false
+  editingRuleJson.value = ''
+}
+
+function onRuleSave(updated: PersistedEffectiveRule): void {
+  try {
+    if (updated.id > 0) {
+      updateRule(updated)
+    } else {
+      const newId = insertRule(updated)
+      updated.id = newId
+    }
+    showRuleEditor.value = false
+    editingRuleJson.value = ''
+    try { rules.value = getActiveRules() } catch (_) { rules.value = [] }
+    uni.showToast({ title: '已保存', icon: 'success' })
+  } catch (e) {
+    console.warn('[settings] onRuleSave 异常: ' + JSON.stringify(e))
+    uni.showToast({ title: '保存失败', icon: 'none' })
+  }
+}
+
+function onRuleDelete(id: number): void {
+  try {
+    if (id > 0) deleteRule(id)
+    showRuleEditor.value = false
+    editingRuleJson.value = ''
+    try { rules.value = getActiveRules() } catch (_) { rules.value = [] }
+    uni.showToast({ title: '已删除', icon: 'success' })
+  } catch (e) {
+    console.warn('[settings] onRuleDelete 异常: ' + JSON.stringify(e))
+    uni.showToast({ title: '删除失败', icon: 'none' })
+  }
 }
 
 let debugTapCount = 0

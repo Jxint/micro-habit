@@ -1,0 +1,546 @@
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <view class="dialog-header">
+        <text class="dialog-title">编辑触发规则</text>
+        <text v-if="isDefault" class="dialog-subtitle">系统默认规则</text>
+      </view>
+
+      <scroll-view class="dialog-body" scroll-y="true">
+        <view class="field-group">
+          <text class="field-label">微动作</text>
+          <view v-if="isDefault" class="field-static">
+            <text class="field-static-text">任意动作（由算法推荐）</text>
+          </view>
+          <view v-else class="action-picker">
+            <view
+              v-for="(a, i) in actions"
+              :key="'act-' + i"
+              class="action-item"
+              :class="a.id === draftActionId ? 'action-item-active' : ''"
+              @tap="onPickAction(a.id)"
+            >
+              <text class="action-name">{{ a.name }}</text>
+              <text class="action-cat">{{ a.category }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="field-group">
+          <text class="field-label">触发阈值</text>
+          <view class="threshold-row">
+            <text class="field-value">{{ draftThreshold }} 分钟</text>
+            <view class="stepper">
+              <view class="stepper-btn" @tap="onDecStep"><text class="stepper-text">-</text></view>
+              <view class="stepper-btn" @tap="onIncStep"><text class="stepper-text">+</text></view>
+            </view>
+          </view>
+          <text class="field-hint">使用同一应用达到该时长后触发</text>
+        </view>
+
+        <view class="field-group">
+          <text class="field-label">生效时段</text>
+          <view class="time-row">
+            <view class="time-pill" :class="!draftTimeEnabled ? 'time-pill-active' : ''" @tap="onToggleTimeWindow(false)">
+              <text class="time-pill-text">全天</text>
+            </view>
+            <view class="time-pill" :class="draftTimeEnabled ? 'time-pill-active' : ''" @tap="onToggleTimeWindow(true)">
+              <text class="time-pill-text">自定义</text>
+            </view>
+          </view>
+          <view v-if="draftTimeEnabled" class="time-inputs">
+            <view class="time-input">
+              <text class="time-input-label">起</text>
+              <view class="stepper stepper-sm">
+                <view class="stepper-btn" @tap="onDecStart"><text class="stepper-text">-</text></view>
+                <text class="time-input-val">{{ pad2(draftStartHour) }}:00</text>
+                <view class="stepper-btn" @tap="onIncStart"><text class="stepper-text">+</text></view>
+              </view>
+            </view>
+            <view class="time-input">
+              <text class="time-input-label">止</text>
+              <view class="stepper stepper-sm">
+                <view class="stepper-btn" @tap="onDecEnd"><text class="stepper-text">-</text></view>
+                <text class="time-input-val">{{ pad2(draftEndHour) }}:00</text>
+                <view class="stepper-btn" @tap="onIncEnd"><text class="stepper-text">+</text></view>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view v-if="!isDefault" class="field-group">
+          <text class="field-label">指定 App</text>
+          <text class="field-hint">留空表示所有 App 触发，每行一个包名</text>
+          <textarea
+            class="apps-area"
+            v-model="draftAppsText"
+            placeholder="com.tencent.mm&#10;com.android.chrome"
+            auto-height="true"
+          />
+        </view>
+
+        <view v-if="!isDefault" class="field-group">
+          <text class="field-label">触发强度</text>
+          <view class="level-row">
+            <view class="level-pill" :class="draftLevel == 'gentle' ? 'level-pill-active' : ''" @tap="onPickLevel('gentle')">
+              <text class="level-pill-text">温和</text>
+            </view>
+            <view class="level-pill" :class="draftLevel == 'strong' ? 'level-pill-active' : ''" @tap="onPickLevel('strong')">
+              <text class="level-pill-text">强烈</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="field-group">
+          <view class="enable-row">
+            <text class="field-label">启用此规则</text>
+            <switch :checked="draftEnabled" @change="onEnabledChange" />
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="dialog-footer">
+        <view v-if="!isDefault" class="btn btn-danger" @tap="onDelete">
+          <text class="btn-text btn-text-danger">删除</text>
+        </view>
+        <view class="btn btn-ghost" @tap="onCancel">
+          <text class="btn-text">取消</text>
+        </view>
+        <view class="btn btn-primary" @tap="onSave">
+          <text class="btn-text btn-text-primary">保存</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ALL_ACTIONS, getActionById } from '../constants/Actions'
+import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
+import { TimeWindow, TriggerLevel } from '../models/EffectiveTriggerRule'
+
+const props = withDefaults(defineProps<{
+  visible: boolean
+  ruleJson: string
+}>(), {
+  visible: false,
+  ruleJson: ''
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'save', rule: PersistedEffectiveRule): void
+  (e: 'delete', id: number): void
+}>()
+
+const actions = ALL_ACTIONS
+
+function pad2(n: number): string {
+  if (n < 10) return '0' + n
+  return '' + n
+}
+
+let draftActionId: string = ''
+let draftThreshold: number = 60
+let draftTimeEnabled: boolean = false
+let draftStartHour: number = 9
+let draftEndHour: number = 22
+let draftAppsText: string = ''
+let draftLevel: TriggerLevel = 'gentle'
+let draftEnabled: boolean = true
+let isDefault: boolean = false
+let ruleId: number = 0
+let ruleSource: 'user' | 'llm' | 'system' = 'user'
+let ruleCreatedAt: number = 0
+let ruleSourceHistoryId: number | null = null
+let ruleExpiresAt: number | null = null
+
+function resetDraft(): void {
+  // 解析 ruleJson（基础类型 prop 无 reactive 包装问题，AGENTS §13/§49）
+  if (props.ruleJson.length < 1) {
+    draftActionId = ''
+    draftThreshold = 60
+    draftTimeEnabled = false
+    draftStartHour = 9
+    draftEndHour = 22
+    draftAppsText = ''
+    draftLevel = 'gentle'
+    draftEnabled = true
+    isDefault = false
+    ruleId = 0
+    ruleSource = 'user'
+    ruleCreatedAt = Math.floor(Date.now() / 1000)
+    ruleSourceHistoryId = null
+    ruleExpiresAt = null
+    return
+  }
+  const r: PersistedEffectiveRule = JSON.parse(props.ruleJson) as PersistedEffectiveRule
+  ruleId = r.id
+  isDefault = r.source == 'system'
+  draftActionId = r.actionId
+  draftThreshold = r.timeThresholdMinutes
+  draftTimeEnabled = r.timeWindow != null
+  if (r.timeWindow != null) {
+    const sh = parseInt(r.timeWindow.start.split(':')[0] as string)
+    const eh = parseInt(r.timeWindow.end.split(':')[0] as string)
+    draftStartHour = isNaN(sh) ? 9 : sh
+    draftEndHour = isNaN(eh) ? 22 : eh
+  } else {
+    draftStartHour = 9
+    draftEndHour = 22
+  }
+  draftAppsText = r.appPackages.join('\n')
+  draftLevel = r.triggerLevel
+  draftEnabled = r.enabled
+  ruleSource = r.source
+  ruleCreatedAt = r.createdAt
+  ruleSourceHistoryId = r.sourceHistoryId
+  ruleExpiresAt = r.expiresAt
+}
+
+function onMaskTap(): void {
+  emit('close')
+}
+
+function onCancel(): void {
+  emit('close')
+}
+
+function onPickAction(id: string): void {
+  if (isDefault) return
+  draftActionId = id
+}
+
+function onDecStep(): void {
+  if (draftThreshold > 5) draftThreshold = draftThreshold - 5
+}
+
+function onIncStep(): void {
+  if (draftThreshold < 240) draftThreshold = draftThreshold + 5
+}
+
+function onToggleTimeWindow(enabled: boolean): void {
+  draftTimeEnabled = enabled
+}
+
+function onDecStart(): void {
+  if (draftStartHour > 0) draftStartHour = draftStartHour - 1
+}
+
+function onIncStart(): void {
+  if (draftStartHour < 23) draftStartHour = draftStartHour + 1
+}
+
+function onDecEnd(): void {
+  if (draftEndHour > 0) draftEndHour = draftEndHour - 1
+}
+
+function onIncEnd(): void {
+  if (draftEndHour < 23) draftEndHour = draftEndHour + 1
+}
+
+function onPickLevel(lv: string): void {
+  if (isDefault) return
+  draftLevel = lv
+}
+
+function onEnabledChange(e: any): void {
+  try {
+    const obj = e as UTSJSONObject
+    if (obj == null) return
+    const v = obj['detail']
+    if (v == null) return
+    const detail = v as UTSJSONObject
+    if (detail == null) return
+    const valRaw = detail['value']
+    if (valRaw == null) return
+    if (typeof valRaw === 'boolean') draftEnabled = valRaw as boolean
+    else if (typeof valRaw === 'number') draftEnabled = (valRaw as number) != 0
+  } catch (_) {}
+}
+
+function onSave(): void {
+  const pkgs: string[] = []
+  if (!isDefault && draftAppsText.length > 0) {
+    const lines = draftAppsText.split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      const t = (lines[i] as string).trim()
+      if (t.length > 0) pkgs.push(t)
+    }
+  }
+  const tw: TimeWindow | null = draftTimeEnabled
+    ? { start: pad2(draftStartHour) + ':00', end: pad2(draftEndHour) + ':00' }
+    : null
+  const out: PersistedEffectiveRule = {
+    id: ruleId,
+    actionId: isDefault ? '' : draftActionId,
+    appPackages: pkgs,
+    timeWindow: tw,
+    timeThresholdMinutes: draftThreshold,
+    triggerLevel: isDefault ? 'gentle' : draftLevel,
+    categoryFilter: null,
+    source: ruleSource,
+    sourceHistoryId: ruleSourceHistoryId,
+    expiresAt: ruleExpiresAt,
+    enabled: draftEnabled,
+    priority: isDefault ? 0 : 5,
+    createdAt: ruleCreatedAt,
+    updatedAt: Math.floor(Date.now() / 1000)
+  }
+  emit('save', out)
+}
+
+function onDelete(): void {
+  if (isDefault) return
+  emit('delete', ruleId)
+}
+
+watch((): boolean => props.visible, (v: boolean): void => {
+  if (v) resetDraft()
+})
+</script>
+
+<style scoped>
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  justify-content: center;
+  align-items: center;
+}
+.dialog-card {
+  width: 88%;
+  max-height: 560px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dialog-header {
+  padding: 16px;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+  align-items: center;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.dialog-subtitle {
+  font-size: 12px;
+  color: #F39C12;
+  margin-top: 4px;
+}
+.dialog-body {
+  max-height: 480px;
+  padding: 12px 16px;
+}
+.field-group {
+  margin-bottom: 16px;
+}
+.field-label {
+  font-size: 13px;
+  color: #2C3E50;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.field-hint {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 4px;
+}
+.field-static {
+  background-color: #F8F9FA;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+.field-static-text {
+  font-size: 13px;
+  color: #7F8C8D;
+}
+.field-value {
+  font-size: 15px;
+  color: #3498DB;
+  font-weight: 500;
+}
+.action-picker {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.action-item {
+  padding: 8px 12px;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  background-color: #F0F3F4;
+  border-radius: 6px;
+  flex-direction: column;
+  align-items: center;
+}
+.action-item-active {
+  background-color: #3498DB;
+}
+.action-name {
+  font-size: 13px;
+  color: #2C3E50;
+}
+.action-item-active .action-name {
+  color: #FFFFFF;
+}
+.action-cat {
+  font-size: 10px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.action-item-active .action-cat {
+  color: #ECF0F1;
+}
+.threshold-row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.stepper {
+  flex-direction: row;
+  align-items: center;
+}
+.stepper-btn {
+  width: 36px;
+  height: 36px;
+  background-color: #F0F3F4;
+  border-radius: 6px;
+  justify-content: center;
+  align-items: center;
+  margin-left: 8px;
+}
+.stepper-text {
+  font-size: 18px;
+  color: #3498DB;
+  font-weight: bold;
+}
+.time-row {
+  flex-direction: row;
+  margin-bottom: 8px;
+}
+.time-pill {
+  padding: 8px 16px;
+  background-color: #F0F3F4;
+  border-radius: 18px;
+  margin-right: 8px;
+}
+.time-pill-active {
+  background-color: #3498DB;
+}
+.time-pill-text {
+  font-size: 13px;
+  color: #2C3E50;
+}
+.time-pill-active .time-pill-text {
+  color: #FFFFFF;
+}
+.time-inputs {
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.time-input {
+  flex-direction: row;
+  align-items: center;
+}
+.time-input-label {
+  font-size: 13px;
+  color: #7F8C8D;
+  margin-right: 8px;
+}
+.time-input-val {
+  font-size: 14px;
+  color: #2C3E50;
+  font-weight: 500;
+  margin-left: 8px;
+  margin-right: 8px;
+}
+.stepper-sm .stepper-btn {
+  width: 28px;
+  height: 28px;
+  margin-left: 4px;
+}
+.apps-area {
+  width: 100%;
+  min-height: 80px;
+  padding: 10px;
+  background-color: #F8F9FA;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #2C3E50;
+  margin-top: 4px;
+}
+.level-row {
+  flex-direction: row;
+}
+.level-pill {
+  padding: 8px 20px;
+  background-color: #F0F3F4;
+  border-radius: 18px;
+  margin-right: 8px;
+}
+.level-pill-active {
+  background-color: #E74C3C;
+}
+.level-pill-text {
+  font-size: 13px;
+  color: #2C3E50;
+}
+.level-pill-active .level-pill-text {
+  color: #FFFFFF;
+}
+.enable-row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.dialog-footer {
+  flex-direction: row;
+  padding: 12px 16px;
+  border-top-width: 1px;
+  border-top-color: #F0F0F0;
+  border-top-style: solid;
+}
+.btn {
+  flex: 1;
+  height: 40px;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  margin-left: 8px;
+}
+.btn:first-child {
+  margin-left: 0;
+}
+.btn-ghost {
+  background-color: #ECF0F1;
+}
+.btn-primary {
+  background-color: #3498DB;
+}
+.btn-danger {
+  background-color: #FFFFFF;
+  border-width: 1px;
+  border-color: #E74C3C;
+  border-style: solid;
+}
+.btn-text {
+  font-size: 14px;
+  color: #2C3E50;
+}
+.btn-text-primary {
+  color: #FFFFFF;
+}
+.btn-text-danger {
+  color: #E74C3C;
+}
+</style>

@@ -125,7 +125,7 @@ open class GenPagesSettingsIndex : BasePage {
                     return "无条件"
                 }
                 try {
-                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:266") as UTSJSONObject
+                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:275") as UTSJSONObject
                     if (obj == null) {
                         return json.substring(0, 20)
                     }
@@ -243,13 +243,13 @@ open class GenPagesSettingsIndex : BasePage {
                             uni_showToast(ShowToastOptions(title = "已重置成就", icon = "none"))
                         }
                          catch (e: Throwable) {
-                            console.warn("[settings] resetAchievements 回调异常: " + JSON.stringify(e), " at pages/settings/index.uvue:357")
+                            console.warn("[settings] resetAchievements 回调异常: " + JSON.stringify(e), " at pages/settings/index.uvue:366")
                         }
                     }
                     ))
                 }
                  catch (e: Throwable) {
-                    console.warn("[settings] resetAchievements 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:362")
+                    console.warn("[settings] resetAchievements 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:371")
                 }
             }
             val resetAchievements = ::gen_resetAchievements_fn
@@ -257,6 +257,64 @@ open class GenPagesSettingsIndex : BasePage {
                 uni_navigateTo(NavigateToOptions(url = "/pages/settings/app-categories/index"))
             }
             val goAppCategories = ::gen_goAppCategories_fn
+            val showRuleEditor = ref<Boolean>(false)
+            val editingRuleJson = ref<String>("")
+            fun gen_onEditRule_fn(r: PersistedEffectiveRule): Unit {
+                val ruleJson: String = JSON.stringify(r) as String
+                editingRuleJson.value = ruleJson
+                showRuleEditor.value = true
+            }
+            val onEditRule = ::gen_onEditRule_fn
+            fun gen_onRuleEditorClose_fn(): Unit {
+                showRuleEditor.value = false
+                editingRuleJson.value = ""
+            }
+            val onRuleEditorClose = ::gen_onRuleEditorClose_fn
+            fun gen_onRuleSave_fn(updated: PersistedEffectiveRule): Unit {
+                try {
+                    if (updated.id > 0) {
+                        updateRule(updated)
+                    } else {
+                        val newId = insertRule(updated)
+                        updated.id = newId
+                    }
+                    showRuleEditor.value = false
+                    editingRuleJson.value = ""
+                    try {
+                        rules.value = getActiveRules()
+                    }
+                     catch (_: Throwable) {
+                        rules.value = _uA()
+                    }
+                    uni_showToast(ShowToastOptions(title = "已保存", icon = "success"))
+                }
+                 catch (e: Throwable) {
+                    console.warn("[settings] onRuleSave 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:407")
+                    uni_showToast(ShowToastOptions(title = "保存失败", icon = "none"))
+                }
+            }
+            val onRuleSave = ::gen_onRuleSave_fn
+            fun gen_onRuleDelete_fn(id: Number): Unit {
+                try {
+                    if (id > 0) {
+                        deleteRule(id)
+                    }
+                    showRuleEditor.value = false
+                    editingRuleJson.value = ""
+                    try {
+                        rules.value = getActiveRules()
+                    }
+                     catch (_: Throwable) {
+                        rules.value = _uA()
+                    }
+                    uni_showToast(ShowToastOptions(title = "已删除", icon = "success"))
+                }
+                 catch (e: Throwable) {
+                    console.warn("[settings] onRuleDelete 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:420")
+                    uni_showToast(ShowToastOptions(title = "删除失败", icon = "none"))
+                }
+            }
+            val onRuleDelete = ::gen_onRuleDelete_fn
             var debugTapCount: Number = 0
             var debugTapTimer: Number? = null
             fun gen_handleDebugTap_fn(): Unit {
@@ -282,7 +340,7 @@ open class GenPagesSettingsIndex : BasePage {
                     uni_showToast(ShowToastOptions(title = "正在检查...", icon = "none", position = "bottom"))
                 }
                  catch (e: Throwable) {
-                    console.warn("[settings] manualTrigger 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:390")
+                    console.warn("[settings] manualTrigger 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:445")
                 }
             }
             val onManualTrigger = ::gen_onManualTrigger_fn
@@ -328,7 +386,7 @@ open class GenPagesSettingsIndex : BasePage {
                     setTriggerEnabled(enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onTriggerEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:420")
+                    console.warn("[settings] onTriggerEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:475")
                 }
             }
             val onTriggerEnabledChange = ::gen_onTriggerEnabledChange_fn
@@ -342,7 +400,7 @@ open class GenPagesSettingsIndex : BasePage {
                     putBool("llm_trigger_enabled", enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onLlmEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:431")
+                    console.warn("[settings] onLlmEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:486")
                 }
             }
             val onLlmEnabledChange = ::gen_onLlmEnabledChange_fn
@@ -356,7 +414,7 @@ open class GenPagesSettingsIndex : BasePage {
                     putBool("llm_trigger_ask_each_time", enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onAskEachTimeChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:442")
+                    console.warn("[settings] onAskEachTimeChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:497")
                 }
             }
             val onAskEachTimeChange = ::gen_onAskEachTimeChange_fn
@@ -461,7 +519,10 @@ open class GenPagesSettingsIndex : BasePage {
                             }
                             ,
                             _cE(Fragment, null, RenderHelpers.renderList(unref(rules), fun(rule, idx, __index, _cached): Any {
-                                return _cE("view", _uM("key" to ("r-" + idx), "class" to "rule-card"), _uA(
+                                return _cE("view", _uM("key" to ("r-" + idx), "class" to "rule-card", "onClick" to fun(){
+                                    onEditRule(rule)
+                                }
+                                ), _uA(
                                     _cE("view", _uM("class" to "rule-row1"), _uA(
                                         _cE("text", _uM("class" to "rule-type"), _tD(getActionDisplayName(rule.actionId)), 1),
                                         _cE("text", _uM("class" to "rule-trigger"), "≥ " + _tD(rule.timeThresholdMinutes) + " 分钟", 1),
@@ -479,6 +540,8 @@ open class GenPagesSettingsIndex : BasePage {
                                     _cE("view", _uM("class" to "rule-row3"), _uA(
                                         _cE("text", _uM("class" to "rule-time"), "创建 " + _tD(formatTime(rule.createdAt)), 1)
                                     ))
+                                ), 8, _uA(
+                                    "onClick"
                                 ))
                             }
                             ), 128)
@@ -579,6 +642,10 @@ open class GenPagesSettingsIndex : BasePage {
                         "visible",
                         "initial-value",
                         "onClose"
+                    )),
+                    _cV(unref(GenComponentsRuleEditDialogClass), _uM("visible" to unref(showRuleEditor), "rule-json" to unref(editingRuleJson), "onClose" to onRuleEditorClose, "onSave" to onRuleSave, "onDelete" to onRuleDelete), null, 8, _uA(
+                        "visible",
+                        "rule-json"
                     ))
                 ))
             }
@@ -590,7 +657,7 @@ open class GenPagesSettingsIndex : BasePage {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "rgba(0,0,0,0)", "position" to "relative", "overflow" to "hidden")), "page-bg" to _pS(_uM("position" to "absolute", "left" to 0, "top" to 0, "width" to "100%", "height" to "100%", "zIndex" to 0)), "page-bg-img" to _pS(_uM("width" to "100%", "height" to "100%")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "position" to "relative", "zIndex" to 1)), "settings-section" to _pS(_uM("marginTop" to 12, "backgroundColor" to "#FFFFFF")), "section-title" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "fontWeight" to "bold", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 6, "paddingLeft" to 16)), "setting-item" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 14, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "setting-left" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "flexDirection" to "column")), "setting-label" to _pS(_uM("fontSize" to 15, "color" to "#2C3E50")), "setting-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "setting-value" to _pS(_uM("fontSize" to 14, "color" to "#3498DB", "fontWeight" to "500")), "empty-rules" to _pS(_uM("alignItems" to "center", "paddingTop" to 20, "paddingRight" to 0, "paddingBottom" to 20, "paddingLeft" to 0)), "empty-text" to _pS(_uM("fontSize" to 13, "color" to "#BDC3C7")), "rule-card" to _pS(_uM("paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "rule-row1" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginBottom" to 4)), "rule-type" to _pS(_uM("fontSize" to 13, "fontWeight" to "bold", "color" to "#2C3E50", "backgroundColor" to "#EBF5FB", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6, "marginRight" to 6)), "rule-trigger" to _pS(_uM("fontSize" to 11, "color" to "#7F8C8D", "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6)), "rule-priority" to _pS(_uM("fontSize" to 11, "color" to "#3498DB", "marginLeft" to "auto")), "rule-row2" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginTop" to 4)), "rule-source" to _pS(_uM("fontSize" to 11, "color" to "#27AE60", "marginRight" to 8)), "rule-cond" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "rule-row3" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "marginTop" to 4)), "rule-time" to _pS(_uM("fontSize" to 10, "color" to "#BDC3C7", "fontFamily" to "monospace")), "bottom-spacer" to _pS(_uM("height" to 80)))
+                return _uM("page" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "backgroundColor" to "rgba(0,0,0,0)", "position" to "relative", "overflow" to "hidden")), "page-bg" to _pS(_uM("position" to "absolute", "left" to 0, "top" to 0, "width" to "100%", "height" to "100%", "zIndex" to 0)), "page-bg-img" to _pS(_uM("width" to "100%", "height" to "100%")), "scroll-area" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "position" to "relative", "zIndex" to 1)), "settings-section" to _pS(_uM("marginTop" to 12, "backgroundColor" to "#FFFFFF")), "section-title" to _pS(_uM("fontSize" to 13, "color" to "#7F8C8D", "fontWeight" to "bold", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 6, "paddingLeft" to 16)), "setting-item" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 14, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "setting-left" to _pS(_uM("flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%", "flexDirection" to "column")), "setting-label" to _pS(_uM("fontSize" to 15, "color" to "#2C3E50")), "setting-hint" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "marginTop" to 2)), "setting-value" to _pS(_uM("fontSize" to 14, "color" to "#3498DB", "fontWeight" to 500)), "empty-rules" to _pS(_uM("alignItems" to "center", "paddingTop" to 20, "paddingRight" to 0, "paddingBottom" to 20, "paddingLeft" to 0)), "empty-text" to _pS(_uM("fontSize" to 13, "color" to "#BDC3C7")), "rule-card" to _pS(_uM("paddingTop" to 12, "paddingRight" to 16, "paddingBottom" to 12, "paddingLeft" to 16, "borderBottomWidth" to 1, "borderBottomColor" to "#F0F0F0", "borderBottomStyle" to "solid")), "rule-row1" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginBottom" to 4)), "rule-type" to _pS(_uM("fontSize" to 13, "fontWeight" to "bold", "color" to "#2C3E50", "backgroundColor" to "#EBF5FB", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6, "marginRight" to 6)), "rule-trigger" to _pS(_uM("fontSize" to 11, "color" to "#7F8C8D", "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "paddingTop" to 2, "paddingRight" to 6, "paddingBottom" to 2, "paddingLeft" to 6)), "rule-priority" to _pS(_uM("fontSize" to 11, "color" to "#3498DB", "marginLeft" to "auto")), "rule-row2" to _pS(_uM("flexDirection" to "row", "alignItems" to "center", "marginTop" to 4)), "rule-source" to _pS(_uM("fontSize" to 11, "color" to "#27AE60", "marginRight" to 8)), "rule-cond" to _pS(_uM("fontSize" to 11, "color" to "#95A5A6", "flexGrow" to 1, "flexShrink" to 1, "flexBasis" to "0%")), "rule-row3" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "marginTop" to 4)), "rule-time" to _pS(_uM("fontSize" to 10, "color" to "#BDC3C7", "fontFamily" to "monospace")), "bottom-spacer" to _pS(_uM("height" to 80)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

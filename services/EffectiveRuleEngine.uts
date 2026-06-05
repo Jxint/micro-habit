@@ -14,6 +14,7 @@ export type EffectiveRuleMatch = {
 export function evaluate(ctx: TriggerContext): EffectiveRuleMatch | null {
   let candidates: PersistedEffectiveRule[] = []
   const all = getActiveRules()
+  console.log('[EffectiveRuleEngine] all rules=' + all.length + ' pkg=' + ctx.appPackage + ' mins=' + ctx.continuousMinutes)
   const nowSec = Math.floor(Date.now() / 1000)
   for (let i = 0; i < all.length; i++) {
     const r = all[i]
@@ -24,6 +25,7 @@ export function evaluate(ctx: TriggerContext): EffectiveRuleMatch | null {
     if (r.timeThresholdMinutes > 0 && ctx.continuousMinutes < r.timeThresholdMinutes) continue
     candidates.push(r)
   }
+  console.log('[EffectiveRuleEngine] candidates=' + candidates.length)
   if (candidates.length < 1) return null
   // 优先级排序：LLM > system/user；同 source 时更短时间段优先；同时间段时更多 app 指定优先
   let best = candidates[0]
