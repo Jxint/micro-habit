@@ -31,6 +31,10 @@ function mapRow(row: Map<string, any>): LlmHistoryEntry {
       rule = null
     }
   }
+  const targetRaw = row.get('target_rule_id')
+  const targetRuleId: number | null = targetRaw == null ? null : getNum(row, 'target_rule_id')
+  const acceptedRaw = row.get('user_accepted')
+  const userAccepted: number | null = acceptedRaw == null ? null : getNum(row, 'user_accepted')
   return {
     id: getNum(row, 'id'),
     stage: getStr(row, 'stage') as LlmHistoryStage,
@@ -40,6 +44,10 @@ function mapRow(row: Map<string, any>): LlmHistoryEntry {
     adhocText: getStrOrNull(row, 'adhoc_text'),
     suggestedRule: rule,
     reasoning: getStrOrNull(row, 'reasoning'),
+    decision: getStrOrNull(row, 'decision'),
+    targetRuleId: targetRuleId,
+    userAccepted: userAccepted,
+    confidence: getNum(row, 'confidence'),
     createdAt: getNum(row, 'created_at')
   }
 }
@@ -119,6 +127,14 @@ export function getHistoryByStage(stage: LlmHistoryStage, limit: number): LlmHis
 export function getRecentDecisions(limit: number): LlmHistoryEntry[] {
   const rows = dbManager.query(
     "SELECT * FROM llm_history WHERE stage = 'post' AND decision IS NOT NULL ORDER BY created_at DESC LIMIT ?",
+    [limit]
+  )
+  return mapRows(rows)
+}
+
+export function getPendingRuleReviews(limit: number): LlmHistoryEntry[] {
+  const rows = dbManager.query(
+    "SELECT * FROM llm_history WHERE stage = 'post' AND decision IN ('create_rule','modify_rule','delete_rule') AND user_accepted IS NULL ORDER BY created_at DESC LIMIT ?",
     [limit]
   )
   return mapRows(rows)

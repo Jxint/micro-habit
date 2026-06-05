@@ -32,6 +32,12 @@
       </view>
     </view>
 
+    <view class="nav-row">
+      <view class="nav-btn" @tap="goLlmRules">
+        <text class="nav-btn-text">🤖 LLM 规则审核</text>
+      </view>
+    </view>
+
     <view class="tab-bar">
       <view class="tab" :class="{ active: currentTab === 'trigger' }" @tap="switchTab('trigger')">
         <text class="tab-text">触发日志</text>
@@ -325,6 +331,10 @@ function goBack(): void {
   uni.navigateBack({})
 }
 
+function goLlmRules(): void {
+  uni.navigateTo({ url: '/pages/debug/llm-rules' })
+}
+
 onPageShow(() => {
   console.log('[debug] onPageShow firing refresh')
   refresh()
@@ -399,6 +409,25 @@ onPageShow(() => {
   padding: 12px 8px;
   background-color: #FFFFFF;
   margin-bottom: 8px;
+}
+.nav-row {
+  flex-direction: row;
+  padding: 0 12px 8px 12px;
+  background-color: #FFFFFF;
+  margin-bottom: 8px;
+}
+.nav-btn {
+  flex: 1;
+  background-color: #3498DB;
+  border-radius: 8px;
+  padding: 10px 12px;
+  align-items: center;
+  justify-content: center;
+}
+.nav-btn-text {
+  font-size: 13px;
+  color: #FFFFFF;
+  font-weight: bold;
 }
 .stat-card {
   flex: 1;

@@ -1,6 +1,12 @@
 import { getInt, getBool } from '../database/SettingsDao'
 import { currentHour } from '../utils/TimeUtils'
 import { speakSystemTts as pluginSpeakSystemTts } from '../uni_modules/uts-audio-player/utssdk/app-android/index'
+import { play as pluginPlayFile, type AudioPlayerCallbacks } from '../uni_modules/uts-audio-player/utssdk/app-android/AudioPlayer.uts'
+import { getByHash as getTtsCacheByHash, save as saveTtsCache } from '../database/TtsCacheDao'
+import { callMinimaxTts, downloadTtsAudio } from './CloudService'
+import { textHash } from '../utils/HashUtils'
+import { ALL_ACTIONS } from '../constants/Actions'
+import { FALLBACK_ADHOC_TEXTS } from '../constants/LlmPrompts'
 
 type AdhocContext = {
   appLabel: string
@@ -10,7 +16,6 @@ type AdhocContext = {
 
 export function speakAdhocOpen(context: AdhocContext): void {
   if (isSystemMuted()) return
-
   const volume = getAdjustedVolume()
   playFallbackIntro(volume)
 }
@@ -18,10 +23,37 @@ export function speakAdhocOpen(context: AdhocContext): void {
 export function speakAdhoc(text: string): void {
   if (isSystemMuted()) return
   if (text.length < 1) return
-  const vol = getAdjustedVolume()
-  try { pluginSpeakSystemTts(text, vol) } catch (e) {
-    console.warn('[TtsService] speakAdhoc plugin 调用失败: ' + JSON.stringify(e))
+  const hash: string = textHash(text)
+  try {
+    const cached = getTtsCacheByHash(hash)
+    if (cached != null && cached.file_path.length > 0) {
+      const fp: string = cached.file_path
+      playLocalAudio(fp, (): void => {})
+      return
+    }
+  } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    console.warn('[TtsService] speakAdhoc 查缓存失败: ' + msg)
   }
+  const textCopy: string = text
+  const hashCopy: string = hash
+  callMinimaxTts(text,
+    (url: string): void => {
+      downloadTtsAudio(url, hashCopy,
+        (localPath: string): void => {
+          playLocalAudio(localPath, (): void => {})
+        },
+        (errMsg: string): void => {
+          console.warn('[TtsService] speakAdhoc download 失败: ' + errMsg)
+          fallbackSystemTts(textCopy)
+        }
+      )
+    },
+    (errMsg: string): void => {
+      console.warn('[TtsService] speakAdhoc tts 失败: ' + errMsg)
+      fallbackSystemTts(textCopy)
+    }
+  )
 }
 
 export function speakFixedGuide(text: string): void {
@@ -32,7 +64,110 @@ export function speakFixedGuide(text: string): void {
   }
 }
 
+// 启动期预热：把 ALL_ACTIONS 的 ttsText + FALLBACK_ADHOC_TEXTS 全部生成并落盘
+// 限并发 3；已有缓存跳过；不阻塞启动
 export function preGenerateAll(): void {
+  try {
+    const texts: string[] = []
+    for (let i = 0; i < ALL_ACTIONS.length; i++) {
+      const a = ALL_ACTIONS[i]
+      if (a != null && a.ttsText.length > 0) {
+        texts.push(a.ttsText)
+      }
+    }
+    for (let j = 0; j < FALLBACK_ADHOC_TEXTS.length; j++) {
+      const t = FALLBACK_ADHOC_TEXTS[j]
+      if (t != null && t.length > 0) {
+        texts.push(t)
+      }
+    }
+    if (texts.length < 1) return
+    const MAX_CONCURRENT: number = 3
+    const total: number = texts.length
+    let running: number = 0
+    let cursor: number = 0
+    let doneCount: number = 0
+    function tryStart(): void {
+      while (running < MAX_CONCURRENT && cursor < texts.length) {
+        const idx: number = cursor
+        cursor++
+        const t: string | null = texts[idx]
+        if (t == null) continue
+        const tHash: string = textHash(t)
+        let skip: boolean = false
+        try {
+          if (getTtsCacheByHash(tHash) != null) {
+            skip = true
+          }
+        } catch (_) {}
+        if (skip) {
+          doneCount++
+          continue
+        }
+        running++
+        callMinimaxTts(t,
+          (url: string): void => {
+            downloadTtsAudio(url, tHash,
+              (_local: string): void => {
+                running--
+                doneCount++
+                console.log('[TtsService] preGenerateAll 进度 ' + doneCount + '/' + total)
+                tryStart()
+              },
+              (errMsg: string): void => {
+                running--
+                doneCount++
+                console.warn('[TtsService] preGenerateAll download 失败: ' + errMsg)
+                tryStart()
+              }
+            )
+          },
+          (errMsg: string): void => {
+            running--
+            doneCount++
+            console.warn('[TtsService] preGenerateAll tts 失败: ' + errMsg)
+            tryStart()
+          }
+        )
+      }
+    }
+    tryStart()
+  } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    console.warn('[TtsService] preGenerateAll 整体异常: ' + msg)
+  }
+}
+
+// 启动期预热：触发一次空文本 SystemTts 让引擎初始化（不出声，仅 init）
+export function prewarmSystemTts(): void {
+  try { pluginSpeakSystemTts('', 0) } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    console.warn('[TtsService] prewarmSystemTts 失败: ' + msg)
+  }
+}
+
+function playLocalAudio(filePath: string, onEnd: () => void): void {
+  try {
+    const cbs: AudioPlayerCallbacks = {
+      onCompletion: (): void => { onEnd() },
+      onError: (err): void => {
+        const msg = err != null ? ('' + err) : 'null'
+        console.warn('[TtsService] playLocalAudio onError: ' + msg)
+      },
+      onProgress: (_cur, _total): void => {}
+    }
+    pluginPlayFile(filePath, cbs)
+  } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    console.warn('[TtsService] playLocalAudio 失败: ' + msg)
+  }
+}
+
+function fallbackSystemTts(text: string): void {
+  try { pluginSpeakSystemTts(text, getAdjustedVolume()) } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    console.warn('[TtsService] fallbackSystemTts 失败: ' + msg)
+  }
 }
 
 function playFallbackIntro(volume: number): void {

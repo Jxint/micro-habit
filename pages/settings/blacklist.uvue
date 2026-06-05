@@ -1,0 +1,402 @@
+<template>
+  <view class="page">
+    <view class="page-bg">
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
+    </view>
+    <scroll-view class="scroll-area" scroll-y="true">
+      <view class="header-block">
+        <text class="header-title">不提醒这些 App</text>
+        <text class="header-desc">
+          勾选的 App 不会再触发微动作提醒。系统自带 App（launcher、settings 等）已默认排除，无需手动添加。
+        </text>
+      </view>
+
+      <view class="manual-block">
+        <text class="manual-title">手动添加包名</text>
+        <textarea
+          class="manual-input"
+          v-model="manualInput"
+          placeholder="多个包名用逗号分隔，如 com.tencent.mm, com.sina.weibo"
+          :auto-height="true"
+        />
+        <view class="manual-btn-row">
+          <view class="manual-btn" @tap="onManualAdd">
+            <text class="manual-btn-text">添加到黑名单</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="candidates-block" v-if="candidateApps.length > 0">
+        <text class="candidates-title">从近期使用过的 App 中选择（{{ candidateApps.length }}）</text>
+        <view v-for="(c, ci) in candidateApps" :key="'c-' + ci" class="candidate-card">
+          <view class="candidate-left">
+            <text class="candidate-label">{{ c.appLabel.length > 0 ? c.appLabel : c.packageName }}</text>
+            <text class="candidate-pkg">{{ c.packageName }}</text>
+          </view>
+          <switch
+            :checked="isInBlacklist(c.packageName)"
+            @change="(e: any) => onToggle(c.packageName, e)"
+          />
+        </view>
+      </view>
+
+      <view v-if="candidateApps.length < 1" class="empty-block">
+        <text class="empty-text">暂无候选 App</text>
+        <text class="empty-hint">开启使用情况权限并使用几天 App 后，这里会出现近期使用过的应用</text>
+      </view>
+
+      <view v-if="blacklistAppLabels.length > 0" class="current-block">
+        <text class="current-title">当前黑名单（{{ blacklistAppLabels.length }}）</text>
+        <view v-for="(item, idx) in blacklistAppLabels" :key="'bl-' + idx" class="current-card">
+          <view class="current-left">
+            <text class="current-label">{{ item.label }}</text>
+            <text class="current-pkg">{{ item.pkg }}</text>
+          </view>
+          <view class="current-remove" @tap="onRemove(item.pkg)">
+            <text class="current-remove-text">移除</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="bottom-spacer" />
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { getSetting, putSetting } from '../../database/SettingsDao'
+import { getTodayAppBreakdown } from '../../database/AppUsageDao'
+import { isSystemPackage } from '../../utils/SystemAppUtils'
+
+type CandidateApp = {
+  packageName: string
+  appLabel: string
+}
+
+type BlacklistEntry = {
+  pkg: string
+  label: string
+}
+
+const manualInput = ref<string>('')
+const candidateApps = ref<CandidateApp[]>([])
+const blacklistPkgs = ref<string[]>([])
+const blacklistAppLabels = ref<BlacklistEntry[]>([])
+
+function loadBlacklist(): string[] {
+  const raw = getSetting('app_blacklist', '[]')
+  const list: string[] = []
+  try {
+    const arr = JSON.parse(raw) as Array<any>
+    if (arr != null) {
+      for (let i = 0; i < arr.length; i++) {
+        const v = arr[i]
+        if (typeof v === 'string' && v.length > 0) list.push(v)
+      }
+    }
+  } catch (_) {}
+  return list
+}
+
+function rebuildBlacklistLabels(): void {
+  const pkgs = blacklistPkgs.value
+  const cands = candidateApps.value
+  const out: BlacklistEntry[] = []
+  for (let i = 0; i < pkgs.length; i++) {
+    const p = pkgs[i] as string
+    let label = p
+    for (let j = 0; j < cands.length; j++) {
+      if (cands[j].packageName == p) {
+        label = cands[j].appLabel.length > 0 ? cands[j].appLabel : p
+        break
+      }
+    }
+    out.push({ pkg: p, label: label })
+  }
+  blacklistAppLabels.value = out
+}
+
+function saveBlacklist(list: string[]): void {
+  putSetting('app_blacklist', JSON.stringify(list))
+  blacklistPkgs.value = list
+  rebuildBlacklistLabels()
+}
+
+function isInBlacklist(pkg: string): boolean {
+  return blacklistPkgs.value.indexOf(pkg) >= 0
+}
+
+function onToggle(pkg: string, e: any): void {
+  try {
+    const obj = e as UTSJSONObject
+    if (obj == null) return
+    const detail = obj['detail']
+    if (detail == null) return
+    const d = detail as UTSJSONObject
+    if (d == null) return
+    const v = d['value']
+    let enabled = false
+    if (typeof v === 'boolean') enabled = v as boolean
+    else if (typeof v === 'number') enabled = (v as number) != 0
+    const list: string[] = blacklistPkgs.value.concat([] as string[])
+    const idx = list.indexOf(pkg)
+    if (enabled && idx < 0) list.push(pkg)
+    else if (!enabled && idx >= 0) list.splice(idx, 1)
+    saveBlacklist(list)
+  } catch (err) {
+    console.warn('[blacklist] onToggle 异常: ' + JSON.stringify(err))
+  }
+}
+
+function onManualAdd(): void {
+  try {
+    const text = manualInput.value.trim()
+    if (text.length < 1) {
+      uni.showToast({ title: '请输入包名', icon: 'none' })
+      return
+    }
+    const parts = text.split(',')
+    const additions: string[] = []
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i].trim()
+      if (p.length < 1) continue
+      if (isSystemPackage(p)) continue
+      if (blacklistPkgs.value.indexOf(p) >= 0) continue
+      if (additions.indexOf(p) >= 0) continue
+      additions.push(p)
+    }
+    if (additions.length < 1) {
+      uni.showToast({ title: '无可添加的包名', icon: 'none' })
+      return
+    }
+    const next = blacklistPkgs.value.concat(additions)
+    saveBlacklist(next)
+    manualInput.value = ''
+    uni.showToast({ title: '已添加 ' + additions.length + ' 个', icon: 'success' })
+  } catch (err) {
+    console.warn('[blacklist] onManualAdd 异常: ' + JSON.stringify(err))
+  }
+}
+
+function onRemove(pkg: string): void {
+  try {
+    const list: string[] = blacklistPkgs.value.concat([] as string[])
+    const idx = list.indexOf(pkg)
+    if (idx < 0) return
+    list.splice(idx, 1)
+    saveBlacklist(list)
+  } catch (err) {
+    console.warn('[blacklist] onRemove 异常: ' + JSON.stringify(err))
+  }
+}
+
+function refresh(): void {
+  try {
+    const breakdown = getTodayAppBreakdown()
+    const seen: Map<string, boolean> = new Map<string, boolean>()
+    const cands: CandidateApp[] = []
+    for (let i = 0; i < breakdown.length; i++) {
+      const item = breakdown[i]
+      if (item == null) continue
+      const pkg = item.packageName
+      if (pkg.length < 1) continue
+      if (isSystemPackage(pkg)) continue
+      if (seen.get(pkg) == true) continue
+      seen.set(pkg, true)
+      cands.push({ packageName: pkg, appLabel: item.appLabel })
+    }
+    candidateApps.value = cands
+  } catch (err) {
+    console.warn('[blacklist] refresh candidates 异常: ' + JSON.stringify(err))
+    candidateApps.value = []
+  }
+  blacklistPkgs.value = loadBlacklist()
+  rebuildBlacklistLabels()
+}
+
+onPageShow(() => {
+  refresh()
+})
+
+function onBack(): void {
+  uni.navigateBack()
+}
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+.page-bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+.page-bg-img {
+  width: 100%;
+  height: 100%;
+}
+.scroll-area {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+.header-block {
+  padding: 20px 16px 12px 16px;
+  background-color: rgba(255, 255, 255, 0.52);
+  flex-direction: column;
+}
+.header-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1E2A38;
+  margin-bottom: 6px;
+}
+.header-desc {
+  font-size: 12px;
+  color: #526273;
+  line-height: 1.6;
+}
+.manual-block {
+  background-color: #FFFFFF;
+  padding: 14px 16px;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+  flex-direction: column;
+}
+.manual-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 8px;
+}
+.manual-input {
+  font-size: 13px;
+  color: #2C3E50;
+  background-color: #F4F6F8;
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-height: 60px;
+  width: 100%;
+  border-width: 1px;
+  border-color: #E0E6EB;
+  border-style: solid;
+}
+.manual-btn-row {
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.manual-btn {
+  background-color: #3498DB;
+  padding: 8px 16px;
+  border-radius: 6px;
+}
+.manual-btn-text {
+  font-size: 13px;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.candidates-block {
+  background-color: #FFFFFF;
+  padding: 12px 0 4px 0;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+}
+.candidates-title {
+  font-size: 13px;
+  color: #7F8C8D;
+  font-weight: bold;
+  padding: 6px 16px;
+}
+.candidate-card {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+}
+.candidate-left {
+  flex: 1;
+  flex-direction: column;
+}
+.candidate-label {
+  font-size: 14px;
+  color: #2C3E50;
+  font-weight: 500;
+}
+.candidate-pkg {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.current-block {
+  background-color: #FFFFFF;
+  padding: 12px 0 4px 0;
+}
+.current-title {
+  font-size: 13px;
+  color: #E74C3C;
+  font-weight: bold;
+  padding: 6px 16px;
+}
+.current-card {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom-width: 1px;
+  border-bottom-color: #F0F0F0;
+  border-bottom-style: solid;
+}
+.current-left {
+  flex: 1;
+  flex-direction: column;
+}
+.current-label {
+  font-size: 14px;
+  color: #2C3E50;
+}
+.current-pkg {
+  font-size: 11px;
+  color: #95A5A6;
+  margin-top: 2px;
+}
+.current-remove {
+  background-color: #FAEAEA;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+.current-remove-text {
+  font-size: 12px;
+  color: #E74C3C;
+}
+.empty-block {
+  padding: 40px 20px;
+  align-items: center;
+  background-color: #FFFFFF;
+}
+.empty-text {
+  font-size: 14px;
+  color: #7F8C8D;
+  margin-bottom: 6px;
+}
+.empty-hint {
+  font-size: 12px;
+  color: #95A5A6;
+  text-align: center;
+}
+.bottom-spacer {
+  height: 80px;
+}
+</style>

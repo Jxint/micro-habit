@@ -9,6 +9,7 @@ import { isInTimeRange, now } from '../utils/TimeUtils'
 import { evaluate as evaluateRule, EffectiveRuleMatch } from './EffectiveRuleEngine'
 import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
 import { MicroAction } from '../models/MicroAction'
+import { isSystemPackage } from '../utils/SystemAppUtils'
 
 export enum TriggerState {
   IDLE,
@@ -41,10 +42,6 @@ let currentState: TriggerState = TriggerState.IDLE
 let lastTriggerTime: number = 0
 const COOL_DOWN_MS: number = 5 * 60 * 1000
 
-export function getCurrentState(): TriggerState {
-  return currentState
-}
-
 export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
   if (currentState !== TriggerState.IDLE) {
     console.log('[TriggerEngine] skip: state=' + currentState)
@@ -60,6 +57,9 @@ export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
   let dndOk = false
   try { dndOk = isInDndPeriod() } catch (e) { console.warn('[TriggerEngine] isInDndPeriod: ' + e) }
   if (dndOk) return null
+
+  // 系统包二次保险：即使 UsageStatsForegroundService 已过滤，TriggerEngine 也要独立拦截
+  if (isSystemPackage(context.appPackage)) return null
 
   let blacklisted = false
   try { blacklisted = isBlacklisted(context.appPackage) } catch (e) { console.warn('[TriggerEngine] isBlacklisted: ' + e) }
@@ -140,18 +140,9 @@ export function onActionResolved(): void {
   scheduleCooldownEnd()
 }
 
-export function onExternalInterrupt(): void {
-  dismissOverlay()
-  currentState = TriggerState.COOLING_DOWN
-  scheduleCooldownEnd()
-}
-
 export function forceIdle(): void {
   currentState = TriggerState.IDLE
   lastTriggerTime = 0
-}
-
-function dismissOverlay(): void {
 }
 
 function scheduleCooldownEnd(): void {

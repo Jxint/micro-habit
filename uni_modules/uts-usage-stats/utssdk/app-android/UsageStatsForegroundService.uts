@@ -18,10 +18,12 @@ import AppOpsManager from 'android.app.AppOpsManager'
 import UsageStatsManager from 'android.app.usage.UsageStatsManager'
 import UsageStats from 'android.app.usage.UsageStats'
 import System from 'java.lang.System'
-import ServiceInfo from 'android.content.pm.ServiceInfo'
 import Process from 'android.os.Process'
+import SharedPreferences from 'android.content.SharedPreferences'
 
 import { type AppForegroundInfo, type UsageStatEntry, type UsageMonitorCallbacks } from './UsageTypes'
+import { insertHeartbeat } from '../../../../database/HeartbeatDao'
+import { shouldFilterPackage } from '../../../../utils/SystemAppUtils'
 
 const NOTIFICATION_ID: Int = 2
 const CHANNEL_ID: string = 'micro_habit_usage_stats'
@@ -37,7 +39,6 @@ let serviceInstance: UsageStatsForegroundService | null = null
 let monitoring: boolean = false
 let lastReconcileTime: Long = 0
 let triggerEnabled: boolean = false
-let monitoring: boolean = false
 
 function getSelfPackageNameInternal(): string {
   try {
@@ -66,10 +67,9 @@ function startOfTodayMsLong(): Long {
 }
 
 function isInBlacklist(pkg: string, selfPkg: string): boolean {
-  if (pkg.length < 1) return true
-  if (pkg == 'android') return true
-  if (selfPkg.length > 0 && pkg == selfPkg) return true
-  return false
+  // 委托给 SystemAppUtils.shouldFilterPackage（系统包 + 自身 + 空包名）
+  // 保留此函数作为内部 wrapper，调用方无需修改签名
+  return shouldFilterPackage(pkg, selfPkg)
 }
 
 function isUsagePermissionGrantedByContext(ctx: Context): boolean {
@@ -94,6 +94,48 @@ function makeServiceIntent(ctx: Context): Intent {
   return intent
 }
 
+// ============================================================
+// 持久化偏好（SharedPreferences）
+// Service 被 START_STICKY 复活后，模块级 triggerEnabled/thresholdMs
+// 会被进程级 let 变量重置为默认值；通过 SharedPreferences 恢复
+// ============================================================
+const PREFS_NAME: string = 'micro_habit_prefs'
+const KEY_TRIGGER_ENABLED: string = 'trigger_enabled'
+const KEY_POLL_THRESHOLD_MS: string = 'poll_threshold_ms'
+
+function getPrefs(): SharedPreferences | null {
+  try {
+    const ctx = UTSAndroid.getAppContext()
+    if (ctx == null) return null
+    return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+  } catch (_) {
+    return null
+  }
+}
+
+// 读回模块级 triggerEnabled / thresholdMs（默认值与模块级 let 初始值对齐）
+function loadPrefsFromDisk(): void {
+  try {
+    const prefs = getPrefs()
+    if (prefs == null) return
+    // 缺省值：triggerEnabled=false（避免复活后误触发），thresholdMs=1 小时
+    triggerEnabled = prefs.getBoolean(KEY_TRIGGER_ENABLED, false)
+    const defaultThresholdMs: number = 60 * 60 * 1000
+    thresholdMs = prefs.getLong(KEY_POLL_THRESHOLD_MS, defaultThresholdMs.toLong()) as number
+  } catch (_) {}
+}
+
+function savePrefsToDisk(triggerEnabledIn: boolean, thresholdMsIn: number): void {
+  try {
+    const prefs = getPrefs()
+    if (prefs == null) return
+    const editor = prefs.edit()
+    editor.putBoolean(KEY_TRIGGER_ENABLED, triggerEnabledIn)
+    editor.putLong(KEY_POLL_THRESHOLD_MS, thresholdMsIn.toLong())
+    editor.apply()
+  } catch (_) {}
+}
+
 export class UsageStatsForegroundService extends Service {
   private handler: Handler | null = null
   private wakeLock: PowerManager.WakeLock | null = null
@@ -112,6 +154,9 @@ export class UsageStatsForegroundService extends Service {
     try {
       super.onCreate()
       serviceInstance = this
+      // 优先读回持久化的 triggerEnabled / thresholdMs，
+      // 防止 START_STICKY 复活后模块级 let 重置为默认值导致 doPoll 静默空跑
+      loadPrefsFromDisk()
       this.selfPkgCache = getSelfPackageNameInternal()
       this.todayDate = currentDateString()
       this.tryRefreshUsm()
@@ -125,13 +170,21 @@ export class UsageStatsForegroundService extends Service {
   }
 
   override onStartCommand(intent: Intent | null, flags: Int, startId: Int): Int {
-    if (this.started) {
+    if (!this.started) {
+      this.started = true
+      if (this.handler != null) {
+        // 清空旧 tick，避免 START_STICKY 复活后 callback 累积
+        this.handler!!.removeCallbacksAndMessages(null)
+      }
       this.scheduleNextTick()
     }
     return Service.START_STICKY
   }
 
   override onDestroy(): void {
+    try { insertHeartbeat('stopped') } catch (e) {
+      console.warn('[UsageStats] heartbeat onDestroy write failed: ' + JSON.stringify(e))
+    }
     this.stopPolling()
     this.releaseWakeLock()
     serviceInstance = null
@@ -192,6 +245,11 @@ export class UsageStatsForegroundService extends Service {
   }
 
   private acquireWakeLock(): void {
+    // 先释放旧的，防止 tick 反复调用导致 WakeLock 累积
+    if (this.wakeLock != null) {
+      try { this.wakeLock!!.release() } catch (_) {}
+      this.wakeLock = null
+    }
     try {
       const pm = this.getSystemService(Context.POWER_SERVICE) as PowerManager
       if (pm == null) return
@@ -229,6 +287,10 @@ export class UsageStatsForegroundService extends Service {
 
   private tick(): void {
     if (!this.started) return
+    // 每次 5 分钟 tick 写一条 'alive' 心跳，验证触发链路是否真的在跑
+    try { insertHeartbeat('alive') } catch (e) {
+      console.warn('[UsageStats] heartbeat tick write failed: ' + JSON.stringify(e))
+    }
     try {
       this.doPoll()
     } catch (e) {
@@ -398,6 +460,8 @@ export function startUsageMonitor(
     pollIntervalMs = pollIntervalMsIn
   }
   triggerEnabled = triggerEnabledIn
+  // 持久化关键参数：START_STICKY 复活后由 onCreate 读回
+  savePrefsToDisk(triggerEnabled, thresholdMs)
   monitoring = true
   try {
     const ctx = UTSAndroid.getAppContext()
@@ -474,8 +538,8 @@ export function queryUsageStatsOnce(beginMs: number, endMs: number): UsageStatEn
       if (s == null) continue
       const pkg = s.getPackageName() as string
       if (pkg == null || pkg.length < 1) continue
-      if (pkg == 'android') continue
-      if (selfPkg.length > 0 && pkg == selfPkg) continue
+      // 改用 SystemAppUtils.shouldFilterPackage 一次性拦截系统包 + 自身
+      if (shouldFilterPackage(pkg, selfPkg)) continue
       const entry: UsageStatEntry = {
         packageName: pkg,
         totalTimeInForeground: s.getTotalTimeInForeground() as number,

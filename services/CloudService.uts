@@ -6,15 +6,17 @@ import {
   SYSTEM_PROMPT_WEEKLY, buildWeeklyReportPrompt,
   PreTriggerContext, PostActionContext
 } from '../constants/LlmPrompts'
+import { save as saveTtsCache, getByHash as getTtsCacheByHash } from '../database/TtsCacheDao'
+import { save as saveLlmCache, getByKey as getLlmCacheByKey } from '../database/LlmCacheDao'
 
 const MINIMAX_BASE_URL = 'https://api.minimax.chat/v1'
 const MINIMAX_CHAT_PATH = 'text/chatcompletion_v2'
 const MINIMAX_CHAT_MODEL = 'MiniMax-M2.7'
 const MINIMAX_API_KEY = 'sk-cp-Dd2_yFv0hINLsc2fnuWrrde0agYZQCzaRzW0DaK64CAl7Y-plAqRd7R2jSxQTSgSEWbl6teJc2oFL90HPMgyqLXel67OJhufLeLeVauln93DyXmA1277iQw'
 
-type TtsAdhocOptions = {
-  timeout: number
-}
+const MINIMAX_TTS_URL = 'https://api.minimaxi.com/v1/t2a_v2'
+const MINIMAX_TTS_MODEL = 'speech-02-hd'
+const MINIMAX_TTS_VOICE_ID = 'male-qn-qingse'
 
 export function callMinimaxChat(systemPrompt: string, userPrompt: string, maxTokens: number, onOK: (raw: string) => void, onFail: () => void): void {
   if (MINIMAX_API_KEY === 'PLACEHOLDER_KEY') {
@@ -72,6 +74,171 @@ export function callMinimaxChat(systemPrompt: string, userPrompt: string, maxTok
   }
 }
 
+export function callMinimaxTts(
+  text: string,
+  onOK: (audioUrl: string) => void,
+  onFail: (errMsg: string) => void
+): void {
+  if (MINIMAX_API_KEY === 'PLACEHOLDER_KEY' || MINIMAX_API_KEY.length < 8) {
+    onFail('MiniMax TTS key 未配置')
+    return
+  }
+  if (text.length < 1) {
+    onFail('TTS text 为空')
+    return
+  }
+  const reqBody = {
+    model: MINIMAX_TTS_MODEL,
+    text: text,
+    stream: false,
+    voice_setting: { voice_id: MINIMAX_TTS_VOICE_ID, speed: 1, vol: 1, pitch: 0 },
+    audio_setting: { sample_rate: 32000, bitrate: 128000, format: 'mp3', channel: 1 },
+    output_format: 'url'
+  }
+  try {
+    uni.request({
+      url: MINIMAX_TTS_URL,
+      method: 'POST',
+      header: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + MINIMAX_API_KEY
+      },
+      data: JSON.stringify(reqBody),
+      timeout: 30000,
+      success(res) {
+        try {
+          const data = res.data
+          if (data == null) {
+            onFail('TTS 响应为空')
+            return
+          }
+          const obj = data as UTSJSONObject
+          const baseResp = obj.get('base_resp')
+          if (baseResp != null) {
+            const brObj = baseResp as UTSJSONObject
+            const sc = brObj.get('status_code')
+            if (sc != null && sc != 0) {
+              const sm = brObj.get('status_msg')
+              onFail('TTS 返回非 0 状态: ' + (sm != null ? ('' + sm) : ''))
+              return
+            }
+          }
+          const dataField = obj.get('data')
+          if (dataField == null) {
+            onFail('TTS 响应无 data 字段')
+            return
+          }
+          const dObj = dataField as UTSJSONObject
+          const audioField = dObj.get('audio')
+          if (audioField == null) {
+            onFail('TTS 响应无 data.audio 字段')
+            return
+          }
+          const audioUrl = '' + audioField
+          if (audioUrl.length < 8 || audioUrl.indexOf('http') < 0) {
+            onFail('TTS 响应 audio 非 url: ' + audioUrl.substring(0, 80))
+            return
+          }
+          console.log('[CloudService] callMinimaxTts OK, textLen=' + text.length + ' urlLen=' + audioUrl.length)
+          onOK(audioUrl)
+        } catch (e) {
+          const msg = e != null ? ('' + e) : 'null'
+          onFail('TTS 响应解析异常: ' + msg)
+        }
+      },
+      fail(_err) {
+        const msg = _err != null ? ('' + _err) : 'null'
+        console.warn('[CloudService] callMinimaxTts network fail: ' + msg)
+        onFail('TTS 网络失败: ' + msg)
+      }
+    })
+  } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    onFail('TTS 请求构造异常: ' + msg)
+  }
+}
+
+export function downloadTtsAudio(
+  url: string,
+  cacheKey: string,
+  onOK: (localPath: string) => void,
+  onFail: (errMsg: string) => void
+): void {
+  if (url.length < 8) {
+    onFail('downloadTtsAudio url 为空')
+    return
+  }
+  if (cacheKey.length < 1) {
+    onFail('downloadTtsAudio cacheKey 为空')
+    return
+  }
+  try {
+    uni.request({
+      url: url,
+      method: 'GET',
+      responseType: 'arraybuffer',
+      timeout: 60000,
+      success(res) {
+        try {
+          const ab = res.data as ArrayBuffer
+          if (ab == null) {
+            onFail('下载响应无 ArrayBuffer')
+            return
+          }
+          const filePath: string = '_doc/' + cacheKey + '.mp3'
+          const abRef: ArrayBuffer = ab
+          // ArrayBuffer → base64 字符串，writeFile 在 App-Android 上只支持 base64/utf-8
+          let base64: string = ''
+          try {
+            base64 = uni.arrayBufferToBase64(abRef)
+          } catch (e) {
+            const msg = e != null ? ('' + e) : 'null'
+            onFail('TTS ArrayBuffer→base64 失败: ' + msg)
+            return
+          }
+          try {
+            uni.getFileSystemManager().writeFile({
+              filePath: filePath,
+              data: base64,
+              encoding: 'base64',
+              success: (): void => {
+                try {
+                  const fileSize: number = abRef.byteLength
+                  saveTtsCache(cacheKey, cacheKey, filePath, fileSize, 'minimax')
+                  console.log('[CloudService] downloadTtsAudio OK, cacheKey=' + cacheKey + ' size=' + fileSize)
+                  onOK(filePath)
+                } catch (e) {
+                  const msg = e != null ? ('' + e) : 'null'
+                  onFail('TTS 缓存写库失败: ' + msg)
+                }
+              },
+              fail: (err): void => {
+                const msg = err != null ? ('' + err) : 'null'
+                console.warn('[CloudService] writeFile fail: ' + msg)
+                onFail('TTS 文件写失败: ' + msg)
+              }
+            })
+          } catch (e) {
+            const msg = e != null ? ('' + e) : 'null'
+            onFail('TTS 写文件构造失败: ' + msg)
+          }
+        } catch (e) {
+          const msg = e != null ? ('' + e) : 'null'
+          onFail('TTS 下载处理异常: ' + msg)
+        }
+      },
+      fail(_err) {
+        const msg = _err != null ? ('' + _err) : 'null'
+        console.warn('[CloudService] downloadTtsAudio network fail: ' + msg)
+        onFail('TTS 下载网络失败: ' + msg)
+      }
+    })
+  } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    onFail('TTS 下载请求构造失败: ' + msg)
+  }
+}
+
 export function callDaily(date: string, data: DailyData, onOK: (raw: string) => void, onFail: () => void): void {
   console.log('[CloudService] callDaily start, date=' + date)
   const userPrompt = buildDailySummaryPrompt(data)
@@ -106,20 +273,38 @@ export function callWeekly(data: WeeklyReportStats, onOK: (raw: string) => void,
   })
 }
 
-export function callTtsProxy(text: string, onOK: (result: any) => void): void {
-  onOK({ code: -1, error: 'TTS 暂未实现' })
-}
-
-export function callTtsAdhoc(context: any, options: TtsAdhocOptions, onOK: (result: any) => void, onFail: () => void): void {
-  onFail()
-}
-
 export function callLlmEvaluate(
   stage: 'pre' | 'post',
   ctx: PreTriggerContext | PostActionContext,
   onOK: (raw: string) => void,
   onFail: () => void
 ): void {
+  // 缓存命中短路：相同 (stage, pkg, hourBucket, contBucket) 直接复用
+  // 仅 pre 阶段构造缓存键：pre 有 appPackage + continuousMinutes，post 无
+  let cacheKey = ''
+  if (stage === 'pre') {
+    const pCtx = ctx as PreTriggerContext
+    const cacheCtx: LlmCacheContext = {
+      appPackage: pCtx.appPackage,
+      continuousMinutes: pCtx.continuousMinutes
+    }
+    cacheKey = buildLlmCacheKey(stage, cacheCtx)
+  }
+  if (cacheKey.length > 0) {
+    try {
+        const cached = getLlmCacheByKey(cacheKey)
+      if (cached != null && cached.response.length > 0) {
+        const nowSec = Math.floor(Date.now() / 1000)
+        if (cached.expires_at <= 0 || cached.expires_at > nowSec) {
+          console.log('[CloudService] callLlmEvaluate ' + stage + ' cache HIT key=' + cacheKey)
+          onOK(cached.response)
+          return
+        }
+      }
+    } catch (e) {
+      console.warn('[CloudService] callLlmEvaluate 读缓存异常: ' + (e != null ? ('' + e) : 'null'))
+    }
+  }
   let userPrompt = ''
   try {
     if (stage === 'pre') {
@@ -140,11 +325,40 @@ export function callLlmEvaluate(
 
   callMinimaxChat(SYSTEM_PROMPT_EVALUATE, userPrompt, 1500, (raw: string): void => {
     console.log('[CloudService] callLlmEvaluate ' + stage + ' OK, rawLen=' + raw.length + ' preview=' + raw.substring(0, 80))
+    if (cacheKey.length > 0 && raw.length > 0) {
+      try {
+        const ttlSec = 24 * 60 * 60
+        const expiresAt = Math.floor(Date.now() / 1000) + ttlSec
+        saveLlmCache(cacheKey, stage, raw, expiresAt)
+      } catch (e) {
+        console.warn('[CloudService] callLlmEvaluate 写缓存异常: ' + (e != null ? ('' + e) : 'null'))
+      }
+    }
     onOK(raw)
   }, (): void => {
     console.warn('[CloudService] callLlmEvaluate ' + stage + ' FAIL')
     onFail()
   })
+}
+
+// 缓存上下文：仅 pre 阶段有意义（post 阶段无 appPackage / continuousMinutes）
+type LlmCacheContext = {
+  appPackage: string
+  continuousMinutes: number
+}
+
+// 构造缓存键：阶段 + 包名 + 整点 + 30min 连续桶
+function buildLlmCacheKey(stage: string, ctx: LlmCacheContext | null): string {
+  try {
+    if (ctx == null) return ''
+    const pkg = ctx.appPackage.length > 0 ? ctx.appPackage : 'unknown'
+    const dayMs = 24 * 60 * 60 * 1000
+    const hourBucket = Math.floor((Date.now() % dayMs) / (60 * 60 * 1000))
+    const contBucket = Math.floor(ctx.continuousMinutes / 30) * 30
+    return stage + ':' + pkg + ':' + hourBucket + ':' + contBucket
+  } catch (_) {
+    return ''
+  }
 }
 
 function extractChatContent(data: any): string {

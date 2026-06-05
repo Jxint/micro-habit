@@ -1,0 +1,294 @@
+<template>
+  <view v-if="visible" class="dialog-mask" @tap="onMaskTap">
+    <view class="dialog-card" @tap.stop="">
+      <view class="dialog-header">
+        <text class="dialog-title">AI 建议审核</text>
+        <view class="dialog-close" @tap="close">
+          <text class="dialog-close-text">×</text>
+        </view>
+      </view>
+
+      <view class="dialog-body">
+        <view class="row-tag">
+          <text class="row-tag-text" :class="'tag-' + decisionBadge">{{ decisionText }}</text>
+          <text v-if="confidencePercent.length > 0" class="row-confidence">把握度 {{ confidencePercent }}%</text>
+        </view>
+
+        <text v-if="actionName.length > 0" class="row-section-title">建议动作</text>
+        <text v-if="actionName.length > 0" class="row-value">{{ actionName }}</text>
+
+        <text v-if="timeWindowText.length > 0" class="row-section-title">生效时间段</text>
+        <text v-if="timeWindowText.length > 0" class="row-value">{{ timeWindowText }}</text>
+
+        <text v-if="thresholdText.length > 0" class="row-section-title">时间阈值</text>
+        <text v-if="thresholdText.length > 0" class="row-value">{{ thresholdText }}</text>
+
+        <text v-if="appPackagesText.length > 0" class="row-section-title">命中 App</text>
+        <text v-if="appPackagesText.length > 0" class="row-value">{{ appPackagesText }}</text>
+
+        <text v-if="reasoning.length > 0" class="row-section-title">AI 理由</text>
+        <text v-if="reasoning.length > 0" class="row-value reasoning">{{ reasoning }}</text>
+      </view>
+
+      <view class="dialog-buttons">
+        <view class="btn btn-secondary" @tap="onReject">
+          <text class="btn-text">拒绝</text>
+        </view>
+        <view class="btn btn-primary" @tap="onAccept">
+          <text class="btn-text">接受</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { markAccepted, markRejected } from '../services/LlmRejectTracker'
+import { EffectiveTriggerRule } from '../models/EffectiveTriggerRule'
+import { getActionById } from '../constants/Actions'
+
+type ReviewDecision = 'create_rule' | 'modify_rule' | 'delete_rule' | 'no_change' | string
+
+const props = withDefaults(defineProps<{
+  visible: boolean
+  historyId: number
+  decision: string
+  targetRuleId: number
+  reasoning: string
+  confidence: number
+  suggestedRule: EffectiveTriggerRule | null
+}>(), {
+  visible: false,
+  historyId: 0,
+  decision: '',
+  targetRuleId: 0,
+  reasoning: '',
+  confidence: 0,
+  suggestedRule: null
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'accept', payload: { historyId: number, decision: string, targetRuleId: number }): void
+  (e: 'reject', payload: { historyId: number, decision: string, targetRuleId: number }): void
+}>()
+
+const decisionText = computed<string>((): string => {
+  const d: string = props.decision
+  if (d == 'create_rule') return '新增规则'
+  if (d == 'modify_rule') return '修改规则'
+  if (d == 'delete_rule') return '删除规则'
+  if (d == 'no_change') return '保持现状'
+  return d.length > 0 ? d : '建议'
+})
+
+const decisionBadge = computed<string>((): string => {
+  const d: string = props.decision
+  if (d == 'create_rule') return 'create'
+  if (d == 'modify_rule') return 'modify'
+  if (d == 'delete_rule') return 'delete'
+  return 'noop'
+})
+
+const confidencePercent = computed<string>((): string => {
+  const c: number = props.confidence
+  if (c <= 0) return ''
+  const pct: number = Math.floor(c * 100)
+  return '' + pct
+})
+
+function actionNameOf(r: EffectiveTriggerRule): string {
+  const a = getActionById(r.actionId)
+  return a != null ? a.name : r.actionId
+}
+
+function timeWindowOf(r: EffectiveTriggerRule): string {
+  if (r.timeWindow == null) return ''
+  return r.timeWindow.start + ' ~ ' + r.timeWindow.end
+}
+
+function thresholdOf(r: EffectiveTriggerRule): string {
+  const t: number = r.timeThresholdMinutes
+  if (t <= 0) return ''
+  return '连续前台 ≥ ' + t + ' 分钟'
+}
+
+function appPackagesOf(r: EffectiveTriggerRule): string {
+  if (r.screenConditions == null) return ''
+  if (r.screenConditions.appPackages.length < 1) {
+    return r.screenConditions.includeHome ? '任意 App（含桌面）' : '任意 App'
+  }
+  return r.screenConditions.appPackages.join('、')
+}
+
+const actionName = computed<string>((): string => {
+  const r = props.suggestedRule
+  if (r == null) return ''
+  return actionNameOf(r as EffectiveTriggerRule)
+})
+
+const timeWindowText = computed<string>((): string => {
+  const r = props.suggestedRule
+  if (r == null) return ''
+  return timeWindowOf(r as EffectiveTriggerRule)
+})
+
+const thresholdText = computed<string>((): string => {
+  const r = props.suggestedRule
+  if (r == null) return ''
+  return thresholdOf(r as EffectiveTriggerRule)
+})
+
+const appPackagesText = computed<string>((): string => {
+  const r = props.suggestedRule
+  if (r == null) return ''
+  return appPackagesOf(r as EffectiveTriggerRule)
+})
+
+function close(): void {
+  emit('close')
+}
+
+function onMaskTap(): void {
+  close()
+}
+
+function onAccept(): void {
+  if (props.historyId > 0) markAccepted(props.historyId)
+  emit('accept', { historyId: props.historyId, decision: props.decision, targetRuleId: props.targetRuleId })
+  close()
+}
+
+function onReject(): void {
+  if (props.historyId > 0) markRejected(props.historyId)
+  emit('reject', { historyId: props.historyId, decision: props.decision, targetRuleId: props.targetRuleId })
+  close()
+}
+</script>
+
+<style scoped>
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.dialog-card {
+  width: 90%;
+  max-width: 420px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px;
+  flex-direction: column;
+}
+.dialog-header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px 12px 4px;
+}
+.dialog-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.dialog-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background-color: #F0F3F4;
+  align-items: center;
+  justify-content: center;
+}
+.dialog-close-text {
+  font-size: 18px;
+  color: #7F8C8D;
+  font-weight: bold;
+}
+.dialog-body {
+  padding: 8px 4px;
+  margin-bottom: 12px;
+}
+.row-tag {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.row-tag-text {
+  font-size: 11px;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+}
+.tag-create {
+  background-color: #D5F5E3;
+  color: #239B56;
+}
+.tag-modify {
+  background-color: #FCF3CF;
+  color: #B7950B;
+}
+.tag-delete {
+  background-color: #FADBD8;
+  color: #C0392B;
+}
+.tag-noop {
+  background-color: #ECF0F1;
+  color: #7F8C8D;
+}
+.row-confidence {
+  font-size: 11px;
+  color: #95A5A6;
+}
+.row-section-title {
+  font-size: 12px;
+  color: #95A5A6;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+.row-value {
+  font-size: 14px;
+  color: #2C3E50;
+  font-weight: bold;
+  line-height: 1.4;
+}
+.row-value.reasoning {
+  font-weight: normal;
+  color: #34495E;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.dialog-buttons {
+  flex-direction: row;
+  margin-bottom: 4px;
+}
+.btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.btn-secondary {
+  background-color: #ECF0F1;
+  margin-right: 8px;
+}
+.btn-primary {
+  background-color: #3498DB;
+  margin-left: 8px;
+}
+.btn-text {
+  font-size: 14px;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.btn-secondary .btn-text {
+  color: #2C3E50;
+}
+</style>

@@ -1,0 +1,98 @@
+// 系统应用包名识别 + 用户黑名单判断
+// 用于在触发链路（UsageStats 轮询 / AppCategory 入册 / TriggerEngine / EffectiveRuleEngine）
+// 各处统一拦截 com.android.launcher 等系统包，避免弹窗污染和 LLM 误分类
+
+// 系统应用包名前缀（命中任一前缀即视为系统包）
+const SYSTEM_PKG_PREFIXES: string[] = [
+  'com.android.',
+  'com.google.android.',
+  'android.',
+  'com.miui.',
+  'com.huawei.',
+  'com.samsung.',
+  'com.oppo.',
+  'com.vivo.',
+  'com.oneplus.',
+  'com.sec.',
+  'com.qualcomm.',
+  'com.qti.',
+  'com.mediatek.',
+  'com.lenovo.',
+  'com.zte.',
+  'com.meizu.',
+  'com.nubia.',
+  'com.letv.',
+  'com.sonymobile.',
+  'com.motorola.',
+  'com.lge.'
+]
+
+// 已知系统包名（精确匹配，覆盖框架/launcher/dialer 等不带 com.android. 前缀的）
+const SYSTEM_PKG_EXACT: string[] = [
+  'android',
+  'com.android.launcher',
+  'com.android.launcher2',
+  'com.android.launcher3',
+  'com.android.settings',
+  'com.android.systemui',
+  'com.android.dialer',
+  'com.android.phone',
+  'com.android.contacts',
+  'com.android.camera',
+  'com.android.gallery',
+  'com.android.music',
+  'com.android.email',
+  'com.android.browser',
+  'com.android.calendar',
+  'com.android.clock',
+  'com.android.deskclock',
+  'com.android.documentsui',
+  'com.android.downloads',
+  'com.android.inputmethod.latin',
+  'com.android.keyguard',
+  'com.android.location.fused',
+  'com.android.nfc',
+  'com.android.providers',
+  'com.android.server',
+  'com.android.shell',
+  'com.android.sms',
+  'com.android.soundrecorder',
+  'com.android.vending',
+  'com.android.webview',
+  'com.android.wifi',
+  'com.android.providers.media',
+  'com.android.providers.telephony',
+  'com.android.providers.calendar',
+  'com.android.providers.contacts'
+]
+
+/**
+ * 判断包名是否为系统应用（应被排除在触发名单外）
+ */
+export function isSystemPackage(pkg: string): boolean {
+  if (pkg.length < 1) return true
+  if (pkg == 'android') return true
+  for (let i = 0; i < SYSTEM_PKG_EXACT.length; i++) {
+    if (pkg == SYSTEM_PKG_EXACT[i]) return true
+  }
+  for (let i = 0; i < SYSTEM_PKG_PREFIXES.length; i++) {
+    if (pkg.indexOf(SYSTEM_PKG_PREFIXES[i]) == 0) return true
+  }
+  return false
+}
+
+/**
+ * 判断包名是否为应用自身（避免触发自身的后台服务）
+ */
+export function isSelfPackage(pkg: string, selfPkg: string): boolean {
+  if (selfPkg.length < 1) return false
+  return pkg == selfPkg
+}
+
+/**
+ * 综合过滤判定：系统包 OR 自身
+ * 用户自定义黑名单（app_blacklist 设置项）由各调用方在自身服务内读取，不在此处耦合
+ */
+export function shouldFilterPackage(pkg: string, selfPkg: string): boolean {
+  return isSystemPackage(pkg) || isSelfPackage(pkg, selfPkg)
+}

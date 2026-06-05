@@ -9,12 +9,14 @@ import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.database.sqlite.SQLiteStatement
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -48,6 +50,7 @@ import kotlin.properties.Delegates
 import io.dcloud.uniapp.extapi.`$emit` as uni__emit
 import io.dcloud.uniapp.extapi.`$on` as uni__on
 import android.view.WindowManager.LayoutParams as WindowManagerLayoutParams
+import io.dcloud.uniapp.extapi.arrayBufferToBase64 as uni_arrayBufferToBase64
 import io.dcloud.uniapp.extapi.connectSocket as uni_connectSocket
 import io.dcloud.uniapp.extapi.exit as uni_exit
 import io.dcloud.uniapp.extapi.getFileSystemManager as uni_getFileSystemManager
@@ -138,9 +141,9 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
     )
 }
 fun initRuntimeSocketService(): UTSPromise<Boolean> {
-    val hosts: String = "172.24.25.140,127.0.0.1"
+    val hosts: String = "172.24.90.1,127.0.0.1"
     val port: String = "8090"
-    val id: String = "app-android_Gn-q0K"
+    val id: String = "app-android_L5D_tz"
     if (hosts == "" || port == "" || id == "") {
         return UTSPromise.resolve(false)
     }
@@ -276,6 +279,7 @@ open class EffectiveTriggerRule (
     open var screenConditions: ScreenConditions? = null,
     @JsonNotNull
     open var timeThresholdMinutes: Number,
+    open var categoryFilter: String? = null,
     @JsonNotNull
     open var source: String,
     @JsonNotNull
@@ -295,7 +299,7 @@ class EffectiveTriggerRuleReactiveObject : EffectiveTriggerRule, IUTSReactive<Ef
     override var __v_isReadonly: Boolean
     override var __v_isShallow: Boolean
     override var __v_skip: Boolean
-    constructor(__v_raw: EffectiveTriggerRule, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(id = __v_raw.id, actionId = __v_raw.actionId, timeWindow = __v_raw.timeWindow, screenConditions = __v_raw.screenConditions, timeThresholdMinutes = __v_raw.timeThresholdMinutes, source = __v_raw.source, enabled = __v_raw.enabled, createdAt = __v_raw.createdAt) {
+    constructor(__v_raw: EffectiveTriggerRule, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(id = __v_raw.id, actionId = __v_raw.actionId, timeWindow = __v_raw.timeWindow, screenConditions = __v_raw.screenConditions, timeThresholdMinutes = __v_raw.timeThresholdMinutes, categoryFilter = __v_raw.categoryFilter, source = __v_raw.source, enabled = __v_raw.enabled, createdAt = __v_raw.createdAt) {
         this.__v_raw = __v_raw
         this.__v_isReadonly = __v_isReadonly
         this.__v_isShallow = __v_isShallow
@@ -363,6 +367,18 @@ class EffectiveTriggerRuleReactiveObject : EffectiveTriggerRule, IUTSReactive<Ef
             val oldValue = __v_raw.timeThresholdMinutes
             __v_raw.timeThresholdMinutes = value
             _tRS(__v_raw, "timeThresholdMinutes", oldValue, value)
+        }
+    override var categoryFilter: String?
+        get() {
+            return _tRG(__v_raw, "categoryFilter", __v_raw.categoryFilter, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("categoryFilter")) {
+                return
+            }
+            val oldValue = __v_raw.categoryFilter
+            __v_raw.categoryFilter = value
+            _tRS(__v_raw, "categoryFilter", oldValue, value)
         }
     override var source: String
         get() {
@@ -907,7 +923,7 @@ fun buildPreTriggerPrompt(context: PreTriggerContext): String {
     } else {
         ""
     }
-    ) + "\n请基于以上状态生成：\n" + "1. adhocText：一句 10-30 字的 TTS 即兴文案，温暖+轻度幽默，要提到当前 app 和时长\n" + "2. stateDescription：用 5-15 字概括当前状态（用于\"为什么提醒我\"展示）\n\n" + "严格按 JSON 格式输出：{\"adhocText\": \"...\", \"stateDescription\": \"...\"}"
+    ) + "\n请基于以上状态生成：\n" + "1. adhocText：一句 10-30 字的 TTS 即兴文案\n" + "2. stateDescription：用 5-15 字概括当前状态（用于\"为什么提醒我\"展示）\n\n" + "严格按 JSON 格式输出：{\"adhocText\": \"...\", \"stateDescription\": \"...\"}"
 }
 fun buildPostActionPrompt(context: PostActionContext): String {
     if (context == null) {
@@ -1014,7 +1030,7 @@ fun buildPostActionPrompt(context: PostActionContext): String {
     } else {
         ""
     }
-    ) + "\n请评估：\n" + "1. 用户的健康习惯是否稳定？是否需要调整触发频率或类型？\n" + "2. 是否需要新增/修改/删除某条触发规则？\n\n" + "严格按以下 JSON 格式输出：\n" + "{\"decision\": \"create_rule\" | \"modify_rule\" | \"delete_rule\" | \"no_change\", \"targetRuleId\": 0, \"suggestedRule\": {\"actionId\": \"eye_blink\", \"appPackages\": [\"com.zhihu.android\"], \"timeWindow\": {\"start\": \"22:00\", \"end\": \"07:00\"}, \"timeThresholdMinutes\": 60, \"triggerLevel\": \"gentle\", \"categoryFilter\": null}, \"reasoning\": \"...\", \"confidence\": 0.85, \"alternatives\": []}\n\n" + "如果不调整，输出：\n" + "{\"decision\": \"no_change\", \"targetRuleId\": 0, \"suggestedRule\": null, \"reasoning\": \"当前规则合理，继续观察\", \"confidence\": 0.7, \"alternatives\": []}\n\n" + "说明：\n" + "- decision: no_change（不动）/ create_rule（新增）/ modify_rule（修改 targetRuleId）/ delete_rule（删除 targetRuleId）\n" + "- targetRuleId: 仅 modify/delete 时填对应 rule id\n" + "- suggestedRule.appPackages: 命中的应用包名列表\n" + "- suggestedRule.timeWindow: {start, end} 格式 \"HH:MM\"；不需要时填 null\n" + "- suggestedRule.triggerLevel: gentle（温和）/ strong（强提醒）/ forced（强打断）\n" + "- suggestedRule.categoryFilter: 仅在指定分类触发时填，如 \"social\"；不需要时填 null\n" + "- confidence: 0~1，你对这个建议的把握度\n" + "- alternatives: 备选方案数组（可为空）"
+    ) + "\n请评估：\n" + "1. 用户的健康习惯是否稳定？是否需要调整触发频率或类型？\n" + "2. 是否需要新增/修改/删除某条触发规则？\n\n" + "严格按以下 JSON 格式输出（decision 必须是以下之一：create_rule / modify_rule / delete_rule / no_change）：\n" + "{\"decision\": \"create_rule\", \"targetRuleId\": 0, \"suggestedRule\": {\"actionId\": \"eye_blink\", \"screenConditions\": {\"appPackages\": [\"com.zhihu.android\"], \"includeHome\": false}, \"timeWindow\": {\"start\": \"22:00\", \"end\": \"07:00\"}, \"timeThresholdMinutes\": 60}, \"reasoning\": \"...\", \"confidence\": 0.85, \"alternatives\": []}\n\n" + "如果不调整，输出：\n" + "{\"decision\": \"no_change\", \"targetRuleId\": 0, \"suggestedRule\": null, \"reasoning\": \"当前规则合理，继续观察\", \"confidence\": 0.7, \"alternatives\": []}\n\n" + "说明：\n" + "- decision: no_change（不动）/ create_rule（新增）/ modify_rule（修改 targetRuleId）/ delete_rule（删除 targetRuleId）\n" + "- targetRuleId: 仅 modify/delete 时填对应 rule id\n" + "- suggestedRule.actionId: 动作 ID（必填）\n" + "- suggestedRule.screenConditions.appPackages: 命中的应用包名列表（数组）\n" + "- suggestedRule.screenConditions.includeHome: 是否包含桌面（boolean）\n" + "- suggestedRule.timeWindow: {start, end} 格式 \"HH:MM\"；不需要时填 null\n" + "- suggestedRule.timeThresholdMinutes: 连续前台分钟阈值（数字）\n" + "- confidence: 0~1，你对这个建议的把握度\n" + "- alternatives: 备选方案数组（可为空）"
 }
 val FALLBACK_ADHOC_TEXTS = _uA(
     "该起来动动了——",
@@ -1659,6 +1675,8 @@ fun createTables(): Unit {
     runSql("CREATE INDEX IF NOT EXISTS idx_app_tags_locked ON app_tags(is_user_locked)")
     runSql("CREATE TABLE IF NOT EXISTS effective_rules (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    action_id TEXT NOT NULL,\n    app_packages_json TEXT NOT NULL,\n    time_window_json TEXT,\n    time_threshold_minutes INTEGER NOT NULL,\n    trigger_level TEXT NOT NULL DEFAULT 'gentle',\n    category_filter TEXT,\n    source TEXT NOT NULL DEFAULT 'user',\n    source_history_id INTEGER,\n    expires_at INTEGER,\n    enabled INTEGER NOT NULL DEFAULT 1,\n    priority INTEGER NOT NULL DEFAULT 0,\n    created_at INTEGER NOT NULL,\n    updated_at INTEGER NOT NULL\n  )")
     runSql("CREATE INDEX IF NOT EXISTS idx_effective_rules_enabled ON effective_rules(enabled)")
+    runSql("CREATE TABLE IF NOT EXISTS user_achievements (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    achievement_id TEXT NOT NULL UNIQUE,\n    unlocked_at INTEGER NOT NULL,\n    current_progress REAL NOT NULL DEFAULT 0,\n    created_at INTEGER NOT NULL\n  )")
+    runSql("CREATE INDEX IF NOT EXISTS idx_user_achievements_unlocked ON user_achievements(unlocked_at)")
 }
 fun insertDefaultSettings(): Unit {
     val now = Math.floor(Date.now() / 1000)
@@ -3363,6 +3381,102 @@ fun getActiveRules(): UTSArray<PersistedEffectiveRule> {
     }
     return result
 }
+val SYSTEM_PKG_PREFIXES = _uA(
+    "com.android.",
+    "com.google.android.",
+    "android.",
+    "com.miui.",
+    "com.huawei.",
+    "com.samsung.",
+    "com.oppo.",
+    "com.vivo.",
+    "com.oneplus.",
+    "com.sec.",
+    "com.qualcomm.",
+    "com.qti.",
+    "com.mediatek.",
+    "com.lenovo.",
+    "com.zte.",
+    "com.meizu.",
+    "com.nubia.",
+    "com.letv.",
+    "com.sonymobile.",
+    "com.motorola.",
+    "com.lge."
+) as UTSArray<String>
+val SYSTEM_PKG_EXACT = _uA(
+    "android",
+    "com.android.launcher",
+    "com.android.launcher2",
+    "com.android.launcher3",
+    "com.android.settings",
+    "com.android.systemui",
+    "com.android.dialer",
+    "com.android.phone",
+    "com.android.contacts",
+    "com.android.camera",
+    "com.android.gallery",
+    "com.android.music",
+    "com.android.email",
+    "com.android.browser",
+    "com.android.calendar",
+    "com.android.clock",
+    "com.android.deskclock",
+    "com.android.documentsui",
+    "com.android.downloads",
+    "com.android.inputmethod.latin",
+    "com.android.keyguard",
+    "com.android.location.fused",
+    "com.android.nfc",
+    "com.android.providers",
+    "com.android.server",
+    "com.android.shell",
+    "com.android.sms",
+    "com.android.soundrecorder",
+    "com.android.vending",
+    "com.android.webview",
+    "com.android.wifi",
+    "com.android.providers.media",
+    "com.android.providers.telephony",
+    "com.android.providers.calendar",
+    "com.android.providers.contacts"
+) as UTSArray<String>
+fun isSystemPackage(pkg: String): Boolean {
+    if (pkg.length < 1) {
+        return true
+    }
+    if (pkg == "android") {
+        return true
+    }
+    run {
+        var i: Number = 0
+        while(i < SYSTEM_PKG_EXACT.length){
+            if (pkg == SYSTEM_PKG_EXACT[i]) {
+                return true
+            }
+            i++
+        }
+    }
+    run {
+        var i: Number = 0
+        while(i < SYSTEM_PKG_PREFIXES.length){
+            if (pkg.indexOf(SYSTEM_PKG_PREFIXES[i]) == 0) {
+                return true
+            }
+            i++
+        }
+    }
+    return false
+}
+fun isSelfPackage(pkg: String, selfPkg: String): Boolean {
+    if (selfPkg.length < 1) {
+        return false
+    }
+    return pkg == selfPkg
+}
+fun shouldFilterPackage(pkg: String, selfPkg: String): Boolean {
+    return isSystemPackage(pkg) || isSelfPackage(pkg, selfPkg)
+}
 val DISABLED_ACTIONS_KEY = "disabled_action_ids"
 fun getEnabledActions(): UTSArray<MicroAction> {
     val disabledStr = getSetting(DISABLED_ACTIONS_KEY, "[]")
@@ -3524,7 +3638,7 @@ open class EffectiveRuleMatch (
     open var level: String,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("EffectiveRuleMatch", "services/EffectiveRuleEngine.uts", 7, 13)
+        return UTSSourceMapPosition("EffectiveRuleMatch", "services/EffectiveRuleEngine.uts", 8, 13)
     }
 }
 open class TriggerContext (
@@ -3539,7 +3653,7 @@ open class TriggerContext (
     open var triggerType: String,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("TriggerContext", "services/TriggerEngine.uts", 19, 13)
+        return UTSSourceMapPosition("TriggerContext", "services/TriggerEngine.uts", 20, 13)
     }
 }
 open class TriggerDecision (
@@ -3561,16 +3675,19 @@ open class TriggerDecision (
     open var matchedRuleSource: String,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("TriggerDecision", "services/TriggerEngine.uts", 26, 13)
+        return UTSSourceMapPosition("TriggerDecision", "services/TriggerEngine.uts", 27, 13)
     }
 }
 var currentState: TriggerState__1 = TriggerState__1.IDLE
 var lastTriggerTime: Number = 0
 val COOL_DOWN_MS: Number = 300000
 fun evaluate(ctx: TriggerContext): EffectiveRuleMatch? {
+    if (isSystemPackage(ctx.appPackage)) {
+        return null
+    }
     var candidates: UTSArray<PersistedEffectiveRule> = _uA()
     val all = getActiveRules()
-    console.log("[EffectiveRuleEngine] all rules=" + all.length + " pkg=" + ctx.appPackage + " mins=" + ctx.continuousMinutes, " at services/EffectiveRuleEngine.uts:17")
+    console.log("[EffectiveRuleEngine] all rules=" + all.length + " pkg=" + ctx.appPackage + " mins=" + ctx.continuousMinutes, " at services/EffectiveRuleEngine.uts:22")
     val nowSec = Math.floor(Date.now() / 1000)
     run {
         var i: Number = 0
@@ -3600,7 +3717,7 @@ fun evaluate(ctx: TriggerContext): EffectiveRuleMatch? {
             i++
         }
     }
-    console.log("[EffectiveRuleEngine] candidates=" + candidates.length, " at services/EffectiveRuleEngine.uts:28")
+    console.log("[EffectiveRuleEngine] candidates=" + candidates.length, " at services/EffectiveRuleEngine.uts:33")
     if (candidates.length < 1) {
         return null
     }
@@ -3653,12 +3770,12 @@ fun evaluate(ctx: TriggerContext): EffectiveRuleMatch? {
 }
 fun shouldTrigger(context: TriggerContext): TriggerDecision? {
     if (currentState !== TriggerState__1.IDLE) {
-        console.log("[TriggerEngine] skip: state=" + currentState, " at services/TriggerEngine.uts:50")
+        console.log("[TriggerEngine] skip: state=" + currentState, " at services/TriggerEngine.uts:47")
         return null
     }
     val nowMs = Date.now()
     if (nowMs - lastTriggerTime < COOL_DOWN_MS) {
-        console.log("[TriggerEngine] skip: cooldown remaining=" + (COOL_DOWN_MS - (nowMs - lastTriggerTime)), " at services/TriggerEngine.uts:56")
+        console.log("[TriggerEngine] skip: cooldown remaining=" + (COOL_DOWN_MS - (nowMs - lastTriggerTime)), " at services/TriggerEngine.uts:53")
         return null
     }
     var dndOk = false
@@ -3666,9 +3783,12 @@ fun shouldTrigger(context: TriggerContext): TriggerDecision? {
         dndOk = isInDndPeriod()
     }
      catch (e: Throwable) {
-        console.warn("[TriggerEngine] isInDndPeriod: " + e, " at services/TriggerEngine.uts:61")
+        console.warn("[TriggerEngine] isInDndPeriod: " + e, " at services/TriggerEngine.uts:58")
     }
     if (dndOk) {
+        return null
+    }
+    if (isSystemPackage(context.appPackage)) {
         return null
     }
     var blacklisted = false
@@ -3798,7 +3918,7 @@ fun isInDndPeriod(): Boolean {
 fun isBlacklisted(packageName: String): Boolean {
     val listStr = getSetting("app_blacklist", "[]")
     try {
-        val list = UTSAndroid.consoleDebugError(JSON.parse(listStr), " at services/TriggerEngine.uts:188") as UTSArray<String>
+        val list = UTSAndroid.consoleDebugError(JSON.parse(listStr), " at services/TriggerEngine.uts:182") as UTSArray<String>
         return list.indexOf(packageName) >= 0
     }
      catch (_: Throwable) {
@@ -3867,6 +3987,131 @@ fun shortVibrate(times: Number = 1): Unit {
         return
     }
 }
+open class AudioPlayerCallbacks (
+    open var onCompletion: () -> Unit,
+    open var onError: (error: String) -> Unit,
+    open var onProgress: (currentMs: Number, totalMs: Number) -> Unit,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("AudioPlayerCallbacks", "uni_modules/uts-audio-player/utssdk/app-android/AudioPlayer.uts", 4, 13)
+    }
+}
+var player: NativeAudioPlayer? = null
+fun play(filePath: String, callbacks: AudioPlayerCallbacks): Unit {
+    ensurePlayer()
+    player!!!!.playFile(filePath, callbacks)
+}
+fun ensurePlayer(): Unit {
+    if (player == null) {
+        player = NativeAudioPlayer()
+    }
+}
+open class NativeAudioPlayer : IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("NativeAudioPlayer", "uni_modules/uts-audio-player/utssdk/app-android/AudioPlayer.uts", 44, 7)
+    }
+    private var mp: MediaPlayer? = null
+    private var handler: Handler? = null
+    private var callbacks: AudioPlayerCallbacks? = null
+    open fun playFile(filePath: String, cbs: AudioPlayerCallbacks): Unit {
+        this.stop()
+        this.callbacks = cbs
+        this.mp = MediaPlayer()
+        try {
+            this.mp!!!!.setDataSource(filePath)
+            this.setup()
+            this.mp!!!!.prepare()
+            this.mp!!!!.start()
+            this.startProgress()
+        }
+         catch (e: Throwable) {
+            cbs.onError("playFile failed")
+        }
+    }
+    open fun playUrl(url: String, cbs: AudioPlayerCallbacks): Unit {
+        this.stop()
+        this.callbacks = cbs
+        this.mp = MediaPlayer()
+        try {
+            this.mp!!!!.setDataSource(url)
+            this.setup()
+            this.mp!!!!.prepareAsync()
+            this.mp!!!!.setOnPreparedListener(fun(mp: MediaPlayer): Unit {
+                mp.start()
+            }
+            )
+            this.startProgress()
+        }
+         catch (e: Throwable) {
+            cbs.onError("playUrl failed")
+        }
+    }
+    open fun pause(): Unit {
+        if (this.mp != null && this.mp!!!!.isPlaying()) {
+            this.mp!!!!.pause()
+        }
+    }
+    open fun resume(): Unit {
+        if (this.mp != null && !this.mp!!!!.isPlaying()) {
+            this.mp!!!!.start()
+        }
+    }
+    open fun stop(): Unit {
+        this.stopProgress()
+        if (this.mp != null) {
+            try {
+                this.mp!!!!.stop()
+                this.mp!!!!.release()
+            }
+             catch (_: Throwable) {}
+            this.mp = null
+        }
+        this.callbacks = null
+    }
+    open fun setVolume(vol: Number): Unit {
+        if (this.mp != null) {
+            val v: Float = vol.toFloat()
+            this.mp!!!!.setVolume(v, v)
+        }
+    }
+    open fun isPlaying(): Boolean {
+        return this.mp != null && this.mp!!!!.isPlaying()
+    }
+    private fun setup(): Unit {
+        if (this.mp != null && this.callbacks != null) {
+            val cbs = this.callbacks!!
+            this.mp!!!!.setOnCompletionListener(fun(mp: MediaPlayer): Unit {
+                cbs.onCompletion()
+            }
+            )
+            this.mp!!!!.setOnErrorListener(fun(mp: MediaPlayer, what: Number, extra: Number): Boolean {
+                cbs.onError("error: " + what + "/" + extra)
+                return true
+            }
+            )
+        }
+    }
+    private fun startProgress(): Unit {
+        this.stopProgress()
+        this.handler = Handler(Looper.getMainLooper())
+        val self = this
+        this.handler!!!!.postDelayed(fun(): Unit {
+            val mp = self.mp
+            val cbs = self.callbacks
+            if (mp != null && mp.isPlaying() && cbs != null) {
+                cbs.onProgress(mp.getCurrentPosition(), mp.getDuration())
+                self.startProgress()
+            }
+        }
+        , 100.toLong())
+    }
+    private fun stopProgress(): Unit {
+        if (this.handler != null) {
+            this.handler!!!!.removeCallbacksAndMessages(null)
+            this.handler = null
+        }
+    }
+}
 var ttsInstance: TextToSpeech? = null
 var ttsReady: Boolean = false
 var pendingText: String = ""
@@ -3926,6 +4171,568 @@ fun initTts(): Unit {
     }
      catch (_: Throwable) {}
 }
+open class TtsCache (
+    @JsonNotNull
+    open var text_hash: String,
+    @JsonNotNull
+    open var text_content: String,
+    @JsonNotNull
+    open var file_path: String,
+    @JsonNotNull
+    open var file_size: Number,
+    @JsonNotNull
+    open var source: String,
+    @JsonNotNull
+    open var created_at: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("TtsCache", "models/TtsCache.uts", 1, 13)
+    }
+}
+fun getByHash(hash: String): TtsCache? {
+    val row = dbManager.queryOne("SELECT * FROM tts_cache WHERE text_hash = ?", _uA(
+        hash
+    ))
+    if (row == null) {
+        return null
+    }
+    return mapRow__4(row)
+}
+fun save(textHash: String, textContent: String, filePath: String, fileSize: Number, source: String): Unit {
+    val row = SqlRow(columns = _uA(
+        "text_hash",
+        "text_content",
+        "file_path",
+        "file_size",
+        "source",
+        "created_at"
+    ), values = _uA(
+        textHash,
+        textContent,
+        filePath,
+        fileSize,
+        source,
+        Math.floor(Date.now() / 1000)
+    ))
+    dbManager.insert("tts_cache", row)
+}
+fun mapRow__4(row: Map<String, Any>): TtsCache {
+    return TtsCache(text_hash = getStr(row, "text_hash"), text_content = getStr(row, "text_content"), file_path = getStr(row, "file_path"), file_size = getNum(row, "file_size"), source = getStr(row, "source"), created_at = getNum(row, "created_at"))
+}
+open class LlmCache (
+    @JsonNotNull
+    open var cache_key: String,
+    @JsonNotNull
+    open var cache_type: String,
+    @JsonNotNull
+    open var response: String,
+    @JsonNotNull
+    open var model: String,
+    @JsonNotNull
+    open var created_at: Number,
+    @JsonNotNull
+    open var expires_at: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("LlmCache", "models/LlmCache.uts", 1, 13)
+    }
+}
+fun getByKey(key: String): LlmCache? {
+    val row = dbManager.queryOne("SELECT * FROM llm_cache WHERE cache_key = ?", _uA(
+        key
+    ))
+    if (row == null) {
+        return null
+    }
+    return mapRow__5(row)
+}
+fun save__1(key: String, type: String, response: String, expiresAt: Number): Unit {
+    dbManager.execSql("INSERT OR REPLACE INTO llm_cache (cache_key, cache_type, response, expires_at, created_at) VALUES (?,?,?,?,?)", _uA(
+        key,
+        type,
+        response,
+        expiresAt,
+        Math.floor(Date.now() / 1000)
+    ))
+}
+fun mapRow__5(row: Map<String, Any>): LlmCache {
+    return LlmCache(cache_key = getStr(row, "cache_key"), cache_type = getStr(row, "cache_type"), response = getStr(row, "response"), model = getStr(row, "model"), created_at = getNum(row, "created_at"), expires_at = getNum(row, "expires_at"))
+}
+val MINIMAX_BASE_URL = "https://api.minimax.chat/v1"
+val MINIMAX_CHAT_PATH = "text/chatcompletion_v2"
+val MINIMAX_CHAT_MODEL = "MiniMax-M2.7"
+val MINIMAX_API_KEY = "sk-cp-Dd2_yFv0hINLsc2fnuWrrde0agYZQCzaRzW0DaK64CAl7Y-plAqRd7R2jSxQTSgSEWbl6teJc2oFL90HPMgyqLXel67OJhufLeLeVauln93DyXmA1277iQw"
+val MINIMAX_TTS_URL = "https://api.minimaxi.com/v1/t2a_v2"
+val MINIMAX_TTS_MODEL = "speech-02-hd"
+val MINIMAX_TTS_VOICE_ID = "male-qn-qingse"
+fun callMinimaxChat(systemPrompt: String, userPrompt: String, maxTokens: Number, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
+    if (MINIMAX_API_KEY === "PLACEHOLDER_KEY") {
+        console.warn("[CloudService] MiniMax API key 未配置，走降级路径", " at services/CloudService.uts:23")
+        onFail()
+        return
+    }
+    val reqBody: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("reqBody", "services/CloudService.uts", 19, 11), "model" to MINIMAX_CHAT_MODEL, "messages" to _uA(
+        _uO("role" to "system", "content" to systemPrompt, "name" to "MiniMax AI"),
+        _uO("role" to "user", "content" to userPrompt, "name" to "用户")
+    ), "temperature" to 0.7, "max_completion_tokens" to maxTokens, "reasoning_effort" to "low")
+    try {
+        uni_request<Any>(RequestOptions(url = MINIMAX_BASE_URL + "/" + MINIMAX_CHAT_PATH, method = "POST", header = _uO("Content-Type" to "application/json", "Authorization" to ("Bearer " + MINIMAX_API_KEY)), data = JSON.stringify(reqBody), timeout = 30000, success = fun(res) {
+            try {
+                val data = res.data
+                val statusCode = if ((data != null)) {
+                    (data as UTSJSONObject).get("base_resp")
+                } else {
+                    null
+                }
+                val finishReason = if ((data != null)) {
+                    extractFinishReason(data as UTSJSONObject)
+                } else {
+                    ""
+                }
+                console.log("[CloudService] callMinimaxChat response, finishReason=" + finishReason, " at services/CloudService.uts:54")
+                val content = extractChatContent(if (data != null) {
+                    data
+                } else {
+                    ""
+                }
+                )
+                if (content.length > 0) {
+                    console.log("[CloudService] callMinimaxChat content OK, length=" + content.length, " at services/CloudService.uts:57")
+                    onOK(content)
+                } else {
+                    console.warn("[CloudService] callMinimaxChat empty content, raw data=" + JSON.stringify(data), " at services/CloudService.uts:60")
+                    onFail()
+                }
+            }
+             catch (_: Throwable) {
+                onFail()
+            }
+        }
+        , fail = fun(_err) {
+            console.warn("[CloudService] callMinimaxChat network fail: " + JSON.stringify(_err), " at services/CloudService.uts:68")
+            onFail()
+        }
+        ))
+    }
+     catch (_: Throwable) {
+        onFail()
+    }
+}
+fun callMinimaxTts(text: String, onOK: (audioUrl: String) -> Unit, onFail: (errMsg: String) -> Unit): Unit {
+    if (MINIMAX_API_KEY === "PLACEHOLDER_KEY" || MINIMAX_API_KEY.length < 8) {
+        onFail("MiniMax TTS key 未配置")
+        return
+    }
+    if (text.length < 1) {
+        onFail("TTS text 为空")
+        return
+    }
+    val reqBody: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("reqBody", "services/CloudService.uts", 78, 11), "model" to MINIMAX_TTS_MODEL, "text" to text, "stream" to false, "voice_setting" to _uO("voice_id" to MINIMAX_TTS_VOICE_ID, "speed" to 1, "vol" to 1, "pitch" to 0), "audio_setting" to _uO("sample_rate" to 32000, "bitrate" to 128000, "format" to "mp3", "channel" to 1), "output_format" to "url")
+    try {
+        uni_request<Any>(RequestOptions(url = MINIMAX_TTS_URL, method = "POST", header = _uO("Content-Type" to "application/json", "Authorization" to ("Bearer " + MINIMAX_API_KEY)), data = JSON.stringify(reqBody), timeout = 30000, success = fun(res) {
+            try {
+                val data = res.data
+                if (data == null) {
+                    onFail("TTS 响应为空")
+                    return
+                }
+                val obj = data as UTSJSONObject
+                val baseResp = obj.get("base_resp")
+                if (baseResp != null) {
+                    val brObj = baseResp as UTSJSONObject
+                    val sc = brObj.get("status_code")
+                    if (sc != null && sc != 0) {
+                        val sm = brObj.get("status_msg")
+                        onFail("TTS 返回非 0 状态: " + (if (sm != null) {
+                            ("" + sm)
+                        } else {
+                            ""
+                        }
+                        ))
+                        return
+                    }
+                }
+                val dataField = obj.get("data")
+                if (dataField == null) {
+                    onFail("TTS 响应无 data 字段")
+                    return
+                }
+                val dObj = dataField as UTSJSONObject
+                val audioField = dObj.get("audio")
+                if (audioField == null) {
+                    onFail("TTS 响应无 data.audio 字段")
+                    return
+                }
+                val audioUrl = "" + audioField
+                if (audioUrl.length < 8 || audioUrl.indexOf("http") < 0) {
+                    onFail("TTS 响应 audio 非 url: " + audioUrl.substring(0, 80))
+                    return
+                }
+                console.log("[CloudService] callMinimaxTts OK, textLen=" + text.length + " urlLen=" + audioUrl.length, " at services/CloudService.uts:142")
+                onOK(audioUrl)
+            }
+             catch (e: Throwable) {
+                val msg = if (e != null) {
+                    ("" + e)
+                } else {
+                    "null"
+                }
+                onFail("TTS 响应解析异常: " + msg)
+            }
+        }
+        , fail = fun(_err) {
+            val msg = if (_err != null) {
+                ("" + _err)
+            } else {
+                "null"
+            }
+            console.warn("[CloudService] callMinimaxTts network fail: " + msg, " at services/CloudService.uts:151")
+            onFail("TTS 网络失败: " + msg)
+        }
+        ))
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        onFail("TTS 请求构造异常: " + msg)
+    }
+}
+fun downloadTtsAudio(url: String, cacheKey: String, onOK: (localPath: String) -> Unit, onFail: (errMsg: String) -> Unit): Unit {
+    if (url.length < 8) {
+        onFail("downloadTtsAudio url 为空")
+        return
+    }
+    if (cacheKey.length < 1) {
+        onFail("downloadTtsAudio cacheKey 为空")
+        return
+    }
+    try {
+        uni_request<Any>(RequestOptions(url = url, method = "GET", responseType = "arraybuffer", timeout = 60000, success = fun(res) {
+            try {
+                val ab = res.data as ArrayBuffer
+                if (ab == null) {
+                    onFail("下载响应无 ArrayBuffer")
+                    return
+                }
+                val filePath: String = "_doc/" + cacheKey + ".mp3"
+                val abRef: ArrayBuffer = ab
+                var base64: String = ""
+                try {
+                    base64 = uni_arrayBufferToBase64(abRef)
+                }
+                 catch (e: Throwable) {
+                    val msg = if (e != null) {
+                        ("" + e)
+                    } else {
+                        "null"
+                    }
+                    onFail("TTS ArrayBuffer→base64 失败: " + msg)
+                    return
+                }
+                try {
+                    uni_getFileSystemManager().writeFile(WriteFileOptions(filePath = filePath, data = base64, encoding = "base64", success = fun(_res): Unit {
+                        try {
+                            val fileSize: Number = abRef.byteLength
+                            save(cacheKey, cacheKey, filePath, fileSize, "minimax")
+                            console.log("[CloudService] downloadTtsAudio OK, cacheKey=" + cacheKey + " size=" + fileSize, " at services/CloudService.uts:208")
+                            onOK(filePath)
+                        }
+                         catch (e: Throwable) {
+                            val msg = if (e != null) {
+                                ("" + e)
+                            } else {
+                                "null"
+                            }
+                            onFail("TTS 缓存写库失败: " + msg)
+                        }
+                    }
+                    , fail = fun(err): Unit {
+                        val msg = if (err != null) {
+                            ("" + err)
+                        } else {
+                            "null"
+                        }
+                        console.warn("[CloudService] writeFile fail: " + msg, " at services/CloudService.uts:217")
+                        onFail("TTS 文件写失败: " + msg)
+                    }
+                    ))
+                }
+                 catch (e: Throwable) {
+                    val msg = if (e != null) {
+                        ("" + e)
+                    } else {
+                        "null"
+                    }
+                    onFail("TTS 写文件构造失败: " + msg)
+                }
+            }
+             catch (e: Throwable) {
+                val msg = if (e != null) {
+                    ("" + e)
+                } else {
+                    "null"
+                }
+                onFail("TTS 下载处理异常: " + msg)
+            }
+        }
+        , fail = fun(_err) {
+            val msg = if (_err != null) {
+                ("" + _err)
+            } else {
+                "null"
+            }
+            console.warn("[CloudService] downloadTtsAudio network fail: " + msg, " at services/CloudService.uts:232")
+            onFail("TTS 下载网络失败: " + msg)
+        }
+        ))
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        onFail("TTS 下载请求构造失败: " + msg)
+    }
+}
+fun callDaily(date: String, data: DailyData, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
+    console.log("[CloudService] callDaily start, date=" + date, " at services/CloudService.uts:243")
+    val userPrompt = buildDailySummaryPrompt(data)
+    callMinimaxChat(SYSTEM_PROMPT_DAILY, userPrompt, 1500, fun(raw: String): Unit {
+        if (raw.length > 0) {
+            console.log("[CloudService] callDaily OK, raw.length=" + raw.length, " at services/CloudService.uts:247")
+            onOK(raw)
+            return
+        }
+        console.warn("[CloudService] callDaily empty raw", " at services/CloudService.uts:251")
+        onFail()
+    }
+    , fun(){
+        console.warn("[CloudService] callDaily failed, fallback to local", " at services/CloudService.uts:254")
+        onFail()
+    }
+    )
+}
+fun callWeekly(data: WeeklyReportStats, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
+    console.log("[CloudService] callWeekly start, totalCompleted=" + data.totalCompleted, " at services/CloudService.uts:260")
+    val userPrompt = buildWeeklyReportPrompt(data)
+    callMinimaxChat(SYSTEM_PROMPT_WEEKLY, userPrompt, 2000, fun(raw: String): Unit {
+        if (raw.length > 0) {
+            console.log("[CloudService] callWeekly OK, raw.length=" + raw.length, " at services/CloudService.uts:264")
+            onOK(raw)
+            return
+        }
+        console.warn("[CloudService] callWeekly empty raw", " at services/CloudService.uts:268")
+        onFail()
+    }
+    , fun(){
+        console.warn("[CloudService] callWeekly failed, fallback to local", " at services/CloudService.uts:271")
+        onFail()
+    }
+    )
+}
+fun callLlmEvaluate(stage: String, ctx: UTSUnionTypeObject, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
+    var cacheKey = ""
+    if (stage === "pre") {
+        val pCtx = ctx as PreTriggerContext
+        val cacheCtx = LlmCacheContext(appPackage = pCtx.appPackage, continuousMinutes = pCtx.continuousMinutes)
+        cacheKey = buildLlmCacheKey(stage, cacheCtx)
+    }
+    if (cacheKey.length > 0) {
+        try {
+            val cached = getByKey(cacheKey)
+            if (cached != null && cached.response.length > 0) {
+                val nowSec = Math.floor(Date.now() / 1000)
+                if (cached.expires_at <= 0 || cached.expires_at > nowSec) {
+                    console.log("[CloudService] callLlmEvaluate " + stage + " cache HIT key=" + cacheKey, " at services/CloudService.uts:299")
+                    onOK(cached.response)
+                    return
+                }
+            }
+        }
+         catch (e: Throwable) {
+            console.warn("[CloudService] callLlmEvaluate 读缓存异常: " + (if (e != null) {
+                ("" + e)
+            } else {
+                "null"
+            }
+            ), " at services/CloudService.uts:305")
+        }
+    }
+    var userPrompt = ""
+    try {
+        if (stage === "pre") {
+            val pCtx = ctx as PreTriggerContext
+            userPrompt = buildPreTriggerPrompt(pCtx)
+            console.log("[CloudService] callLlmEvaluate pre userPrompt len=" + userPrompt.length, " at services/CloudService.uts:313")
+        } else {
+            val pCtx = ctx as PostActionContext
+            userPrompt = buildPostActionPrompt(pCtx)
+            console.log("[CloudService] callLlmEvaluate post userPrompt len=" + userPrompt.length, " at services/CloudService.uts:317")
+        }
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[CloudService] callLlmEvaluate prompt 构造失败: " + msg, " at services/CloudService.uts:321")
+        onFail()
+        return
+    }
+    callMinimaxChat(SYSTEM_PROMPT_EVALUATE, userPrompt, 1500, fun(raw: String): Unit {
+        console.log("[CloudService] callLlmEvaluate " + stage + " OK, rawLen=" + raw.length + " preview=" + raw.substring(0, 80), " at services/CloudService.uts:327")
+        if (cacheKey.length > 0 && raw.length > 0) {
+            try {
+                val ttlSec: Number = 86400
+                val expiresAt = Math.floor(Date.now() / 1000) + ttlSec
+                save__1(cacheKey, stage, raw, expiresAt)
+            }
+             catch (e: Throwable) {
+                console.warn("[CloudService] callLlmEvaluate 写缓存异常: " + (if (e != null) {
+                    ("" + e)
+                } else {
+                    "null"
+                }
+                ), " at services/CloudService.uts:334")
+            }
+        }
+        onOK(raw)
+    }
+    , fun(): Unit {
+        console.warn("[CloudService] callLlmEvaluate " + stage + " FAIL", " at services/CloudService.uts:339")
+        onFail()
+    }
+    )
+}
+open class LlmCacheContext (
+    @JsonNotNull
+    open var appPackage: String,
+    @JsonNotNull
+    open var continuousMinutes: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("LlmCacheContext", "services/CloudService.uts", 330, 6)
+    }
+}
+fun buildLlmCacheKey(stage: String, ctx: LlmCacheContext?): String {
+    try {
+        if (ctx == null) {
+            return ""
+        }
+        val pkg = if (ctx.appPackage.length > 0) {
+            ctx.appPackage
+        } else {
+            "unknown"
+        }
+        val dayMs: Number = 86400000
+        val hourBucket = Math.floor((Date.now() % dayMs) / 3600000)
+        val contBucket = Math.floor(ctx.continuousMinutes / 30) * 30
+        return stage + ":" + pkg + ":" + hourBucket + ":" + contBucket
+    }
+     catch (_: Throwable) {
+        return ""
+    }
+}
+fun extractChatContent(data: Any): String {
+    try {
+        val obj = data as UTSJSONObject
+        if (obj == null) {
+            return ""
+        }
+        val baseResp = obj.get("base_resp")
+        if (baseResp != null) {
+            val brObj = baseResp as UTSJSONObject
+            val sc = brObj.get("status_code")
+            if (sc != null && sc != 0) {
+                val sm = brObj.get("status_msg")
+                console.warn("[CloudService] MiniMax 返回非 0 状态: " + (if (sm != null) {
+                    "" + sm
+                } else {
+                    ""
+                }
+                ), " at services/CloudService.uts:374")
+                return ""
+            }
+        }
+        val choicesRaw = obj.get("choices")
+        if (choicesRaw == null) {
+            return ""
+        }
+        val choices = choicesRaw as UTSArray<UTSJSONObject>
+        if (choices.length < 1) {
+            return ""
+        }
+        val first = choices[0]
+        if (first == null) {
+            return ""
+        }
+        val message = first.get("message")
+        if (message == null) {
+            return ""
+        }
+        val msgObj = message as UTSJSONObject
+        val content = msgObj.get("content")
+        if (content != null) {
+            val c = "" + content
+            if (c.length > 0) {
+                return c
+            }
+        }
+        val rc = msgObj.get("reasoning_content")
+        if (rc != null) {
+            val r = "" + rc
+            if (r.length > 0) {
+                return r
+            }
+        }
+    }
+     catch (e: Throwable) {
+        console.warn("[CloudService] extractChatContent exception: " + JSON.stringify(e), " at services/CloudService.uts:398")
+    }
+    return ""
+}
+fun extractFinishReason(data: UTSJSONObject): String {
+    try {
+        val choices = data.get("choices")
+        if (choices == null) {
+            return ""
+        }
+        val arr = choices as UTSArray<UTSJSONObject>
+        if (arr.length < 1) {
+            return ""
+        }
+        val first = arr[0]
+        if (first == null) {
+            return ""
+        }
+        val fr = first.get("finish_reason")
+        if (fr == null) {
+            return ""
+        }
+        return "" + fr
+    }
+     catch (_: Throwable) {
+        return ""
+    }
+}
+fun textHash(text: String): String {
+    var hash: Number = 2166136261
+    run {
+        var i: Number = 0
+        while(i < text.length){
+            val code = text.charCodeAt(i) as Number
+            hash = (hash xor code) * 16777619
+            hash = hash and 0xFFFFFFFF
+            i++
+        }
+    }
+    return (hash ushr 0).toString(16).padStart(8, "0")
+}
 fun speakAdhoc(text: String): Unit {
     if (isSystemMuted()) {
         return
@@ -3933,13 +4740,40 @@ fun speakAdhoc(text: String): Unit {
     if (text.length < 1) {
         return
     }
-    val vol = getAdjustedVolume()
+    val hash: String = textHash(text)
     try {
-        speakSystemTts(text, vol)
+        val cached = getByHash(hash)
+        if (cached != null && cached.file_path.length > 0) {
+            val fp: String = cached.file_path
+            playLocalAudio(fp, fun(): Unit {})
+            return
+        }
     }
      catch (e: Throwable) {
-        console.warn("[TtsService] speakAdhoc plugin 调用失败: " + JSON.stringify(e), " at services/TtsService.uts:23")
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[TtsService] speakAdhoc 查缓存失败: " + msg, " at services/TtsService.uts:36")
     }
+    val textCopy: String = text
+    val hashCopy: String = hash
+    callMinimaxTts(text, fun(url: String): Unit {
+        downloadTtsAudio(url, hashCopy, fun(localPath: String): Unit {
+            playLocalAudio(localPath, fun(): Unit {})
+        }
+        , fun(errMsg: String): Unit {
+            console.warn("[TtsService] speakAdhoc download 失败: " + errMsg, " at services/TtsService.uts:47")
+            fallbackSystemTts(textCopy)
+        }
+        )
+    }
+    , fun(errMsg: String): Unit {
+        console.warn("[TtsService] speakAdhoc tts 失败: " + errMsg, " at services/TtsService.uts:53")
+        fallbackSystemTts(textCopy)
+    }
+    )
 }
 fun speakFixedGuide(text: String): Unit {
     if (isSystemMuted()) {
@@ -3950,7 +4784,145 @@ fun speakFixedGuide(text: String): Unit {
         speakSystemTts(text, vol)
     }
      catch (e: Throwable) {
-        console.warn("[TtsService] speakFixedGuide plugin 调用失败: " + JSON.stringify(e), " at services/TtsService.uts:31")
+        console.warn("[TtsService] speakFixedGuide plugin 调用失败: " + JSON.stringify(e), " at services/TtsService.uts:63")
+    }
+}
+fun preGenerateAll(): Unit {
+    try {
+        val texts: UTSArray<String> = _uA()
+        run {
+            var i: Number = 0
+            while(i < ALL_ACTIONS.length){
+                val a = ALL_ACTIONS[i]
+                if (a != null && a.ttsText.length > 0) {
+                    texts.push(a.ttsText)
+                }
+                i++
+            }
+        }
+        run {
+            var j: Number = 0
+            while(j < FALLBACK_ADHOC_TEXTS.length){
+                val t = FALLBACK_ADHOC_TEXTS[j]
+                if (t != null && t.length > 0) {
+                    texts.push(t)
+                }
+                j++
+            }
+        }
+        if (texts.length < 1) {
+            return
+        }
+        val MAX_CONCURRENT: Number = 3
+        val total: Number = texts.length
+        var running: Number = 0
+        var cursor: Number = 0
+        var doneCount: Number = 0
+        fun tryStart(): Unit {
+            while(running < MAX_CONCURRENT && cursor < texts.length){
+                val idx: Number = cursor
+                cursor++
+                val t: String? = texts[idx]
+                if (t == null) {
+                    continue
+                }
+                val tHash: String = textHash(t)
+                var skip: Boolean = false
+                try {
+                    if (getByHash(tHash) != null) {
+                        skip = true
+                    }
+                }
+                 catch (_: Throwable) {}
+                if (skip) {
+                    doneCount++
+                    continue
+                }
+                running++
+                callMinimaxTts(t, fun(url: String): Unit {
+                    downloadTtsAudio(url, tHash, fun(_local: String): Unit {
+                        running--
+                        doneCount++
+                        console.log("[TtsService] preGenerateAll 进度 " + doneCount + "/" + total, " at services/TtsService.uts:114")
+                        tryStart()
+                    }
+                    , fun(errMsg: String): Unit {
+                        running--
+                        doneCount++
+                        console.warn("[TtsService] preGenerateAll download 失败: " + errMsg, " at services/TtsService.uts:120")
+                        tryStart()
+                    }
+                    )
+                }
+                , fun(errMsg: String): Unit {
+                    running--
+                    doneCount++
+                    console.warn("[TtsService] preGenerateAll tts 失败: " + errMsg, " at services/TtsService.uts:128")
+                    tryStart()
+                }
+                )
+            }
+        }
+        tryStart()
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[TtsService] preGenerateAll 整体异常: " + msg, " at services/TtsService.uts:137")
+    }
+}
+fun prewarmSystemTts(): Unit {
+    try {
+        speakSystemTts("", 0)
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[TtsService] prewarmSystemTts 失败: " + msg, " at services/TtsService.uts:145")
+    }
+}
+fun playLocalAudio(filePath: String, onEnd: () -> Unit): Unit {
+    try {
+        val cbs = AudioPlayerCallbacks(onCompletion = fun(): Unit {
+            onEnd()
+        }
+        , onError = fun(err): Unit {
+            val msg = if (err != null) {
+                ("" + err)
+            } else {
+                "null"
+            }
+            console.warn("[TtsService] playLocalAudio onError: " + msg, " at services/TtsService.uts:155")
+        }
+        , onProgress = fun(_cur, _total): Unit {})
+        play(filePath, cbs)
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[TtsService] playLocalAudio 失败: " + msg, " at services/TtsService.uts:162")
+    }
+}
+fun fallbackSystemTts(text: String): Unit {
+    try {
+        speakSystemTts(text, getAdjustedVolume())
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[TtsService] fallbackSystemTts 失败: " + msg, " at services/TtsService.uts:169")
     }
 }
 fun getAdjustedVolume(): Number {
@@ -4003,6 +4975,16 @@ open class UsageMonitorCallbacks (
         return UTSSourceMapPosition("UsageMonitorCallbacks", "uni_modules/uts-usage-stats/utssdk/app-android/UsageTypes.uts", 12, 13)
     }
 }
+fun insertHeartbeat(status: String): Unit {
+    val row = SqlRow(columns = _uA(
+        "service_status",
+        "timestamp"
+    ), values = _uA(
+        status,
+        Date.now()
+    ))
+    dbManager.insert("heartbeat_logs", row)
+}
 val NOTIFICATION_ID: Int = 2
 val CHANNEL_ID: String = "micro_habit_usage_stats"
 val FOREGROUND_TYPE_SPECIAL_USE: Int = 108
@@ -4044,16 +5026,7 @@ fun startOfTodayMsLong(): Long {
     return d.getTime().toLong()
 }
 fun isInBlacklist(pkg: String, selfPkg: String): Boolean {
-    if (pkg.length < 1) {
-        return true
-    }
-    if (pkg == "android") {
-        return true
-    }
-    if (selfPkg.length > 0 && pkg == selfPkg) {
-        return true
-    }
-    return false
+    return shouldFilterPackage(pkg, selfPkg)
 }
 fun isUsagePermissionGrantedByContext(ctx: Context): Boolean {
     try {
@@ -4073,9 +5046,49 @@ fun makeServiceIntent(ctx: Context): Intent {
     intent.setClassName(ctx, SERVICE_CLASS_NAME)
     return intent
 }
+val PREFS_NAME: String = "micro_habit_prefs"
+val KEY_TRIGGER_ENABLED: String = "trigger_enabled"
+val KEY_POLL_THRESHOLD_MS: String = "poll_threshold_ms"
+fun getPrefs(): SharedPreferences? {
+    try {
+        val ctx = UTSAndroid.getAppContext()
+        if (ctx == null) {
+            return null
+        }
+        return ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+     catch (_: Throwable) {
+        return null
+    }
+}
+fun loadPrefsFromDisk(): Unit {
+    try {
+        val prefs = getPrefs()
+        if (prefs == null) {
+            return
+        }
+        triggerEnabled = prefs.getBoolean(KEY_TRIGGER_ENABLED, false)
+        val defaultThresholdMs: Number = 3600000
+        thresholdMs = prefs.getLong(KEY_POLL_THRESHOLD_MS, defaultThresholdMs.toLong()) as Number
+    }
+     catch (_: Throwable) {}
+}
+fun savePrefsToDisk(triggerEnabledIn: Boolean, thresholdMsIn: Number): Unit {
+    try {
+        val prefs = getPrefs()
+        if (prefs == null) {
+            return
+        }
+        val editor = prefs.edit()
+        editor.putBoolean(KEY_TRIGGER_ENABLED, triggerEnabledIn)
+        editor.putLong(KEY_POLL_THRESHOLD_MS, thresholdMsIn.toLong())
+        editor.apply()
+    }
+     catch (_: Throwable) {}
+}
 open class UsageStatsForegroundService : Service, IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("UsageStatsForegroundService", "uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts", 90, 14)
+        return UTSSourceMapPosition("UsageStatsForegroundService", "uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts", 131, 14)
     }
     private var handler: Handler? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -4090,6 +5103,7 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
         try {
             super.onCreate()
             serviceInstance = this
+            loadPrefsFromDisk()
             this.selfPkgCache = getSelfPackageNameInternal()
             this.todayDate = currentDateString()
             this.tryRefreshUsm()
@@ -4099,16 +5113,26 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             this.startPolling()
         }
          catch (e: Throwable) {
-            console.error("[UsageStats] onCreate THREW: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:123")
+            console.error("[UsageStats] onCreate THREW: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:168")
         }
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (this.started) {
+        if (!this.started) {
+            this.started = true
+            if (this.handler != null) {
+                this.handler!!!!.removeCallbacksAndMessages(null)
+            }
             this.scheduleNextTick()
         }
         return Service.START_STICKY
     }
     override fun onDestroy(): Unit {
+        try {
+            insertHeartbeat("stopped")
+        }
+         catch (e: Throwable) {
+            console.warn("[UsageStats] heartbeat onDestroy write failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:186")
+        }
         this.stopPolling()
         this.releaseWakeLock()
         serviceInstance = null
@@ -4133,7 +5157,7 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             this.doPoll()
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] immediate poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:161")
+            console.warn("[UsageStats] immediate poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:214")
         }
     }
     private fun createChannel(): Unit {
@@ -4163,6 +5187,13 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
         return Notification.Builder(this, CHANNEL_ID).setContentTitle("微习惯健康伴侣").setContentText("正在守护你的健康").setSmallIcon(android.R.drawable.ic_popup_reminder).setOngoing(true).build()
     }
     private fun acquireWakeLock(): Unit {
+        if (this.wakeLock != null) {
+            try {
+                this.wakeLock!!!!.release()
+            }
+             catch (_: Throwable) {}
+            this.wakeLock = null
+        }
         try {
             val pm = this.getSystemService(Context.POWER_SERVICE) as PowerManager
             if (pm == null) {
@@ -4210,10 +5241,16 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             return
         }
         try {
+            insertHeartbeat("alive")
+        }
+         catch (e: Throwable) {
+            console.warn("[UsageStats] heartbeat tick write failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:292")
+        }
+        try {
             this.doPoll()
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:235")
+            console.warn("[UsageStats] poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:297")
         }
         this.acquireWakeLock()
         this.scheduleNextTick()
@@ -4286,7 +5323,7 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             }
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] queryUsageStats 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:295")
+            console.warn("[UsageStats] queryUsageStats 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:357")
         }
         this.checkTimePeriod(nowMs)
         val rolled: Boolean = this.checkDayRollover()
@@ -4312,10 +5349,10 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, todayStart, now)
             val sz: Int = stats.size
             if (sz < 1) {
-                console.log("[UsageStats] reconcile: no system stats", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:320")
+                console.log("[UsageStats] reconcile: no system stats", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:382")
                 return
             }
-            console.log("[UsageStats] reconcile: system has " + sz + " apps, top 3:", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:323")
+            console.log("[UsageStats] reconcile: system has " + sz + " apps, top 3:", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:385")
             var n: Int = 0
             run {
                 var i: Int = 0
@@ -4331,14 +5368,14 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
                         continue
                     }
                     val totalMs: Long = s.getTotalTimeInForeground() as Number as Long
-                    console.log("[UsageStats]   " + pkg + " totalMs=" + totalMs, " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:331")
+                    console.log("[UsageStats]   " + pkg + " totalMs=" + totalMs, " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:393")
                     n++
                     i++
                 }
             }
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] reconcile failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:335")
+            console.warn("[UsageStats] reconcile failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:397")
         }
     }
     private fun tryRefreshUsm(): Unit {
@@ -4403,6 +5440,7 @@ fun startUsageMonitor(cbs: UsageMonitorCallbacks, thresholdMsIn: Number, pollInt
         pollIntervalMs = pollIntervalMsIn
     }
     triggerEnabled = triggerEnabledIn
+    savePrefsToDisk(triggerEnabled, thresholdMs)
     true
     try {
         val ctx = UTSAndroid.getAppContext()
@@ -4412,7 +5450,7 @@ fun startUsageMonitor(cbs: UsageMonitorCallbacks, thresholdMsIn: Number, pollInt
         ctx.startForegroundService(makeServiceIntent(ctx))
     }
      catch (e: Throwable) {
-        console.warn("[UsageStats] startForegroundService 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:407")
+        console.warn("[UsageStats] startForegroundService 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:471")
     }
 }
 fun setTriggerEnabled(enabled: Boolean): Unit {
@@ -4489,11 +5527,7 @@ fun queryUsageStatsOnce(beginMs: Number, endMs: Number): UTSArray<UsageStatEntry
                     i++
                     continue
                 }
-                if (pkg == "android") {
-                    i++
-                    continue
-                }
-                if (selfPkg.length > 0 && pkg == selfPkg) {
+                if (shouldFilterPackage(pkg, selfPkg)) {
                     i++
                     continue
                 }
@@ -4504,7 +5538,7 @@ fun queryUsageStatsOnce(beginMs: Number, endMs: Number): UTSArray<UsageStatEntry
         }
     }
      catch (e: Throwable) {
-        console.warn("[UsageStats] queryUsageStatsOnce 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:487")
+        console.warn("[UsageStats] queryUsageStatsOnce 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:551")
     }
     return result
 }
@@ -4609,6 +5643,14 @@ open class FloatingOverlayManager : IUTSSourceMap {
         if (this.showing) {
             return
         }
+        if (this.rootView != null) {
+            try {
+                this.wm?.removeView(this.rootView!!)
+            }
+             catch (_: Throwable) {}
+            this.rootView = null
+            this.wm = null
+        }
         this.callbacks = callbacks
         this.config = config
         this.totalMs = config.durationMs
@@ -4640,13 +5682,15 @@ open class FloatingOverlayManager : IUTSSourceMap {
         this.showing = false
         this.state = "hidden"
         this.stopCountdown()
-        if (this.rootView != null && this.wm != null) {
+        if (this.rootView != null) {
             try {
-                this.wm!!.removeView(this.rootView!!)
+                this.wm?.removeView(this.rootView!!)
             }
-             catch (_: Throwable) {}
+             catch (e: Throwable) {
+                console.warn("[FloatingOverlay] removeView 失败: " + JSON.stringify(e), " at uni_modules/uts-floating-overlay/utssdk/app-android/FloatingOverlay.uts:137")
+            }
+            this.rootView = null
         }
-        this.rootView = null
         this.wm = null
         this.callbacks = null
         this.config = null
@@ -4904,214 +5948,6 @@ fun takeActionId(): String {
 fun setAdhocForNextPage(text: String): Unit {
     text
 }
-val MINIMAX_BASE_URL = "https://api.minimax.chat/v1"
-val MINIMAX_CHAT_PATH = "text/chatcompletion_v2"
-val MINIMAX_CHAT_MODEL = "MiniMax-M2.7"
-val MINIMAX_API_KEY = "sk-cp-Dd2_yFv0hINLsc2fnuWrrde0agYZQCzaRzW0DaK64CAl7Y-plAqRd7R2jSxQTSgSEWbl6teJc2oFL90HPMgyqLXel67OJhufLeLeVauln93DyXmA1277iQw"
-fun callMinimaxChat(systemPrompt: String, userPrompt: String, maxTokens: Number, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
-    if (MINIMAX_API_KEY === "PLACEHOLDER_KEY") {
-        console.warn("[CloudService] MiniMax API key 未配置，走降级路径", " at services/CloudService.uts:21")
-        onFail()
-        return
-    }
-    val reqBody: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("reqBody", "services/CloudService.uts", 17, 11), "model" to MINIMAX_CHAT_MODEL, "messages" to _uA(
-        _uO("role" to "system", "content" to systemPrompt, "name" to "MiniMax AI"),
-        _uO("role" to "user", "content" to userPrompt, "name" to "用户")
-    ), "temperature" to 0.7, "max_completion_tokens" to maxTokens, "reasoning_effort" to "low")
-    try {
-        uni_request<Any>(RequestOptions(url = MINIMAX_BASE_URL + "/" + MINIMAX_CHAT_PATH, method = "POST", header = _uO("Content-Type" to "application/json", "Authorization" to ("Bearer " + MINIMAX_API_KEY)), data = JSON.stringify(reqBody), timeout = 30000, success = fun(res) {
-            try {
-                val data = res.data
-                val statusCode = if ((data != null)) {
-                    (data as UTSJSONObject).get("base_resp")
-                } else {
-                    null
-                }
-                val finishReason = if ((data != null)) {
-                    extractFinishReason(data as UTSJSONObject)
-                } else {
-                    ""
-                }
-                console.log("[CloudService] callMinimaxChat response, finishReason=" + finishReason, " at services/CloudService.uts:52")
-                val content = extractChatContent(if (data != null) {
-                    data
-                } else {
-                    ""
-                }
-                )
-                if (content.length > 0) {
-                    console.log("[CloudService] callMinimaxChat content OK, length=" + content.length, " at services/CloudService.uts:55")
-                    onOK(content)
-                } else {
-                    console.warn("[CloudService] callMinimaxChat empty content, raw data=" + JSON.stringify(data), " at services/CloudService.uts:58")
-                    onFail()
-                }
-            }
-             catch (_: Throwable) {
-                onFail()
-            }
-        }
-        , fail = fun(_err) {
-            console.warn("[CloudService] callMinimaxChat network fail: " + JSON.stringify(_err), " at services/CloudService.uts:66")
-            onFail()
-        }
-        ))
-    }
-     catch (_: Throwable) {
-        onFail()
-    }
-}
-fun callDaily(date: String, data: DailyData, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
-    console.log("[CloudService] callDaily start, date=" + date, " at services/CloudService.uts:76")
-    val userPrompt = buildDailySummaryPrompt(data)
-    callMinimaxChat(SYSTEM_PROMPT_DAILY, userPrompt, 1500, fun(raw: String): Unit {
-        if (raw.length > 0) {
-            console.log("[CloudService] callDaily OK, raw.length=" + raw.length, " at services/CloudService.uts:80")
-            onOK(raw)
-            return
-        }
-        console.warn("[CloudService] callDaily empty raw", " at services/CloudService.uts:84")
-        onFail()
-    }
-    , fun(){
-        console.warn("[CloudService] callDaily failed, fallback to local", " at services/CloudService.uts:87")
-        onFail()
-    }
-    )
-}
-fun callWeekly(data: WeeklyReportStats, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
-    console.log("[CloudService] callWeekly start, totalCompleted=" + data.totalCompleted, " at services/CloudService.uts:93")
-    val userPrompt = buildWeeklyReportPrompt(data)
-    callMinimaxChat(SYSTEM_PROMPT_WEEKLY, userPrompt, 2000, fun(raw: String): Unit {
-        if (raw.length > 0) {
-            console.log("[CloudService] callWeekly OK, raw.length=" + raw.length, " at services/CloudService.uts:97")
-            onOK(raw)
-            return
-        }
-        console.warn("[CloudService] callWeekly empty raw", " at services/CloudService.uts:101")
-        onFail()
-    }
-    , fun(){
-        console.warn("[CloudService] callWeekly failed, fallback to local", " at services/CloudService.uts:104")
-        onFail()
-    }
-    )
-}
-fun callLlmEvaluate(stage: String, ctx: UTSUnionTypeObject, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
-    var userPrompt = ""
-    try {
-        if (stage === "pre") {
-            val pCtx = ctx as PreTriggerContext
-            userPrompt = buildPreTriggerPrompt(pCtx)
-            console.log("[CloudService] callLlmEvaluate pre userPrompt len=" + userPrompt.length, " at services/CloudService.uts:128")
-        } else {
-            val pCtx = ctx as PostActionContext
-            userPrompt = buildPostActionPrompt(pCtx)
-            console.log("[CloudService] callLlmEvaluate post userPrompt len=" + userPrompt.length, " at services/CloudService.uts:132")
-        }
-    }
-     catch (e: Throwable) {
-        val msg = if (e != null) {
-            ("" + e)
-        } else {
-            "null"
-        }
-        console.warn("[CloudService] callLlmEvaluate prompt 构造失败: " + msg, " at services/CloudService.uts:136")
-        onFail()
-        return
-    }
-    callMinimaxChat(SYSTEM_PROMPT_EVALUATE, userPrompt, 1500, fun(raw: String): Unit {
-        console.log("[CloudService] callLlmEvaluate " + stage + " OK, rawLen=" + raw.length + " preview=" + raw.substring(0, 80), " at services/CloudService.uts:142")
-        onOK(raw)
-    }
-    , fun(): Unit {
-        console.warn("[CloudService] callLlmEvaluate " + stage + " FAIL", " at services/CloudService.uts:145")
-        onFail()
-    }
-    )
-}
-fun extractChatContent(data: Any): String {
-    try {
-        val obj = data as UTSJSONObject
-        if (obj == null) {
-            return ""
-        }
-        val baseResp = obj.get("base_resp")
-        if (baseResp != null) {
-            val brObj = baseResp as UTSJSONObject
-            val sc = brObj.get("status_code")
-            if (sc != null && sc != 0) {
-                val sm = brObj.get("status_msg")
-                console.warn("[CloudService] MiniMax 返回非 0 状态: " + (if (sm != null) {
-                    "" + sm
-                } else {
-                    ""
-                }
-                ), " at services/CloudService.uts:160")
-                return ""
-            }
-        }
-        val choicesRaw = obj.get("choices")
-        if (choicesRaw == null) {
-            return ""
-        }
-        val choices = choicesRaw as UTSArray<UTSJSONObject>
-        if (choices.length < 1) {
-            return ""
-        }
-        val first = choices[0]
-        if (first == null) {
-            return ""
-        }
-        val message = first.get("message")
-        if (message == null) {
-            return ""
-        }
-        val msgObj = message as UTSJSONObject
-        val content = msgObj.get("content")
-        if (content != null) {
-            val c = "" + content
-            if (c.length > 0) {
-                return c
-            }
-        }
-        val rc = msgObj.get("reasoning_content")
-        if (rc != null) {
-            val r = "" + rc
-            if (r.length > 0) {
-                return r
-            }
-        }
-    }
-     catch (e: Throwable) {
-        console.warn("[CloudService] extractChatContent exception: " + JSON.stringify(e), " at services/CloudService.uts:184")
-    }
-    return ""
-}
-fun extractFinishReason(data: UTSJSONObject): String {
-    try {
-        val choices = data.get("choices")
-        if (choices == null) {
-            return ""
-        }
-        val arr = choices as UTSArray<UTSJSONObject>
-        if (arr.length < 1) {
-            return ""
-        }
-        val first = arr[0]
-        if (first == null) {
-            return ""
-        }
-        val fr = first.get("finish_reason")
-        if (fr == null) {
-            return ""
-        }
-        return "" + fr
-    }
-     catch (_: Throwable) {
-        return ""
-    }
-}
 typealias LlmHistoryStage = String
 open class ParsedLlmResult (
     open var adhocText: String? = null,
@@ -5255,6 +6091,11 @@ open class LlmHistoryEntry (
     open var adhocText: String? = null,
     open var suggestedRule: EffectiveTriggerRule? = null,
     open var reasoning: String? = null,
+    open var decision: String? = null,
+    open var targetRuleId: Number? = null,
+    open var userAccepted: Number? = null,
+    @JsonNotNull
+    open var confidence: Number,
     @JsonNotNull
     open var createdAt: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
@@ -5270,7 +6111,7 @@ class LlmHistoryEntryReactiveObject : LlmHistoryEntry, IUTSReactive<LlmHistoryEn
     override var __v_isReadonly: Boolean
     override var __v_isShallow: Boolean
     override var __v_skip: Boolean
-    constructor(__v_raw: LlmHistoryEntry, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(id = __v_raw.id, stage = __v_raw.stage, contextJson = __v_raw.contextJson, aiRawResponse = __v_raw.aiRawResponse, parsedResult = __v_raw.parsedResult, adhocText = __v_raw.adhocText, suggestedRule = __v_raw.suggestedRule, reasoning = __v_raw.reasoning, createdAt = __v_raw.createdAt) {
+    constructor(__v_raw: LlmHistoryEntry, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(id = __v_raw.id, stage = __v_raw.stage, contextJson = __v_raw.contextJson, aiRawResponse = __v_raw.aiRawResponse, parsedResult = __v_raw.parsedResult, adhocText = __v_raw.adhocText, suggestedRule = __v_raw.suggestedRule, reasoning = __v_raw.reasoning, decision = __v_raw.decision, targetRuleId = __v_raw.targetRuleId, userAccepted = __v_raw.userAccepted, confidence = __v_raw.confidence, createdAt = __v_raw.createdAt) {
         this.__v_raw = __v_raw
         this.__v_isReadonly = __v_isReadonly
         this.__v_isShallow = __v_isShallow
@@ -5375,6 +6216,54 @@ class LlmHistoryEntryReactiveObject : LlmHistoryEntry, IUTSReactive<LlmHistoryEn
             __v_raw.reasoning = value
             _tRS(__v_raw, "reasoning", oldValue, value)
         }
+    override var decision: String?
+        get() {
+            return _tRG(__v_raw, "decision", __v_raw.decision, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("decision")) {
+                return
+            }
+            val oldValue = __v_raw.decision
+            __v_raw.decision = value
+            _tRS(__v_raw, "decision", oldValue, value)
+        }
+    override var targetRuleId: Number?
+        get() {
+            return _tRG(__v_raw, "targetRuleId", __v_raw.targetRuleId, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("targetRuleId")) {
+                return
+            }
+            val oldValue = __v_raw.targetRuleId
+            __v_raw.targetRuleId = value
+            _tRS(__v_raw, "targetRuleId", oldValue, value)
+        }
+    override var userAccepted: Number?
+        get() {
+            return _tRG(__v_raw, "userAccepted", __v_raw.userAccepted, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("userAccepted")) {
+                return
+            }
+            val oldValue = __v_raw.userAccepted
+            __v_raw.userAccepted = value
+            _tRS(__v_raw, "userAccepted", oldValue, value)
+        }
+    override var confidence: Number
+        get() {
+            return _tRG(__v_raw, "confidence", __v_raw.confidence, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("confidence")) {
+                return
+            }
+            val oldValue = __v_raw.confidence
+            __v_raw.confidence = value
+            _tRS(__v_raw, "confidence", oldValue, value)
+        }
     override var createdAt: Number
         get() {
             return _tRG(__v_raw, "createdAt", __v_raw.createdAt, __v_isReadonly, __v_isShallow)
@@ -5388,7 +6277,21 @@ class LlmHistoryEntryReactiveObject : LlmHistoryEntry, IUTSReactive<LlmHistoryEn
             _tRS(__v_raw, "createdAt", oldValue, value)
         }
 }
-fun mapRow__4(row: Map<String, Any>): LlmHistoryEntry {
+open class LlmAcceptanceRate (
+    @JsonNotNull
+    open var total: Number,
+    @JsonNotNull
+    open var accepted: Number,
+    @JsonNotNull
+    open var rejected: Number,
+    @JsonNotNull
+    open var pending: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("LlmAcceptanceRate", "database/LlmHistoryDao.uts", 5, 13)
+    }
+}
+fun mapRow__6(row: Map<String, Any>): LlmHistoryEntry {
     val parsedJson = getStr(row, "parsed_result_json")
     var parsed = ParsedLlmResult()
     if (parsedJson != null && parsedJson.length > 0) {
@@ -5415,7 +6318,19 @@ fun mapRow__4(row: Map<String, Any>): LlmHistoryEntry {
             rule = null
         }
     }
-    return LlmHistoryEntry(id = getNum(row, "id"), stage = getStr(row, "stage") as LlmHistoryStage, contextJson = getStr(row, "context_json"), aiRawResponse = getStr(row, "ai_raw_response"), parsedResult = parsed, adhocText = getStrOrNull(row, "adhoc_text"), suggestedRule = rule, reasoning = getStrOrNull(row, "reasoning"), createdAt = getNum(row, "created_at"))
+    val targetRaw = row.get("target_rule_id")
+    val targetRuleId: Number? = if (targetRaw == null) {
+        null
+    } else {
+        getNum(row, "target_rule_id")
+    }
+    val acceptedRaw = row.get("user_accepted")
+    val userAccepted: Number? = if (acceptedRaw == null) {
+        null
+    } else {
+        getNum(row, "user_accepted")
+    }
+    return LlmHistoryEntry(id = getNum(row, "id"), stage = getStr(row, "stage") as LlmHistoryStage, contextJson = getStr(row, "context_json"), aiRawResponse = getStr(row, "ai_raw_response"), parsedResult = parsed, adhocText = getStrOrNull(row, "adhoc_text"), suggestedRule = rule, reasoning = getStrOrNull(row, "reasoning"), decision = getStrOrNull(row, "decision"), targetRuleId = targetRuleId, userAccepted = userAccepted, confidence = getNum(row, "confidence"), createdAt = getNum(row, "created_at"))
 }
 fun mapRows(rows: UTSArray<Map<String, Any>>): UTSArray<LlmHistoryEntry> {
     val result: UTSArray<LlmHistoryEntry> = _uA()
@@ -5428,10 +6343,10 @@ fun mapRows(rows: UTSArray<Map<String, Any>>): UTSArray<LlmHistoryEntry> {
                 continue
             }
             try {
-                result.push(mapRow__4(r))
+                result.push(mapRow__6(r))
             }
              catch (e: Throwable) {
-                console.warn("[LlmHistoryDao] mapRow skip dirty row, err: " + JSON.stringify(e), " at database/LlmHistoryDao.uts:55")
+                console.warn("[LlmHistoryDao] mapRow skip dirty row, err: " + JSON.stringify(e), " at database/LlmHistoryDao.uts:63")
             }
             i++
         }
@@ -5493,12 +6408,34 @@ fun getAllHistory(limit: Number): UTSArray<LlmHistoryEntry> {
     ))
     return mapRows(rows)
 }
+fun getPendingRuleReviews(limit: Number): UTSArray<LlmHistoryEntry> {
+    val rows = dbManager.query("SELECT * FROM llm_history WHERE stage = 'post' AND decision IN ('create_rule','modify_rule','delete_rule') AND user_accepted IS NULL ORDER BY created_at DESC LIMIT ?", _uA(
+        limit
+    ))
+    return mapRows(rows)
+}
 fun existsRejectedByRule(targetRuleId: Number, decision: String): Boolean {
     val row = dbManager.queryOne("SELECT id FROM llm_history WHERE target_rule_id = ? AND decision = ? AND user_accepted = 0 LIMIT 1", _uA(
         targetRuleId,
         decision
     ))
     return row != null
+}
+fun getAcceptanceRate(days: Number): LlmAcceptanceRate {
+    val cutoff = Math.floor(Date.now() / 1000) - days * 86400
+    val totalRow = dbManager.queryOne("SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND decision IS NOT NULL AND decision != 'no_change'", _uA(
+        cutoff
+    ))
+    val acceptedRow = dbManager.queryOne("SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND user_accepted = 1", _uA(
+        cutoff
+    ))
+    val rejectedRow = dbManager.queryOne("SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND user_accepted = 0", _uA(
+        cutoff
+    ))
+    val pendingRow = dbManager.queryOne("SELECT COUNT(*) as cnt FROM llm_history WHERE stage = 'post' AND created_at >= ? AND user_accepted IS NULL AND decision IS NOT NULL AND decision != 'no_change'", _uA(
+        cutoff
+    ))
+    return LlmAcceptanceRate(total = getNum(totalRow, "cnt"), accepted = getNum(acceptedRow, "cnt"), rejected = getNum(rejectedRow, "cnt"), pending = getNum(pendingRow, "cnt"))
 }
 fun hasBeenRejected(targetRuleId: Number, decision: String): Boolean {
     if (targetRuleId < 1) {
@@ -5537,7 +6474,7 @@ open class PreTriggerResult (
     open var fallback: Boolean = false,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("PreTriggerResult", "services/LlmTriggerFlow.uts", 7, 13)
+        return UTSSourceMapPosition("PreTriggerResult", "services/LlmTriggerFlow.uts", 9, 13)
     }
 }
 open class PostActionResult (
@@ -5556,7 +6493,7 @@ open class PostActionResult (
     open var fallback: Boolean = false,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("PostActionResult", "services/LlmTriggerFlow.uts", 12, 13)
+        return UTSSourceMapPosition("PostActionResult", "services/LlmTriggerFlow.uts", 14, 13)
     }
 }
 var preContextCache: PreTriggerContext? = null
@@ -5573,20 +6510,38 @@ fun setPostContext(ctx: PostActionContext): Unit {
 fun clearPostContext(): Unit {
     postContextCache = null
 }
+fun fromEffectiveTriggerRule(rule: EffectiveTriggerRule): PersistedEffectiveRule {
+    var pkgList: UTSArray<String> = _uA()
+    if (rule.screenConditions != null) {
+        pkgList = rule.screenConditions!!.appPackages
+    }
+    val nowSec = Math.floor(Date.now() / 1000)
+    return PersistedEffectiveRule(id = rule.id, actionId = rule.actionId, appPackages = pkgList, timeWindow = rule.timeWindow, timeThresholdMinutes = rule.timeThresholdMinutes, triggerLevel = "gentle", categoryFilter = rule.categoryFilter, source = if (rule.source == "local") {
+        "user"
+    } else {
+        rule.source
+    }
+    , sourceHistoryId = null, expiresAt = null, enabled = rule.enabled, priority = 5, createdAt = if (rule.createdAt > 0) {
+        rule.createdAt
+    } else {
+        nowSec
+    }
+    , updatedAt = nowSec)
+}
 fun evaluatePre(onReady: (result: PreTriggerResult) -> Unit, onFail: () -> Unit): Unit {
-    console.log("[LlmFlow] evaluatePre 开始", " at services/LlmTriggerFlow.uts:55")
+    console.log("[LlmFlow] evaluatePre 开始", " at services/LlmTriggerFlow.uts:83")
     val ctx = preContextCache
     if (ctx == null) {
-        console.warn("[LlmFlow] evaluatePre: preContextCache 为空", " at services/LlmTriggerFlow.uts:58")
+        console.warn("[LlmFlow] evaluatePre: preContextCache 为空", " at services/LlmTriggerFlow.uts:86")
         onFail()
         return
     }
     val contextJson = JSON.stringify(ctx)
-    console.log("[LlmFlow] evaluatePre 上下文长度: " + contextJson.length, " at services/LlmTriggerFlow.uts:63")
+    console.log("[LlmFlow] evaluatePre 上下文长度: " + contextJson.length, " at services/LlmTriggerFlow.uts:91")
     try {
-        console.log("[LlmFlow] evaluatePre 调用 callLlmEvaluate pre", " at services/LlmTriggerFlow.uts:65")
+        console.log("[LlmFlow] evaluatePre 调用 callLlmEvaluate pre", " at services/LlmTriggerFlow.uts:93")
         callLlmEvaluate("pre", ctx, fun(raw: String): Unit {
-            console.log("[LlmFlow] evaluatePre LLM 返回 raw 长度: " + raw.length, " at services/LlmTriggerFlow.uts:70")
+            console.log("[LlmFlow] evaluatePre LLM 返回 raw 长度: " + raw.length, " at services/LlmTriggerFlow.uts:98")
             try {
                 val parsed = parsePreResponse(raw)
                 console.log("[LlmFlow] evaluatePre parsePreResult adhocText=" + (if (parsed.adhocText != null) {
@@ -5594,7 +6549,7 @@ fun evaluatePre(onReady: (result: PreTriggerResult) -> Unit, onFail: () -> Unit)
                 } else {
                     "null"
                 }
-                ), " at services/LlmTriggerFlow.uts:73")
+                ), " at services/LlmTriggerFlow.uts:101")
                 val adhoc = if (parsed.adhocText != null) {
                     parsed.adhocText!!
                 } else {
@@ -5609,13 +6564,13 @@ fun evaluatePre(onReady: (result: PreTriggerResult) -> Unit, onFail: () -> Unit)
                     insertHistory("pre", contextJson, raw, parsed, adhoc, null, stateDesc)
                 }
                  catch (e: Throwable) {
-                    console.warn("[LlmTriggerFlow] 写 pre history 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:79")
+                    console.warn("[LlmTriggerFlow] 写 pre history 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:107")
                 }
                 val result = PreTriggerResult(adhocText = adhoc, stateDescription = stateDesc, fallback = false)
                 onReady(result)
             }
              catch (e: Throwable) {
-                console.warn("[LlmTriggerFlow] pre parse 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:88")
+                console.warn("[LlmTriggerFlow] pre parse 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:116")
                 val fallback: PreTriggerResult = buildFallbackPre()
                 try {
                     insertHistory("pre", contextJson, raw, ParsedLlmResult(), fallback.adhocText, null, fallback.stateDescription)
@@ -5625,7 +6580,7 @@ fun evaluatePre(onReady: (result: PreTriggerResult) -> Unit, onFail: () -> Unit)
             }
         }
         , fun(): Unit {
-            console.warn("[LlmFlow] evaluatePre LLM 请求失败，使用 fallback", " at services/LlmTriggerFlow.uts:97")
+            console.warn("[LlmFlow] evaluatePre LLM 请求失败，使用 fallback", " at services/LlmTriggerFlow.uts:125")
             val fallback: PreTriggerResult = buildFallbackPre()
             try {
                 insertHistory("pre", contextJson, "", ParsedLlmResult(), fallback.adhocText, null, fallback.stateDescription)
@@ -5636,7 +6591,7 @@ fun evaluatePre(onReady: (result: PreTriggerResult) -> Unit, onFail: () -> Unit)
         )
     }
      catch (e: Throwable) {
-        console.warn("[LlmTriggerFlow] pre 异常: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:106")
+        console.warn("[LlmTriggerFlow] pre 异常: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:134")
         onFail()
     }
 }
@@ -5701,13 +6656,38 @@ fun evaluatePost(actionId: String, actionName: String, actionCategory: String, d
                     , null, alternatives)
                 }
                  catch (e: Throwable) {
-                    console.warn("[LlmTriggerFlow] 写 post history 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:183")
+                    console.warn("[LlmTriggerFlow] 写 post history 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:211")
+                }
+                try {
+                    val targetId = if (parsed.targetRuleId != null) {
+                        parsed.targetRuleId!!
+                    } else {
+                        0
+                    }
+                    if (finalDecision == "create_rule" && finalRule != null) {
+                        val persisted = fromEffectiveTriggerRule(finalRule)
+                        persisted.sourceHistoryId = historyId
+                        insertRule(persisted)
+                        console.log("[LlmFlow] create_rule 已落库 actionId=" + finalRule.actionId, " at services/LlmTriggerFlow.uts:220")
+                    } else if (finalDecision == "modify_rule" && finalRule != null && targetId > 0) {
+                        val persisted = fromEffectiveTriggerRule(finalRule)
+                        persisted.id = targetId
+                        persisted.sourceHistoryId = historyId
+                        updateRule(persisted)
+                        console.log("[LlmFlow] modify_rule 已落库 id=" + targetId, " at services/LlmTriggerFlow.uts:226")
+                    } else if (finalDecision == "delete_rule" && targetId > 0) {
+                        deleteRule(targetId)
+                        console.log("[LlmFlow] delete_rule 已落库 id=" + targetId, " at services/LlmTriggerFlow.uts:229")
+                    }
+                }
+                 catch (e: Throwable) {
+                    console.warn("[LlmFlow] apply rule fail: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:232")
                 }
                 val result = PostActionResult(suggestedRule = finalRule, decision = finalDecision, reasoning = reasoning, confidence = confidence, alternatives = alternatives, historyId = historyId, fallback = false)
                 onReady(result)
             }
              catch (e: Throwable) {
-                console.warn("[LlmTriggerFlow] post parse 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:196")
+                console.warn("[LlmTriggerFlow] post parse 失败: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:245")
                 var hid: Number = 0
                 try {
                     hid = insertHistory("post", contextJson, raw, ParsedLlmResult(), null, null, "", 0, null, null, null, null)
@@ -5729,7 +6709,7 @@ fun evaluatePost(actionId: String, actionName: String, actionCategory: String, d
         )
     }
      catch (e: Throwable) {
-        console.warn("[LlmTriggerFlow] post 异常: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:231")
+        console.warn("[LlmTriggerFlow] post 异常: " + JSON.stringify(e), " at services/LlmTriggerFlow.uts:280")
         onFail()
     }
 }
@@ -5778,7 +6758,7 @@ fun parsePostResponse(raw: String): ParsedLlmResult {
     if (altArr != null) {
         try {
             val altStr = JSON.stringify(altArr)
-            val alt = UTSAndroid.consoleDebugError(JSON.parse(altStr), " at services/LlmTriggerFlow.uts:245") as UTSArray<Any>
+            val alt = UTSAndroid.consoleDebugError(JSON.parse(altStr), " at services/LlmTriggerFlow.uts:296") as UTSArray<Any>
             if (alt != null) {
                 result.alternatives = alt
             }
@@ -5826,7 +6806,7 @@ fun normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule? {
         if (appPackagesRaw != null) {
             try {
                 val arrStr = JSON.stringify(appPackagesRaw)
-                val arr = UTSAndroid.consoleDebugError(JSON.parse(arrStr), " at services/LlmTriggerFlow.uts:291") as UTSArray<Any>
+                val arr = UTSAndroid.consoleDebugError(JSON.parse(arrStr), " at services/LlmTriggerFlow.uts:342") as UTSArray<Any>
                 run {
                     var i: Number = 0
                     while(i < arr.length){
@@ -5851,7 +6831,12 @@ fun normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule? {
     if (UTSAndroid.`typeof`(thresholdRaw) === "number") {
         threshold = (thresholdRaw as Number).toInt()
     }
-    val rule = EffectiveTriggerRule(id = 0, actionId = actionIdStr, timeWindow = timeWindow, screenConditions = screenConditions, timeThresholdMinutes = threshold, source = "llm", enabled = true, createdAt = Math.floor(Date.now() / 1000))
+    var categoryFilter: String? = null
+    val cfRaw = raw["categoryFilter"]
+    if (UTSAndroid.`typeof`(cfRaw) === "string" && (cfRaw as String).length > 0) {
+        categoryFilter = cfRaw as String
+    }
+    val rule = EffectiveTriggerRule(id = 0, actionId = actionIdStr, timeWindow = timeWindow, screenConditions = screenConditions, timeThresholdMinutes = threshold, categoryFilter = categoryFilter, source = "llm", enabled = true, createdAt = Math.floor(Date.now() / 1000))
     return rule
 }
 fun parseJsonThreeLevels(raw: String): UTSJSONObject? {
@@ -5873,7 +6858,7 @@ fun parseJsonThreeLevels(raw: String): UTSJSONObject? {
         }
     }
     try {
-        return UTSAndroid.consoleDebugError(JSON.parse(cleaned), " at services/LlmTriggerFlow.uts:339") as UTSJSONObject
+        return UTSAndroid.consoleDebugError(JSON.parse(cleaned), " at services/LlmTriggerFlow.uts:396") as UTSJSONObject
     }
      catch (_: Throwable) {}
     try {
@@ -5881,7 +6866,7 @@ fun parseJsonThreeLevels(raw: String): UTSJSONObject? {
         if (match != null) {
             val m = match[0]
             if (m != null && m.length > 0) {
-                return UTSAndroid.consoleDebugError(JSON.parse(m), " at services/LlmTriggerFlow.uts:347") as UTSJSONObject
+                return UTSAndroid.consoleDebugError(JSON.parse(m), " at services/LlmTriggerFlow.uts:404") as UTSJSONObject
             }
         }
     }
@@ -6318,7 +7303,7 @@ class AppTagReactiveObject : AppTag, IUTSReactive<AppTag> {
             _tRS(__v_raw, "updatedAt", oldValue, value)
         }
 }
-fun mapRow__5(row: Map<String, Any>): AppTag {
+fun mapRow__7(row: Map<String, Any>): AppTag {
     val total = getNum(row, "total_uses")
     return AppTag(packageName = getStr(row, "package_name"), appLabel = getStr(row, "app_label"), category = getStr(row, "category") as AppCategory, tagSource = getStr(row, "tag_source") as TagSource, isUserLocked = getNum(row, "is_user_locked") == 1, isInRule = getNum(row, "is_in_rule") == 1, totalUses = total, lastSeenAt = getNum(row, "last_seen_at"), createdAt = getNum(row, "created_at"), updatedAt = getNum(row, "updated_at"))
 }
@@ -6329,7 +7314,7 @@ fun getByPackage(pkg: String): AppTag? {
     if (row == null) {
         return null
     }
-    return mapRow__5(row)
+    return mapRow__7(row)
 }
 fun listAll(): UTSArray<AppTag> {
     val rows = dbManager.query("SELECT * FROM app_tags ORDER BY last_seen_at DESC")
@@ -6342,7 +7327,7 @@ fun listAll(): UTSArray<AppTag> {
                 i++
                 continue
             }
-            result.push(mapRow__5(r))
+            result.push(mapRow__7(r))
             i++
         }
     }
@@ -6359,7 +7344,7 @@ fun listPendingForLlm(): UTSArray<AppTag> {
                 i++
                 continue
             }
-            result.push(mapRow__5(r))
+            result.push(mapRow__7(r))
             i++
         }
     }
@@ -6500,6 +7485,9 @@ fun isValidCategory(s: String): Boolean {
     return false
 }
 fun ensureCategory(pkg: String, appLabel: String): Unit {
+    if (shouldFilterPackage(pkg, "")) {
+        return
+    }
     try {
         val existing = getByPackage(pkg)
         if (existing != null) {
@@ -6511,7 +7499,7 @@ fun ensureCategory(pkg: String, appLabel: String): Unit {
         upsert(tag)
     }
      catch (e: Throwable) {
-        console.warn("[AppCategoryService] ensureCategory 失败: " + JSON.stringify(e), " at services/AppCategoryService.uts:40")
+        console.warn("[AppCategoryService] ensureCategory 失败: " + JSON.stringify(e), " at services/AppCategoryService.uts:43")
     }
 }
 fun batchClassifyTodayNewApps(onComplete: ((n: Number) -> Unit)? = null): Unit {
@@ -6541,6 +7529,10 @@ fun batchClassifyTodayNewApps(onComplete: ((n: Number) -> Unit)? = null): Unit {
                     var i: Number = 0
                     while(i < obj.length){
                         val item = obj[i]
+                        if (shouldFilterPackage(item.pkg, "")) {
+                            i++
+                            continue
+                        }
                         val tag = getByPackage(item.pkg)
                         if (tag == null) {
                             i++
@@ -6560,14 +7552,14 @@ fun batchClassifyTodayNewApps(onComplete: ((n: Number) -> Unit)? = null): Unit {
                 }
             }
              catch (e: Throwable) {
-                console.warn("[AppCategoryService] batchClassify 解析失败: " + JSON.stringify(e), " at services/AppCategoryService.uts:71")
+                console.warn("[AppCategoryService] batchClassify 解析失败: " + JSON.stringify(e), " at services/AppCategoryService.uts:76")
                 if (onComplete != null) {
                     onComplete(0)
                 }
             }
         }
         , fun(): Unit {
-            console.warn("[AppCategoryService] batchClassify LLM 失败", " at services/AppCategoryService.uts:75")
+            console.warn("[AppCategoryService] batchClassify LLM 失败", " at services/AppCategoryService.uts:80")
             if (onComplete != null) {
                 onComplete(0)
             }
@@ -6575,7 +7567,7 @@ fun batchClassifyTodayNewApps(onComplete: ((n: Number) -> Unit)? = null): Unit {
         )
     }
      catch (e: Throwable) {
-        console.warn("[AppCategoryService] batchClassifyTodayNewApps 异常: " + JSON.stringify(e), " at services/AppCategoryService.uts:79")
+        console.warn("[AppCategoryService] batchClassifyTodayNewApps 异常: " + JSON.stringify(e), " at services/AppCategoryService.uts:84")
         if (onComplete != null) {
             onComplete(0)
         }
@@ -6588,7 +7580,7 @@ open class ClassifyItem (
     open var category: AppCategory,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("ClassifyItem", "services/AppCategoryService.uts", 88, 6)
+        return UTSSourceMapPosition("ClassifyItem", "services/AppCategoryService.uts", 95, 6)
     }
 }
 fun parseClassifyResponse(raw: String, pending: UTSArray<AppTag>): UTSArray<ClassifyItem> {
@@ -6602,7 +7594,7 @@ fun parseClassifyResponse(raw: String, pending: UTSArray<AppTag>): UTSArray<Clas
     text = text.substring(startIdx, endIdx + 1)
     var arr: UTSArray<UTSJSONObject> = _uA()
     try {
-        val parsed = UTSAndroid.consoleDebugError(JSON.parse(text), " at services/AppCategoryService.uts:102") as UTSArray<Any>
+        val parsed = UTSAndroid.consoleDebugError(JSON.parse(text), " at services/AppCategoryService.uts:109") as UTSArray<Any>
         if (parsed != null) {
             run {
                 var i: Number = 0
@@ -6996,7 +7988,7 @@ open class UserAchievementRow (
         return UTSSourceMapPosition("UserAchievementRow", "database/AchievementDao.uts", 3, 13)
     }
 }
-fun mapRow__6(row: Map<String, Any>): UserAchievementRow {
+fun mapRow__8(row: Map<String, Any>): UserAchievementRow {
     return UserAchievementRow(id = getNum(row, "id"), achievementId = getStr(row, "achievement_id"), unlockedAt = getNum(row, "unlocked_at"), currentProgress = getNum(row, "current_progress"), createdAt = getNum(row, "created_at"))
 }
 fun getAllUnlocked(): UTSArray<UserAchievementRow> {
@@ -7012,7 +8004,7 @@ fun getAllUnlocked(): UTSArray<UserAchievementRow> {
                     continue
                 }
                 try {
-                    result.push(mapRow__6(r))
+                    result.push(mapRow__8(r))
                 }
                  catch (e: Throwable) {
                     console.warn("[AchievementDao] mapRow skip dirty row: " + JSON.stringify(e), " at database/AchievementDao.uts:32")
@@ -7319,6 +8311,8 @@ open class GenApp : BaseApp {
             var pendingAdhocText = ""
             var pendingActionId = ""
             var pendingActionIds: Map<String, Boolean> = Map<String, Boolean>()
+            val TRIGGER_COOL_DOWN_MS_PER_PKG: Number = 1800000
+            var lastTriggerPerPkg: Map<String, Number> = Map<String, Number>()
             fun gen_safeNowHour_fn(): Number {
                 try {
                     return currentHour()
@@ -7430,7 +8424,7 @@ open class GenApp : BaseApp {
                             } else {
                                 "null"
                             }
-                            ), " at App.uvue:180")
+                            ), " at App.uvue:182")
                         }
                     }
                 }
@@ -7440,7 +8434,7 @@ open class GenApp : BaseApp {
                     } else {
                         "null"
                     }
-                    ), " at App.uvue:184")
+                    ), " at App.uvue:186")
                 }
             }
             val checkAchievementsAndNotify = ::gen_checkAchievementsAndNotify_fn
@@ -7449,13 +8443,13 @@ open class GenApp : BaseApp {
                     uni__emit("showTriggerRuleDialog", payload)
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] emitShowRuleDialog 失败: " + JSON.stringify(e), " at App.uvue:192")
+                    console.warn("[App.uvue] emitShowRuleDialog 失败: " + JSON.stringify(e), " at App.uvue:194")
                 }
             }
             val emitShowRuleDialog = ::gen_emitShowRuleDialog_fn
             fun gen_onActionResolvedLLM_fn(actionId: String, actionName: String, actionCategory: String, durationMs: Number, appPackage: String): Unit {
                 if (pendingActionIds.has(actionId)) {
-                    console.log("[App.uvue] onActionResolvedLLM skip duplicate: " + actionId, " at App.uvue:199")
+                    console.log("[App.uvue] onActionResolvedLLM skip duplicate: " + actionId, " at App.uvue:201")
                     return
                 }
                 pendingActionIds.set(actionId, true)
@@ -7474,54 +8468,41 @@ open class GenApp : BaseApp {
                 actionCategory
                 val postCtx = buildPostContext(actionName, actionCategory, durationMs, appPackage)
                 setPostContext(postCtx)
-                try {
-                    evaluatePost(actionId, actionName, actionCategory, durationMs, fun(postResult: PostActionResult): Unit {
-                        try {
-                            if (postResult.decision != "no_change" && postResult.suggestedRule != null) {
-                                val askEach = getBool("llm_trigger_ask_each_time", true)
-                                if (askEach) {
-                                    val rule = postResult.suggestedRule!!
-                                    val payload: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("payload", "App.uvue", 229, 21), "rule" to rule, "reasoning" to postResult.reasoning, "confidence" to postResult.confidence, "historyId" to postResult.historyId, "decision" to postResult.decision, "targetRuleId" to postResult.historyId)
-                                    emitShowRuleDialog(payload)
-                                } else {
-                                    try {
-                                        val finalActionId = actionId
-                                        if (finalActionId.length > 0) {
-                                            val nowSec = Math.floor(Date.now() / 1000)
-                                            val rule = postResult.suggestedRule!!
-                                            var pkgList: UTSArray<String> = _uA()
-                                            if (rule.screenConditions != null) {
-                                                pkgList = rule.screenConditions!!.appPackages
-                                            }
-                                            val ruleRow = PersistedEffectiveRule(id = 0, actionId = rule.actionId, appPackages = pkgList, timeWindow = rule.timeWindow, timeThresholdMinutes = rule.timeThresholdMinutes, triggerLevel = "gentle", categoryFilter = null, source = "llm", sourceHistoryId = postResult.historyId, expiresAt = null, enabled = true, priority = 5, createdAt = nowSec, updatedAt = nowSec)
-                                            insertRule(ruleRow)
-                                        }
-                                    }
-                                     catch (e2: Throwable) {
-                                        console.warn("[App.uvue] 静默保存 suggestedRule 失败: " + JSON.stringify(e2), " at App.uvue:267")
-                                    }
-                                }
-                            }
-                        }
-                         catch (e: Throwable) {
-                            console.warn("[App.uvue] post-result 处理异常: " + JSON.stringify(e), " at App.uvue:272")
-                        }
-                        clearPreContext()
-                        clearPostContext()
-                    }
-                    , fun(): Unit {
-                        clearPreContext()
-                        clearPostContext()
-                    }
-                    )
-                }
-                 catch (e: Throwable) {
-                    console.warn("[App.uvue] evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:283")
-                    clearPreContext()
-                    clearPostContext()
-                }
             }
             val onActionResolvedLLM = ::gen_onActionResolvedLLM_fn
+            fun gen_tryShowLlmRuleDialog_fn(postResult: PostActionResult, actionId: String): Unit {
+                try {
+                    if (postResult.decision == "no_change" || postResult.suggestedRule == null) {
+                        return
+                    }
+                    val askEach = getBool("llm_trigger_ask_each_time", true)
+                    if (askEach) {
+                        val rule = postResult.suggestedRule!!
+                        val payload: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("payload", "App.uvue", 230, 13), "rule" to rule, "reasoning" to postResult.reasoning, "confidence" to postResult.confidence, "historyId" to postResult.historyId, "decision" to postResult.decision, "targetRuleId" to postResult.historyId)
+                        emitShowRuleDialog(payload)
+                    } else {
+                        try {
+                            if (actionId.length > 0) {
+                                val nowSec = Math.floor(Date.now() / 1000)
+                                val rule = postResult.suggestedRule!!
+                                var pkgList: UTSArray<String> = _uA()
+                                if (rule.screenConditions != null) {
+                                    pkgList = rule.screenConditions!!.appPackages
+                                }
+                                val ruleRow = PersistedEffectiveRule(id = 0, actionId = rule.actionId, appPackages = pkgList, timeWindow = rule.timeWindow, timeThresholdMinutes = rule.timeThresholdMinutes, triggerLevel = "gentle", categoryFilter = null, source = "llm", sourceHistoryId = postResult.historyId, expiresAt = null, enabled = true, priority = 5, createdAt = nowSec, updatedAt = nowSec)
+                                insertRule(ruleRow)
+                            }
+                        }
+                         catch (e2: Throwable) {
+                            console.warn("[App.uvue] 静默保存 suggestedRule 失败: " + JSON.stringify(e2), " at App.uvue:267")
+                        }
+                    }
+                }
+                 catch (e: Throwable) {
+                    console.warn("[App.uvue] tryShowLlmRuleDialog 异常: " + JSON.stringify(e), " at App.uvue:271")
+                }
+            }
+            val tryShowLlmRuleDialog = ::gen_tryShowLlmRuleDialog_fn
             fun gen_showOverlayWithAdhoc_fn(decision: TriggerDecision, adhocText: String, fallback: Boolean): Unit {
                 triggeredActionId = decision.actionId
                 pendingDecisionActionId = decision.actionId
@@ -7559,11 +8540,7 @@ open class GenApp : BaseApp {
                         checkAchievementsAndNotify()
                     }
                     onActionResolved()
-                    val pkgName = if (decision != null) {
-                        ""
-                    } else {
-                        ""
-                    }
+                    val pkgName = ""
                     onActionResolvedLLM(pendingDecisionActionId, if (action != null) {
                         action.name
                     } else {
@@ -7580,6 +8557,41 @@ open class GenApp : BaseApp {
                         0
                     }
                     , pkgName)
+                    if (getBool("llm_trigger_enabled", true)) {
+                        try {
+                            evaluatePost(pendingDecisionActionId, if (action != null) {
+                                action.name
+                            } else {
+                                ""
+                            }
+                            , if (action != null) {
+                                action.category
+                            } else {
+                                ""
+                            }
+                            , if (action != null) {
+                                action.defaultDurationMs
+                            } else {
+                                0
+                            }
+                            , fun(postResult: PostActionResult): Unit {
+                                try {
+                                    tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
+                                }
+                                 catch (e: Throwable) {
+                                    console.warn("[App.uvue] onSelfReported post-result 异常: " + JSON.stringify(e), " at App.uvue:337")
+                                }
+                            }
+                            , fun(): Unit {
+                                console.warn("[App.uvue] onSelfReported evaluatePost fail", " at App.uvue:341")
+                            }
+                            )
+                        }
+                         catch (e: Throwable) {
+                            console.warn("[App.uvue] onSelfReported evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:345")
+                        }
+                    }
+                    dismissOverlay()
                 }
                 , onBusyRemindLater = fun(): Unit {
                     val action = getActionById(pendingDecisionActionId)
@@ -7598,10 +8610,60 @@ open class GenApp : BaseApp {
                         ""
                     }
                     , 0, "")
+                    if (getBool("llm_trigger_enabled", true)) {
+                        try {
+                            evaluatePost(pendingDecisionActionId, if (action != null) {
+                                action.name
+                            } else {
+                                ""
+                            }
+                            , if (action != null) {
+                                action.category
+                            } else {
+                                ""
+                            }
+                            , 0, fun(postResult: PostActionResult): Unit {
+                                try {
+                                    tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
+                                }
+                                 catch (e: Throwable) {
+                                    console.warn("[App.uvue] onBusyRemindLater post-result 异常: " + JSON.stringify(e), " at App.uvue:380")
+                                }
+                            }
+                            , fun(): Unit {
+                                console.warn("[App.uvue] onBusyRemindLater evaluatePost fail", " at App.uvue:384")
+                            }
+                            )
+                        }
+                         catch (e: Throwable) {
+                            console.warn("[App.uvue] onBusyRemindLater evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:388")
+                        }
+                    }
+                    dismissOverlay()
                 }
                 , onSkipDuringExec = fun(): Unit {
                     onActionResolved()
                     onActionResolvedLLM(pendingDecisionActionId, "", "", 0, "")
+                    if (getBool("llm_trigger_enabled", true)) {
+                        try {
+                            evaluatePost(pendingDecisionActionId, "", "", 0, fun(postResult: PostActionResult): Unit {
+                                try {
+                                    tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
+                                }
+                                 catch (e: Throwable) {
+                                    console.warn("[App.uvue] onSkipDuringExec post-result 异常: " + JSON.stringify(e), " at App.uvue:406")
+                                }
+                            }
+                            , fun(): Unit {
+                                console.warn("[App.uvue] onSkipDuringExec evaluatePost fail", " at App.uvue:410")
+                            }
+                            )
+                        }
+                         catch (e: Throwable) {
+                            console.warn("[App.uvue] onSkipDuringExec evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:414")
+                        }
+                    }
+                    dismissOverlay()
                 }
                 , onCountdownTick = fun(_remaining: Number): Unit {}, onCountdownFinish = fun(): Unit {
                     shortVibrate(2)
@@ -7632,27 +8694,64 @@ open class GenApp : BaseApp {
                         0
                     }
                     , "")
+                    if (getBool("llm_trigger_enabled", true)) {
+                        try {
+                            evaluatePost(pendingDecisionActionId, if (action != null) {
+                                action.name
+                            } else {
+                                ""
+                            }
+                            , if (action != null) {
+                                action.category
+                            } else {
+                                ""
+                            }
+                            , if (action != null) {
+                                action.defaultDurationMs
+                            } else {
+                                0
+                            }
+                            , fun(postResult: PostActionResult): Unit {
+                                try {
+                                    tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
+                                }
+                                 catch (e: Throwable) {
+                                    console.warn("[App.uvue] onCountdownFinish post-result 异常: " + JSON.stringify(e), " at App.uvue:454")
+                                }
+                            }
+                            , fun(): Unit {
+                                console.warn("[App.uvue] onCountdownFinish evaluatePost fail", " at App.uvue:458")
+                            }
+                            )
+                        }
+                         catch (e: Throwable) {
+                            console.warn("[App.uvue] onCountdownFinish evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:462")
+                        }
+                    }
                 }
                 , onPartialCompletion = fun(_completed: Number, _total: Number): Unit {})
                 try {
                     showOverlay(cfg, cbs)
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] showOverlay 失败: " + JSON.stringify(e), " at App.uvue:397")
+                    console.warn("[App.uvue] showOverlay 失败: " + JSON.stringify(e), " at App.uvue:471")
                 }
                 try {
                     if (getBool("tts_enabled", true)) {
-                        speakAdhoc(decision.actionName)
+                        val actionNameStr = decision.actionName ?: ""
+                        val merged = actionNameStr + (if (adhocText.length > 0) {
+                            ("，" + adhocText)
+                        } else {
+                            ""
+                        }
+                        )
+                        if (merged.length > 0) {
+                            speakAdhoc(merged)
+                        }
                     }
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] 播 TTS 开场白失败: " + JSON.stringify(e), " at App.uvue:405")
-                }
-                if (!fallback && adhocText.length > 0) {
-                    try {
-                        speakAdhoc(adhocText)
-                    }
-                     catch (_: Throwable) {}
+                    console.warn("[App.uvue] 播 TTS 开场白失败: " + JSON.stringify(e), " at App.uvue:482")
                 }
             }
             val showOverlayWithAdhoc = ::gen_showOverlayWithAdhoc_fn
@@ -7682,69 +8781,31 @@ open class GenApp : BaseApp {
                             onActionResolvedLLM(actionId, actionName, actionCategory, durationMs, appPackage)
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] llmActionCompleted 处理异常: " + JSON.stringify(e), " at App.uvue:427")
-                        }
-                    }
-                    )
-                    uni__on("acceptLlmRule", fun(data: Any): Unit {
-                        try {
-                            if (data == null) {
-                                return
-                            }
-                            val obj = data as UTSJSONObject
-                            if (obj == null) {
-                                return
-                            }
-                            val historyId = obj["historyId"] as Number
-                            if (historyId > 0) {
-                                markAccepted(historyId)
-                            }
-                        }
-                         catch (e: Throwable) {
-                            console.warn("[App.uvue] acceptLlmRule 异常: " + JSON.stringify(e), " at App.uvue:438")
-                        }
-                    }
-                    )
-                    uni__on("rejectLlmRule", fun(data: Any): Unit {
-                        try {
-                            if (data == null) {
-                                return
-                            }
-                            val obj = data as UTSJSONObject
-                            if (obj == null) {
-                                return
-                            }
-                            val historyId = obj["historyId"] as Number
-                            if (historyId > 0) {
-                                markRejected(historyId)
-                            }
-                        }
-                         catch (e: Throwable) {
-                            console.warn("[App.uvue] rejectLlmRule 异常: " + JSON.stringify(e), " at App.uvue:449")
+                            console.warn("[App.uvue] llmActionCompleted 处理异常: " + JSON.stringify(e), " at App.uvue:501")
                         }
                     }
                     )
                     uni__on("manualTriggerCheck", fun(_data: Any): Unit {
                         try {
-                            console.log("[manualTrigger] 开始检查", " at App.uvue:454")
+                            console.log("[manualTrigger] 开始检查", " at App.uvue:506")
                             val triggerVal = getBool("trigger_enabled", true)
-                            console.log("[manualTrigger] trigger_enabled=" + triggerVal, " at App.uvue:456")
+                            console.log("[manualTrigger] trigger_enabled=" + triggerVal, " at App.uvue:508")
                             if (!triggerVal) {
-                                console.log("[manualTrigger] 触发已关闭", " at App.uvue:458")
+                                console.log("[manualTrigger] 触发已关闭", " at App.uvue:510")
                                 uni_showToast(ShowToastOptions(title = "触发已关闭", icon = "none", position = "bottom"))
                                 return
                             }
                             if (!isUsagePermissionGranted()) {
-                                console.log("[manualTrigger] 缺少使用情况权限", " at App.uvue:463")
+                                console.log("[manualTrigger] 缺少使用情况权限", " at App.uvue:515")
                                 uni_showToast(ShowToastOptions(title = "缺少使用情况权限", icon = "none", position = "bottom"))
                                 return
                             }
                             val thresholdMs = getInt("app_duration_threshold", 60) * 60000
-                            console.log("[manualTrigger] 阈值(ms): " + thresholdMs, " at App.uvue:468")
+                            console.log("[manualTrigger] 阈值(ms): " + thresholdMs, " at App.uvue:520")
                             val nowMs = Date.now()
                             val startMs = nowMs - 86400000
                             val stats = queryUsageStatsOnce(startMs, nowMs)
-                            console.log("[manualTrigger] queryUsageStatsOnce 返回 " + stats.length + " 条", " at App.uvue:472")
+                            console.log("[manualTrigger] queryUsageStatsOnce 返回 " + stats.length + " 条", " at App.uvue:524")
                             var triggered = false
                             run {
                                 var i: Number = 0
@@ -7759,10 +8820,10 @@ open class GenApp : BaseApp {
                                         i++
                                         continue
                                     }
-                                    console.log("[manualTrigger] 超阈值 App: " + s.packageName + " totalMs=" + totalMs, " at App.uvue:479")
+                                    console.log("[manualTrigger] 超阈值 App: " + s.packageName + " totalMs=" + totalMs, " at App.uvue:531")
                                     val ctx = TriggerContext(appPackage = s.packageName, appLabel = s.packageName, continuousMinutes = Math.floor(totalMs / 60000), triggerType = "app_duration")
                                     forceIdle()
-                                    console.log("[manualTrigger] forceIdle done, calling shouldTrigger", " at App.uvue:487")
+                                    console.log("[manualTrigger] forceIdle done, calling shouldTrigger", " at App.uvue:539")
                                     var decision: TriggerDecision? = null
                                     try {
                                         decision = shouldTrigger(ctx)
@@ -7773,34 +8834,34 @@ open class GenApp : BaseApp {
                                         } else {
                                             "null"
                                         }
-                                        console.warn("[manualTrigger] shouldTrigger THREW: " + errMsg, " at App.uvue:493")
+                                        console.warn("[manualTrigger] shouldTrigger THREW: " + errMsg, " at App.uvue:545")
                                         i++
                                         continue
                                     }
                                     if (decision == null) {
-                                        console.log("[manualTrigger] shouldTrigger 返回 null, 跳过: " + s.packageName, " at App.uvue:497")
+                                        console.log("[manualTrigger] shouldTrigger 返回 null, 跳过: " + s.packageName, " at App.uvue:549")
                                         i++
                                         continue
                                     }
-                                    console.log("[manualTrigger] shouldTrigger 命中 actionId=" + decision.actionId + " level=" + decision.triggerLevel, " at App.uvue:500")
+                                    console.log("[manualTrigger] shouldTrigger 命中 actionId=" + decision.actionId + " level=" + decision.triggerLevel, " at App.uvue:552")
                                     val info = AppForegroundInfo(packageName = s.packageName, startTime = nowMs, continuousMs = totalMs)
                                     val llmEnabled = getBool("llm_trigger_enabled", true)
                                     if (!llmEnabled) {
-                                        console.log("[manualTrigger] LLM 关闭，跳转健康卡片页", " at App.uvue:508")
+                                        console.log("[manualTrigger] LLM 关闭，跳转健康卡片页", " at App.uvue:560")
                                         setActionIdForNextPage(decision.actionId)
                                         setAdhocForNextPage(decision.ttsText)
                                         uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
                                     } else {
-                                        console.log("[manualTrigger] LLM 开启，走 evaluatePre + 跳转健康卡片页", " at App.uvue:513")
+                                        console.log("[manualTrigger] LLM 开启，走 evaluatePre + 跳转健康卡片页", " at App.uvue:565")
                                         var preCtx: PreTriggerContext? = null
                                         try {
                                             preCtx = buildPreContext(info, decision)
                                         }
                                          catch (e3: Throwable) {
-                                            console.warn("[manualTrigger] buildPreContext 异常: " + ("" + e3), " at App.uvue:516")
+                                            console.warn("[manualTrigger] buildPreContext 异常: " + ("" + e3), " at App.uvue:568")
                                         }
                                         if (preCtx == null) {
-                                            console.warn("[manualTrigger] buildPreContext 返回 null，降级跳转", " at App.uvue:519")
+                                            console.warn("[manualTrigger] buildPreContext 返回 null，降级跳转", " at App.uvue:571")
                                             setActionIdForNextPage(decision.actionId)
                                             setAdhocForNextPage(getFallbackAdhoc())
                                             uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
@@ -7811,18 +8872,18 @@ open class GenApp : BaseApp {
                                             setPreContext(preCtx)
                                         }
                                          catch (e4: Throwable) {
-                                            console.warn("[manualTrigger] setPreContext 异常: " + ("" + e4), " at App.uvue:527")
+                                            console.warn("[manualTrigger] setPreContext 异常: " + ("" + e4), " at App.uvue:579")
                                         }
                                         try {
                                             evaluatePre(fun(preResult: PreTriggerResult): Unit {
-                                                console.log("[manualTrigger] evaluatePre 成功 adhocText=" + preResult.adhocText, " at App.uvue:532")
+                                                console.log("[manualTrigger] evaluatePre 成功 adhocText=" + preResult.adhocText, " at App.uvue:584")
                                                 setActionIdForNextPage(decision.actionId)
                                                 setAdhocForNextPage(preResult.adhocText)
                                                 uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
                                                 clearPreContext()
                                             }
                                             , fun(): Unit {
-                                                console.log("[manualTrigger] evaluatePre 失败，降级跳转", " at App.uvue:539")
+                                                console.log("[manualTrigger] evaluatePre 失败，降级跳转", " at App.uvue:591")
                                                 setActionIdForNextPage(decision.actionId)
                                                 setAdhocForNextPage(getFallbackAdhoc())
                                                 uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
@@ -7831,7 +8892,7 @@ open class GenApp : BaseApp {
                                             )
                                         }
                                          catch (e: Throwable) {
-                                            console.warn("[manualTrigger] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:547")
+                                            console.warn("[manualTrigger] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:599")
                                             setActionIdForNextPage(decision.actionId)
                                             setAdhocForNextPage(getFallbackAdhoc())
                                             uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
@@ -7844,7 +8905,7 @@ open class GenApp : BaseApp {
                                 }
                             }
                             if (!triggered) {
-                                console.log("[manualTrigger] 无 App 超过阈值", " at App.uvue:558")
+                                console.log("[manualTrigger] 无 App 超过阈值", " at App.uvue:610")
                                 uni_showToast(ShowToastOptions(title = "当前无 App 超过阈值，无需触发", icon = "none", position = "bottom"))
                             }
                         }
@@ -7854,30 +8915,77 @@ open class GenApp : BaseApp {
                             } else {
                                 "null"
                             }
-                            console.warn("[manualTrigger] 异常: " + errMsg, " at App.uvue:563")
+                            console.warn("[manualTrigger] 异常: " + errMsg, " at App.uvue:615")
                             uni_showToast(ShowToastOptions(title = "检查失败", icon = "none", position = "bottom"))
                         }
                     }
                     )
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] \$on 异常: " + JSON.stringify(e), " at App.uvue:568")
+                    console.warn("[App.uvue] \$on 异常: " + JSON.stringify(e), " at App.uvue:620")
                 }
                 try {
-                    sqliteStore.openDatabase("micro_habit_v2.db", getDbVersion(), fun(): Unit {
-                        return onCreate()
-                    }
-                    , fun(oldV: Number, newV: Number): Unit {
-                        try {
-                            onUpgrade(oldV, newV)
+                    try {
+                        sqliteStore.openDatabase("micro_habit_v2.db", getDbVersion(), fun(): Unit {
+                            return onCreate()
                         }
-                         catch (e: Throwable) {
-                            console.warn("[App.uvue] onUpgrade 异常: " + JSON.stringify(e), " at App.uvue:572")
+                        , fun(oldV: Number, newV: Number): Unit {
+                            try {
+                                onUpgrade(oldV, newV)
+                            }
+                             catch (e: Throwable) {
+                                console.warn("[App.uvue] onUpgrade 异常: " + JSON.stringify(e), " at App.uvue:625")
+                            }
                         }
+                        )
                     }
-                    )
+                     catch (e: Throwable) {
+                        console.error("[App.uvue] sqliteStore.openDatabase 失败: " + JSON.stringify(e), " at App.uvue:628")
+                    }
+                    try {
+                        setTimeout(fun(): Unit {
+                            try {
+                                preGenerateAll()
+                            }
+                             catch (e: Throwable) {
+                                val msg = if (e != null) {
+                                    ("" + e)
+                                } else {
+                                    "null"
+                                }
+                                console.warn("[App.uvue] preGenerateAll 启动失败: " + msg, " at App.uvue:637")
+                            }
+                        }
+                        , 3000)
+                    }
+                     catch (e: Throwable) {
+                        val msg = if (e != null) {
+                            ("" + e)
+                        } else {
+                            "null"
+                        }
+                        console.warn("[App.uvue] preGenerateAll setTimeout 失败: " + msg, " at App.uvue:642")
+                    }
+                    try {
+                        prewarmSystemTts()
+                    }
+                     catch (e: Throwable) {
+                        val msg = if (e != null) {
+                            ("" + e)
+                        } else {
+                            "null"
+                        }
+                        console.warn("[App.uvue] prewarmSystemTts 失败: " + msg, " at App.uvue:646")
+                    }
                     val callbacks = UsageMonitorCallbacks(onAppDurationTrigger = fun(info: AppForegroundInfo): Unit {
                         try {
+                            val nowTs = Date.now()
+                            val lastTs = lastTriggerPerPkg.get(info.packageName) ?: 0
+                            if (nowTs - lastTs < TRIGGER_COOL_DOWN_MS_PER_PKG) {
+                                console.log("[App.uvue] 跳过同包重复触发: " + info.packageName, " at App.uvue:655")
+                                return
+                            }
+                            lastTriggerPerPkg.set(info.packageName, nowTs)
                             try {
                                 ensureCategory(info.packageName, info.packageName)
                             }
@@ -7888,7 +8996,7 @@ open class GenApp : BaseApp {
                                 decision = shouldTrigger(ctx)
                             }
                              catch (e: Throwable) {
-                                console.warn("[App.uvue] shouldTrigger 失败: " + JSON.stringify(e), " at App.uvue:590")
+                                console.warn("[App.uvue] shouldTrigger 失败: " + JSON.stringify(e), " at App.uvue:672")
                             }
                             if (decision == null) {
                                 return
@@ -7906,7 +9014,7 @@ open class GenApp : BaseApp {
                                         showOverlayWithAdhoc(decision, preResult.adhocText, preResult.fallback)
                                     }
                                      catch (e: Throwable) {
-                                        console.warn("[App.uvue] onReady 处理失败: " + JSON.stringify(e), " at App.uvue:608")
+                                        console.warn("[App.uvue] onReady 处理失败: " + JSON.stringify(e), " at App.uvue:690")
                                     }
                                 }
                                 , fun(): Unit {
@@ -7914,20 +9022,20 @@ open class GenApp : BaseApp {
                                         showOverlayWithAdhoc(decision, getFallbackAdhoc(), true)
                                     }
                                      catch (e: Throwable) {
-                                        console.warn("[App.uvue] onFail 降级失败: " + JSON.stringify(e), " at App.uvue:615")
+                                        console.warn("[App.uvue] onFail 降级失败: " + JSON.stringify(e), " at App.uvue:697")
                                     }
                                     clearPreContext()
                                 }
                                 )
                             }
                              catch (e: Throwable) {
-                                console.warn("[App.uvue] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:621")
+                                console.warn("[App.uvue] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:703")
                                 showOverlayWithAdhoc(decision, getFallbackAdhoc(), true)
                                 clearPreContext()
                             }
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onAppDurationTrigger 异常: " + JSON.stringify(e), " at App.uvue:626")
+                            console.warn("[App.uvue] onAppDurationTrigger 异常: " + JSON.stringify(e), " at App.uvue:708")
                         }
                     }
                     , onAppSwitch = fun(from: String, to: String): Unit {
@@ -7941,7 +9049,7 @@ open class GenApp : BaseApp {
                             setSnapshotTotal(pkg, pkg, sec)
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onUsageTick 写快照失败: " + JSON.stringify(e), " at App.uvue:637")
+                            console.warn("[App.uvue] onUsageTick 写快照失败: " + JSON.stringify(e), " at App.uvue:719")
                         }
                     }
                     , onTimePeriodTrigger = fun(_name: String): Unit {}, onDayRollover = fun(_old: String, _new: String): Unit {
@@ -7951,21 +9059,25 @@ open class GenApp : BaseApp {
                          catch (_: Throwable) {}
                     }
                     , onPermissionMissing = fun(): Unit {
-                        console.warn("[App.uvue] PACKAGE_USAGE_STATS 权限缺失或被关闭", " at App.uvue:645")
+                        console.warn("[App.uvue] PACKAGE_USAGE_STATS 权限缺失或被关闭", " at App.uvue:727")
                     }
                     )
                     if (isUsagePermissionGranted()) {
                         val thresholdMs = getInt("app_duration_threshold", 60) * 60000
                         val triggerEnabled = getBool("trigger_enabled", true)
-                        startUsageMonitor(callbacks, thresholdMs, 300000, triggerEnabled)
+                        try {
+                            startUsageMonitor(callbacks, thresholdMs, 300000, triggerEnabled)
+                        } catch (e: Throwable) {
+                            console.error("[App.uvue] startUsageMonitor 失败: " + JSON.stringify(e), " at App.uvue:737")
+                        }
                     } else {
-                        console.warn("[App.uvue] 启动时未授予使用情况权限，需在引导页授权", " at App.uvue:654")
+                        console.warn("[App.uvue] 启动时未授予使用情况权限，需在引导页授权", " at App.uvue:740")
                     }
                 }
                  catch (e: Throwable) {
-                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:657")
+                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:743")
                 }
-                console.log("App Launch", " at App.uvue:659")
+                console.log("App Launch", " at App.uvue:745")
             }
             )
             onAppShow(fun(_options){
@@ -7989,11 +9101,11 @@ open class GenApp : BaseApp {
                     setTriggerEnabled(triggerOn)
                 }
                  catch (_: Throwable) {}
-                console.log("App Show", " at App.uvue:675")
+                console.log("App Show", " at App.uvue:761")
             }
             )
             onAppHide(fun(){
-                console.log("App Hide", " at App.uvue:679")
+                console.log("App Hide", " at App.uvue:765")
             }
             )
             onLastPageBackPress(fun(){
@@ -8018,7 +9130,7 @@ open class GenApp : BaseApp {
                     sqliteStore.close()
                 }
                  catch (_: Throwable) {}
-                console.log("App Exit", " at App.uvue:698")
+                console.log("App Exit", " at App.uvue:784")
             }
             )
             return fun(): Any? {
@@ -8673,45 +9785,6 @@ fun getPreferredTypes(hour: Number): UTSArray<String> {
         "呼吸"
     )
 }
-open class LlmCache (
-    @JsonNotNull
-    open var cache_key: String,
-    @JsonNotNull
-    open var cache_type: String,
-    @JsonNotNull
-    open var response: String,
-    @JsonNotNull
-    open var model: String,
-    @JsonNotNull
-    open var created_at: Number,
-    @JsonNotNull
-    open var expires_at: Number,
-) : UTSObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LlmCache", "models/LlmCache.uts", 1, 13)
-    }
-}
-fun getByKey(key: String): LlmCache? {
-    val row = dbManager.queryOne("SELECT * FROM llm_cache WHERE cache_key = ?", _uA(
-        key
-    ))
-    if (row == null) {
-        return null
-    }
-    return mapRow__7(row)
-}
-fun save(key: String, type: String, response: String, expiresAt: Number): Unit {
-    dbManager.execSql("INSERT OR REPLACE INTO llm_cache (cache_key, cache_type, response, expires_at, created_at) VALUES (?,?,?,?,?)", _uA(
-        key,
-        type,
-        response,
-        expiresAt,
-        Math.floor(Date.now() / 1000)
-    ))
-}
-fun mapRow__7(row: Map<String, Any>): LlmCache {
-    return LlmCache(cache_key = getStr(row, "cache_key"), cache_type = getStr(row, "cache_type"), response = getStr(row, "response"), model = getStr(row, "model"), created_at = getNum(row, "created_at"), expires_at = getNum(row, "expires_at"))
-}
 fun isNetworkAvailable(): Boolean {
     return true
 }
@@ -9005,7 +10078,7 @@ fun useAppStore(): AppStore {
             } else {
                 dailySummaryLoading.value = true
                 generateDailySummary(date, fun(summary: DailyOutput){
-                    save(todayKey, "daily_summary", JSON.stringify(summary), nowMs + 604800000)
+                    save__1(todayKey, "daily_summary", JSON.stringify(summary), nowMs + 604800000)
                     dailySummary.value = summary
                     dailySummaryLoading.value = false
                 }
@@ -9016,7 +10089,7 @@ fun useAppStore(): AppStore {
             if (getByKey(yesterdayKey) == null) {
                 val ydata = getHomepageData(yDate)
                 val fallback = DailyOutput(bodyText = "昨日完成" + ydata.todayCompletedCount + "次微动作，累计" + ydata.guardCount + "次。\n\n今天继续加油！")
-                save(yesterdayKey, "daily_summary", JSON.stringify(fallback), nowMs + 2592000000)
+                save__1(yesterdayKey, "daily_summary", JSON.stringify(fallback), nowMs + 2592000000)
             }
         }
          catch (_: Throwable) {}
@@ -9299,7 +10372,7 @@ open class DbTableInfo (
     open var count: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 172, 6)
+        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 178, 6)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return DbTableInfoReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -9351,7 +10424,7 @@ open class ConfigItem (
     open var value: String,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 176, 6)
+        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 182, 6)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return ConfigItemReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -9406,6 +10479,133 @@ val GenPagesDebugLogsClass = CreateVueComponent(GenPagesDebugLogs::class.java, f
     return GenPagesDebugLogs(instance, renderer)
 }
 )
+val GenComponentsLlmRuleReviewDialogClass = CreateVueComponent(GenComponentsLlmRuleReviewDialog::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsLlmRuleReviewDialog.inheritAttrs, inject = GenComponentsLlmRuleReviewDialog.inject, props = GenComponentsLlmRuleReviewDialog.props, propsNeedCastKeys = GenComponentsLlmRuleReviewDialog.propsNeedCastKeys, emits = GenComponentsLlmRuleReviewDialog.emits, components = GenComponentsLlmRuleReviewDialog.components, styles = GenComponentsLlmRuleReviewDialog.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsLlmRuleReviewDialog.setup(props as GenComponentsLlmRuleReviewDialog)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsLlmRuleReviewDialog {
+    return GenComponentsLlmRuleReviewDialog(instance)
+}
+)
+open class ReviewPayload (
+    @JsonNotNull
+    open var historyId: Number,
+    @JsonNotNull
+    open var decision: String,
+    @JsonNotNull
+    open var targetRuleId: Number,
+    @JsonNotNull
+    open var reasoning: String,
+    @JsonNotNull
+    open var confidence: Number,
+    open var suggestedRule: EffectiveTriggerRule? = null,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("ReviewPayload", "pages/debug/llm-rules.uvue", 87, 6)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return ReviewPayloadReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class ReviewPayloadReactiveObject : ReviewPayload, IUTSReactive<ReviewPayload> {
+    override var __v_raw: ReviewPayload
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: ReviewPayload, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(historyId = __v_raw.historyId, decision = __v_raw.decision, targetRuleId = __v_raw.targetRuleId, reasoning = __v_raw.reasoning, confidence = __v_raw.confidence, suggestedRule = __v_raw.suggestedRule) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): ReviewPayloadReactiveObject {
+        return ReviewPayloadReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var historyId: Number
+        get() {
+            return _tRG(__v_raw, "historyId", __v_raw.historyId, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("historyId")) {
+                return
+            }
+            val oldValue = __v_raw.historyId
+            __v_raw.historyId = value
+            _tRS(__v_raw, "historyId", oldValue, value)
+        }
+    override var decision: String
+        get() {
+            return _tRG(__v_raw, "decision", __v_raw.decision, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("decision")) {
+                return
+            }
+            val oldValue = __v_raw.decision
+            __v_raw.decision = value
+            _tRS(__v_raw, "decision", oldValue, value)
+        }
+    override var targetRuleId: Number
+        get() {
+            return _tRG(__v_raw, "targetRuleId", __v_raw.targetRuleId, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("targetRuleId")) {
+                return
+            }
+            val oldValue = __v_raw.targetRuleId
+            __v_raw.targetRuleId = value
+            _tRS(__v_raw, "targetRuleId", oldValue, value)
+        }
+    override var reasoning: String
+        get() {
+            return _tRG(__v_raw, "reasoning", __v_raw.reasoning, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("reasoning")) {
+                return
+            }
+            val oldValue = __v_raw.reasoning
+            __v_raw.reasoning = value
+            _tRS(__v_raw, "reasoning", oldValue, value)
+        }
+    override var confidence: Number
+        get() {
+            return _tRG(__v_raw, "confidence", __v_raw.confidence, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("confidence")) {
+                return
+            }
+            val oldValue = __v_raw.confidence
+            __v_raw.confidence = value
+            _tRS(__v_raw, "confidence", oldValue, value)
+        }
+    override var suggestedRule: EffectiveTriggerRule?
+        get() {
+            return _tRG(__v_raw, "suggestedRule", __v_raw.suggestedRule, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("suggestedRule")) {
+                return
+            }
+            val oldValue = __v_raw.suggestedRule
+            __v_raw.suggestedRule = value
+            _tRS(__v_raw, "suggestedRule", oldValue, value)
+        }
+}
+val GenPagesDebugLlmRulesClass = CreateVueComponent(GenPagesDebugLlmRules::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesDebugLlmRules.inheritAttrs, inject = GenPagesDebugLlmRules.inject, props = GenPagesDebugLlmRules.props, propsNeedCastKeys = GenPagesDebugLlmRules.propsNeedCastKeys, emits = GenPagesDebugLlmRules.emits, components = GenPagesDebugLlmRules.components, styles = GenPagesDebugLlmRules.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenPagesDebugLlmRules.setup(props as GenPagesDebugLlmRules)
+    }
+    )
+}
+, fun(instance, renderer): GenPagesDebugLlmRules {
+    return GenPagesDebugLlmRules(instance, renderer)
+}
+)
 val GenPagesSettingsAppCategoriesIndexClass = CreateVueComponent(GenPagesSettingsAppCategoriesIndex::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesSettingsAppCategoriesIndex.inheritAttrs, inject = GenPagesSettingsAppCategoriesIndex.inject, props = GenPagesSettingsAppCategoriesIndex.props, propsNeedCastKeys = GenPagesSettingsAppCategoriesIndex.propsNeedCastKeys, emits = GenPagesSettingsAppCategoriesIndex.emits, components = GenPagesSettingsAppCategoriesIndex.components, styles = GenPagesSettingsAppCategoriesIndex.styles, setup = fun(props: ComponentPublicInstance): Any? {
         return GenPagesSettingsAppCategoriesIndex.setup(props as GenPagesSettingsAppCategoriesIndex)
@@ -9414,6 +10614,120 @@ val GenPagesSettingsAppCategoriesIndexClass = CreateVueComponent(GenPagesSetting
 }
 , fun(instance, renderer): GenPagesSettingsAppCategoriesIndex {
     return GenPagesSettingsAppCategoriesIndex(instance, renderer)
+}
+)
+open class CandidateApp (
+    @JsonNotNull
+    open var packageName: String,
+    @JsonNotNull
+    open var appLabel: String,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("CandidateApp", "pages/settings/blacklist.uvue", 71, 6)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return CandidateAppReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class CandidateAppReactiveObject : CandidateApp, IUTSReactive<CandidateApp> {
+    override var __v_raw: CandidateApp
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: CandidateApp, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(packageName = __v_raw.packageName, appLabel = __v_raw.appLabel) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): CandidateAppReactiveObject {
+        return CandidateAppReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var packageName: String
+        get() {
+            return _tRG(__v_raw, "packageName", __v_raw.packageName, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("packageName")) {
+                return
+            }
+            val oldValue = __v_raw.packageName
+            __v_raw.packageName = value
+            _tRS(__v_raw, "packageName", oldValue, value)
+        }
+    override var appLabel: String
+        get() {
+            return _tRG(__v_raw, "appLabel", __v_raw.appLabel, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("appLabel")) {
+                return
+            }
+            val oldValue = __v_raw.appLabel
+            __v_raw.appLabel = value
+            _tRS(__v_raw, "appLabel", oldValue, value)
+        }
+}
+open class BlacklistEntry (
+    @JsonNotNull
+    open var pkg: String,
+    @JsonNotNull
+    open var label: String,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("BlacklistEntry", "pages/settings/blacklist.uvue", 76, 6)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return BlacklistEntryReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class BlacklistEntryReactiveObject : BlacklistEntry, IUTSReactive<BlacklistEntry> {
+    override var __v_raw: BlacklistEntry
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: BlacklistEntry, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(pkg = __v_raw.pkg, label = __v_raw.label) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): BlacklistEntryReactiveObject {
+        return BlacklistEntryReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var pkg: String
+        get() {
+            return _tRG(__v_raw, "pkg", __v_raw.pkg, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("pkg")) {
+                return
+            }
+            val oldValue = __v_raw.pkg
+            __v_raw.pkg = value
+            _tRS(__v_raw, "pkg", oldValue, value)
+        }
+    override var label: String
+        get() {
+            return _tRG(__v_raw, "label", __v_raw.label, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("label")) {
+                return
+            }
+            val oldValue = __v_raw.label
+            __v_raw.label = value
+            _tRS(__v_raw, "label", oldValue, value)
+        }
+}
+val GenPagesSettingsBlacklistClass = CreateVueComponent(GenPagesSettingsBlacklist::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesSettingsBlacklist.inheritAttrs, inject = GenPagesSettingsBlacklist.inject, props = GenPagesSettingsBlacklist.props, propsNeedCastKeys = GenPagesSettingsBlacklist.propsNeedCastKeys, emits = GenPagesSettingsBlacklist.emits, components = GenPagesSettingsBlacklist.components, styles = GenPagesSettingsBlacklist.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenPagesSettingsBlacklist.setup(props as GenPagesSettingsBlacklist)
+    }
+    )
+}
+, fun(instance, renderer): GenPagesSettingsBlacklist {
+    return GenPagesSettingsBlacklist(instance, renderer)
 }
 )
 fun createApp(): UTSJSONObject {
@@ -9429,8 +10743,8 @@ fun main(app: IApp) {
 open class UniAppConfig : io.dcloud.uniapp.appframe.AppConfig {
     override var name: String = "微习惯健康伴侣"
     override var appid: String = "__UNI__B805CE2"
-    override var versionName: String = "1.0.4"
-    override var versionCode: String = "104"
+    override var versionName: String = "1.0.5"
+    override var versionCode: String = "105"
     override var uniCompilerVersion: String = "5.11"
     constructor() : super() {}
 }
@@ -9441,7 +10755,9 @@ fun definePageRoutes() {
     __uniRoutes.push(UniPageRoute(path = "pages/data/dashboard", component = GenPagesDataDashboardClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "数据看板")))
     __uniRoutes.push(UniPageRoute(path = "pages/settings/index", component = GenPagesSettingsIndexClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "设置")))
     __uniRoutes.push(UniPageRoute(path = "pages/debug/logs", component = GenPagesDebugLogsClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "调试日志")))
+    __uniRoutes.push(UniPageRoute(path = "pages/debug/llm-rules", component = GenPagesDebugLlmRulesClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "LLM 规则审核")))
     __uniRoutes.push(UniPageRoute(path = "pages/settings/app-categories/index", component = GenPagesSettingsAppCategoriesIndexClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "App 分类管理")))
+    __uniRoutes.push(UniPageRoute(path = "pages/settings/blacklist", component = GenPagesSettingsBlacklistClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "不提醒这些 App")))
 }
 val __uniTabBar: Map<String, Any?>? = _uM("list" to _uA(
     _uM("pagePath" to "pages/home/index", "text" to "首页"),
@@ -9466,11 +10782,11 @@ fun defineAppConfig() {
 }
 open class UniCloudConfig : io.dcloud.unicloud.InternalUniCloudConfig, IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("UniCloudConfig", "main.uts", 51, 14)
+        return UTSSourceMapPosition("UniCloudConfig", "main.uts", 55, 14)
     }
     override var isDev: Boolean = true
     override var spaceList: String = "[{\"provider\":\"aliyun\",\"spaceName\":\"trial-w7onvxzrxrp2h087561\",\"spaceId\":\"mp-76d188c8-df1a-4535-9cee-3bb94b3a694d\",\"clientSecret\":\"b94cO0f6Qv3WwtDVDIwHFw==\",\"endpoint\":\"https://api.next.bspapp.com\"}]"
-    override var debuggerInfo: String? = "{\"address\":[\"127.0.0.1\",\"172.24.25.140\"],\"servePort\":7000,\"debugPort\":9000,\"initialLaunchType\":\"local\",\"skipFiles\":[\"<node_internals>/**\",\"D:/Program Files (x86)/HBuilderX/plugins/unicloud/**/*.js\"]}"
+    override var debuggerInfo: String? = "{\"address\":[\"127.0.0.1\",\"172.24.90.1\"],\"servePort\":7000,\"debugPort\":9000,\"initialLaunchType\":\"local\",\"skipFiles\":[\"<node_internals>/**\",\"D:/Program Files (x86)/HBuilderX/plugins/unicloud/**/*.js\"]}"
     override var secureNetworkEnable: Boolean = false
     override var secureNetworkConfig: String? = "[]"
     constructor() : super() {}

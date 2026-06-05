@@ -146,6 +146,7 @@ uni_modules/         3个原生插件 (accessibility-service, audio-player, floa
 | 47 | services 本地空函数覆盖 plugin import | 改别名 `import { x as pluginX }` | [S47](agents_rules/S47.md) |
 | 54 | 模块级函数访问类 `private` 字段 | 改 `public` 或在类内加 getter | [S54](agents_rules/S54.md) |
 | 45 | `components/ → models/` 误用 `../../` | 改 `../`（少一级） | [S45](agents_rules/S45.md) |
+| ★NS1 | `import { XxxDao } from '../database/XxxDao'` 试图导入 DAO 类符号 | DAO 模块是顶层 `export function` 集合，不是 class；改解构 `import { save as saveXxx }` | — |
 
 ### 空值/smart cast/异步守卫
 
@@ -170,7 +171,7 @@ uni_modules/         3个原生插件 (accessibility-service, audio-player, floa
 | ★21 | `WindowManager.WINDOW_SERVICE` 找不到 | `Context.WINDOW_SERVICE` | [S21](agents_rules/S21.md) |
 | ★22 | `FrameLayout(ctx: any)` 类型不匹配 | 形参改 `Context` | [S22](agents_rules/S22.md) |
 | ★15 | `uni.vibrateShort({})` 缺 type 编译失败 | 必传 `{ type: 'medium' }` | [S15](agents_rules/S15.md) |
-| 16 | `new X.OnXxxListener({...})` | 工厂 `X.OnXxxListener({...})`；构造 + listener → 纯函数 | [S16](agents_rules/S16.md) |
+| ★16 | `X.OnXxxListener({onXxx(...){}})` SAM 对象字面量 | 一律改纯函数 `function(...): T { ... }`；构造 + listener 位置也是 | [S16](agents_rules/S16.md) |
 | 2 | `uniCloud.callFunction` UTS 不兼容 | 改 `uni.request` HTTP 直连 | [S2](agents_rules/S2.md) |
 
 ### 数值类型 (number/Int/Float)

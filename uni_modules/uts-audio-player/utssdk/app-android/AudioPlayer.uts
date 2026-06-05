@@ -77,11 +77,9 @@ class NativeAudioPlayer {
       this.mp!!.setDataSource(url)
       this.setup()
       this.mp!!.prepareAsync()
-      this.mp!!.setOnPreparedListener(MediaPlayer.OnPreparedListener({
-        onPrepared(mp: MediaPlayer): void {
-          mp.start()
-        }
-      }))
+      this.mp!!.setOnPreparedListener(function(mp: MediaPlayer): void {
+        mp.start()
+      })
       this.startProgress()
     } catch (e) {
       cbs.onError('playUrl failed')
@@ -114,7 +112,8 @@ class NativeAudioPlayer {
 
   setVolume(vol: number): void {
     if (this.mp != null) {
-      this.mp!!.setVolume(vol, vol)
+      const v: Float = vol.toFloat()
+      this.mp!!.setVolume(v, v)
     }
   }
 
@@ -125,17 +124,13 @@ class NativeAudioPlayer {
   private setup(): void {
     if (this.mp != null && this.callbacks != null) {
       const cbs = this.callbacks
-      this.mp!!.setOnCompletionListener(MediaPlayer.OnCompletionListener({
-        onCompletion(mp: MediaPlayer): void {
-          cbs.onCompletion()
-        }
-      }))
-      this.mp!!.setOnErrorListener(MediaPlayer.OnErrorListener({
-        onError(mp: MediaPlayer, what: number, extra: number): boolean {
-          cbs.onError('error: ' + what + '/' + extra)
-          return true
-        }
-      }))
+      this.mp!!.setOnCompletionListener(function(mp: MediaPlayer): void {
+        cbs.onCompletion()
+      })
+      this.mp!!.setOnErrorListener(function(mp: MediaPlayer, what: number, extra: number): boolean {
+        cbs.onError('error: ' + what + '/' + extra)
+        return true
+      })
     }
   }
 

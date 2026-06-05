@@ -11,7 +11,7 @@ import { PersistedEffectiveRule } from './models/PersistedEffectiveRule'
 import { getActionById } from './constants/Actions'
 import { getRandomEncourage } from './constants/EncourageTexts'
 import { shortVibrate } from './utils/VibrateUtils'
-import { speakAdhoc, speakFixedGuide } from './services/TtsService'
+import { speakAdhoc, speakFixedGuide, preGenerateAll, prewarmSystemTts } from './services/TtsService'
 import {
   startUsageMonitor,
   stopUsageMonitor,
@@ -39,7 +39,6 @@ import { getAppHistory } from './services/AppHistoryService'
 import { getUserProfile } from './services/UserProfileService'
 import { getActiveRuleList } from './services/EffectiveRuleService'
 import { ensureCategory as ensureAppCategory, batchClassifyTodayNewApps } from './services/AppCategoryService'
-import { markAccepted, markRejected } from './services/LlmRejectTracker'
 import { currentHour, today } from './utils/TimeUtils'
 import * as AchievementService from './services/AchievementService'
 
@@ -53,6 +52,9 @@ let pendingAdhocText = ''
 let pendingActionId = ''
 // 幂等守卫：$on 重复注册导致同一 actionId 被处理多次
 let pendingActionIds: Map<string, boolean> = new Map<string, boolean>()
+// per-package 触发防抖：5min tick 命中同一包时按 (pkg, time) 二次去重，避免连续弹窗打架
+const TRIGGER_COOL_DOWN_MS_PER_PKG: number = 30 * 60 * 1000
+let lastTriggerPerPkg: Map<string, number> = new Map<string, number>()
 let pendingActionName = ''
 let pendingActionCategory = ''
 
@@ -214,75 +216,59 @@ function onActionResolvedLLM(actionId: string, actionName: string, actionCategor
   pendingActionCategory = actionCategory
   const postCtx = buildPostContext(actionName, actionCategory, durationMs, appPackage)
   setPostContext(postCtx)
+  // 实际的 LLM 评估由 4 个 callback 各自触发（onSelfReported/onBusyRemindLater/onSkipDuringExec/onCountdownFinish）
+  // 此处仅完成上下文准备；评估入口在 callback 内 evaluatePost(...)
+}
+
+// 弹窗：LLM 评估结果出来后，让用户决定是否接受规则
+function tryShowLlmRuleDialog(postResult: PostActionResult, actionId: string): void {
   try {
-    evaluatePost(
-      actionId,
-      actionName,
-      actionCategory,
-      durationMs,
-      (postResult: PostActionResult): void => {
-        try {
-          if (postResult.decision != 'no_change' && postResult.suggestedRule != null) {
-            const askEach = getBool('llm_trigger_ask_each_time', true)
-            if (askEach) {
-              const rule = postResult.suggestedRule
-              const payload: UTSJSONObject = {
-                rule: rule,
-                reasoning: postResult.reasoning,
-                confidence: postResult.confidence,
-                historyId: postResult.historyId,
-                decision: postResult.decision,
-                targetRuleId: postResult.historyId
-              }
-              emitShowRuleDialog(payload)
-            } else {
-              try {
-                const finalActionId = actionId
-                if (finalActionId.length > 0) {
-                  const nowSec = Math.floor(Date.now() / 1000)
-                  const rule = postResult.suggestedRule
-                  let pkgList: string[] = []
-                  if (rule.screenConditions != null) {
-                    pkgList = rule.screenConditions.appPackages
-                  }
-                  const ruleRow: PersistedEffectiveRule = {
-                    id: 0,
-                    actionId: rule.actionId,
-                    appPackages: pkgList,
-                    timeWindow: rule.timeWindow,
-                    timeThresholdMinutes: rule.timeThresholdMinutes,
-                    triggerLevel: 'gentle',
-                    categoryFilter: null,
-                    source: 'llm',
-                    sourceHistoryId: postResult.historyId,
-                    expiresAt: null,
-                    enabled: true,
-                    priority: 5,
-                    createdAt: nowSec,
-                    updatedAt: nowSec
-                  }
-                  insertTriggerRule(ruleRow)
-                }
-              } catch (e2) {
-                console.warn('[App.uvue] 静默保存 suggestedRule 失败: ' + JSON.stringify(e2))
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[App.uvue] post-result 处理异常: ' + JSON.stringify(e))
-        }
-        clearPreContext()
-        clearPostContext()
-      },
-      (): void => {
-        clearPreContext()
-        clearPostContext()
+    if (postResult.decision == 'no_change' || postResult.suggestedRule == null) return
+    const askEach = getBool('llm_trigger_ask_each_time', true)
+    if (askEach) {
+      const rule = postResult.suggestedRule
+      const payload: UTSJSONObject = {
+        rule: rule,
+        reasoning: postResult.reasoning,
+        confidence: postResult.confidence,
+        historyId: postResult.historyId,
+        decision: postResult.decision,
+        targetRuleId: postResult.historyId
       }
-    )
+      emitShowRuleDialog(payload)
+    } else {
+      try {
+        if (actionId.length > 0) {
+          const nowSec = Math.floor(Date.now() / 1000)
+          const rule = postResult.suggestedRule
+          let pkgList: string[] = []
+          if (rule.screenConditions != null) {
+            pkgList = rule.screenConditions.appPackages
+          }
+          const ruleRow: PersistedEffectiveRule = {
+            id: 0,
+            actionId: rule.actionId,
+            appPackages: pkgList,
+            timeWindow: rule.timeWindow,
+            timeThresholdMinutes: rule.timeThresholdMinutes,
+            triggerLevel: 'gentle',
+            categoryFilter: null,
+            source: 'llm',
+            sourceHistoryId: postResult.historyId,
+            expiresAt: null,
+            enabled: true,
+            priority: 5,
+            createdAt: nowSec,
+            updatedAt: nowSec
+          }
+          insertTriggerRule(ruleRow)
+        }
+      } catch (e2) {
+        console.warn('[App.uvue] 静默保存 suggestedRule 失败: ' + JSON.stringify(e2))
+      }
+    }
   } catch (e) {
-    console.warn('[App.uvue] evaluatePost 异常: ' + JSON.stringify(e))
-    clearPreContext()
-    clearPostContext()
+    console.warn('[App.uvue] tryShowLlmRuleDialog 异常: ' + JSON.stringify(e))
   }
 }
 
@@ -335,8 +321,31 @@ function showOverlayWithAdhoc(decision: TriggerDecision, adhocText: string, fall
         checkAchievementsAndNotify()
       }
       onActionResolved()
-      const pkgName = decision != null ? '' : ''
+      // onSelfReported 路径无源包名上下文（前台切换链路未传包名），与其它 callback 保持一致传 ''
+      const pkgName = ''
       onActionResolvedLLM(pendingDecisionActionId, action != null ? action.name : '', action != null ? action.category : '', action != null ? action.defaultDurationMs : 0, pkgName)
+      // LLM post 评估（异步）
+      if (getBool('llm_trigger_enabled', true)) {
+        try {
+          evaluatePost(
+            pendingDecisionActionId,
+            action != null ? action.name : '',
+            action != null ? action.category : '',
+            action != null ? action.defaultDurationMs : 0,
+            (postResult: PostActionResult): void => {
+              try { tryShowLlmRuleDialog(postResult, pendingDecisionActionId) } catch (e) {
+                console.warn('[App.uvue] onSelfReported post-result 异常: ' + JSON.stringify(e))
+              }
+            },
+            (): void => {
+              console.warn('[App.uvue] onSelfReported evaluatePost fail')
+            }
+          )
+        } catch (e) {
+          console.warn('[App.uvue] onSelfReported evaluatePost 异常: ' + JSON.stringify(e))
+        }
+      }
+      dismissOverlay()
     },
     onBusyRemindLater: (): void => {
       const action = getActionById(pendingDecisionActionId)
@@ -358,10 +367,54 @@ function showOverlayWithAdhoc(decision: TriggerDecision, adhocText: string, fall
       }
       onActionResolved()
       onActionResolvedLLM(pendingDecisionActionId, action != null ? action.name : '', action != null ? action.category : '', 0, '')
+      // LLM post 评估（异步）
+      if (getBool('llm_trigger_enabled', true)) {
+        try {
+          evaluatePost(
+            pendingDecisionActionId,
+            action != null ? action.name : '',
+            action != null ? action.category : '',
+            0,
+            (postResult: PostActionResult): void => {
+              try { tryShowLlmRuleDialog(postResult, pendingDecisionActionId) } catch (e) {
+                console.warn('[App.uvue] onBusyRemindLater post-result 异常: ' + JSON.stringify(e))
+              }
+            },
+            (): void => {
+              console.warn('[App.uvue] onBusyRemindLater evaluatePost fail')
+            }
+          )
+        } catch (e) {
+          console.warn('[App.uvue] onBusyRemindLater evaluatePost 异常: ' + JSON.stringify(e))
+        }
+      }
+      dismissOverlay()
     },
     onSkipDuringExec: (): void => {
       onActionResolved()
       onActionResolvedLLM(pendingDecisionActionId, '', '', 0, '')
+      // LLM post 评估（异步）
+      if (getBool('llm_trigger_enabled', true)) {
+        try {
+          evaluatePost(
+            pendingDecisionActionId,
+            '',
+            '',
+            0,
+            (postResult: PostActionResult): void => {
+              try { tryShowLlmRuleDialog(postResult, pendingDecisionActionId) } catch (e) {
+                console.warn('[App.uvue] onSkipDuringExec post-result 异常: ' + JSON.stringify(e))
+              }
+            },
+            (): void => {
+              console.warn('[App.uvue] onSkipDuringExec evaluatePost fail')
+            }
+          )
+        } catch (e) {
+          console.warn('[App.uvue] onSkipDuringExec evaluatePost 异常: ' + JSON.stringify(e))
+        }
+      }
+      dismissOverlay()
     },
     onCountdownTick: (_remaining: number): void => {},
     onCountdownFinish: (): void => {
@@ -388,6 +441,27 @@ function showOverlayWithAdhoc(decision: TriggerDecision, adhocText: string, fall
       }
       onActionResolved()
       onActionResolvedLLM(pendingDecisionActionId, action != null ? action.name : '', action != null ? action.category : '', action != null ? action.defaultDurationMs : 0, '')
+      // LLM post 评估（异步）
+      if (getBool('llm_trigger_enabled', true)) {
+        try {
+          evaluatePost(
+            pendingDecisionActionId,
+            action != null ? action.name : '',
+            action != null ? action.category : '',
+            action != null ? action.defaultDurationMs : 0,
+            (postResult: PostActionResult): void => {
+              try { tryShowLlmRuleDialog(postResult, pendingDecisionActionId) } catch (e) {
+                console.warn('[App.uvue] onCountdownFinish post-result 异常: ' + JSON.stringify(e))
+              }
+            },
+            (): void => {
+              console.warn('[App.uvue] onCountdownFinish evaluatePost fail')
+            }
+          )
+        } catch (e) {
+          console.warn('[App.uvue] onCountdownFinish evaluatePost 异常: ' + JSON.stringify(e))
+        }
+      }
     },
     onPartialCompletion: (_completed: number, _total: number): void => {}
   }
@@ -396,16 +470,16 @@ function showOverlayWithAdhoc(decision: TriggerDecision, adhocText: string, fall
   } catch (e) {
     console.warn('[App.uvue] showOverlay 失败: ' + JSON.stringify(e))
   }
-  // 悬浮窗弹出时立即播 TTS：先播默认开场白，再播 adhoc 内容
+  // 悬浮窗弹出时立即播 TTS：把 actionName 与 adhocText 拼成单条文本
+  // 避免连续两次 speakAdhoc 触发 SystemTts QUEUE_FLUSH 互吞
   try {
     if (getBool('tts_enabled', true)) {
-      speakAdhoc(decision.actionName)
+      const actionNameStr = decision.actionName ?? ''
+      const merged = actionNameStr + (adhocText.length > 0 ? ('，' + adhocText) : '')
+      if (merged.length > 0) speakAdhoc(merged)
     }
   } catch (e) {
     console.warn('[App.uvue] 播 TTS 开场白失败: ' + JSON.stringify(e))
-  }
-  if (!fallback && adhocText.length > 0) {
-    try { speakAdhoc(adhocText) } catch (_) {}
   }
 }
 
@@ -425,28 +499,6 @@ onLaunch(() => {
         onActionResolvedLLM(actionId, actionName, actionCategory, durationMs, appPackage)
       } catch (e) {
         console.warn('[App.uvue] llmActionCompleted 处理异常: ' + JSON.stringify(e))
-      }
-    })
-    uni.$on('acceptLlmRule', (data: any): void => {
-      try {
-        if (data == null) return
-        const obj = data as UTSJSONObject
-        if (obj == null) return
-        const historyId = obj['historyId'] as number
-        if (historyId > 0) markAccepted(historyId)
-      } catch (e) {
-        console.warn('[App.uvue] acceptLlmRule 异常: ' + JSON.stringify(e))
-      }
-    })
-    uni.$on('rejectLlmRule', (data: any): void => {
-      try {
-        if (data == null) return
-        const obj = data as UTSJSONObject
-        if (obj == null) return
-        const historyId = obj['historyId'] as number
-        if (historyId > 0) markRejected(historyId)
-      } catch (e) {
-        console.warn('[App.uvue] rejectLlmRule 异常: ' + JSON.stringify(e))
       }
     })
     uni.$on('manualTriggerCheck', (_data: any): void => {
@@ -568,12 +620,42 @@ onLaunch(() => {
     console.warn('[App.uvue] $on 异常: ' + JSON.stringify(e))
   }
     try {
-      sqliteStore.openDatabase('micro_habit_v2.db', getDbVersion(), (): void => onCreate(), (oldV: number, newV: number): void => {
-        try { onUpgrade(oldV, newV) } catch (e) { console.warn('[App.uvue] onUpgrade 异常: ' + JSON.stringify(e)) }
-      })
+      try {
+        sqliteStore.openDatabase('micro_habit_v2.db', getDbVersion(), (): void => onCreate(), (oldV: number, newV: number): void => {
+          try { onUpgrade(oldV, newV) } catch (e) { console.warn('[App.uvue] onUpgrade 异常: ' + JSON.stringify(e)) }
+        })
+      } catch (e) {
+        console.error('[App.uvue] sqliteStore.openDatabase 失败: ' + JSON.stringify(e))
+      }
+    // 启动期预热 TTS：延迟 3s 再开始（不阻塞启动），并立即触发 SystemTts 引擎初始化
+    try {
+      setTimeout((): void => {
+        try {
+          preGenerateAll()
+        } catch (e) {
+          const msg = e != null ? ('' + e) : 'null'
+          console.warn('[App.uvue] preGenerateAll 启动失败: ' + msg)
+        }
+      }, 3000)
+    } catch (e) {
+      const msg = e != null ? ('' + e) : 'null'
+      console.warn('[App.uvue] preGenerateAll setTimeout 失败: ' + msg)
+    }
+    try { prewarmSystemTts() } catch (e) {
+      const msg = e != null ? ('' + e) : 'null'
+      console.warn('[App.uvue] prewarmSystemTts 失败: ' + msg)
+    }
     const callbacks: UsageMonitorCallbacks = {
       onAppDurationTrigger: (info: AppForegroundInfo): void => {
         try {
+          // per-package 触发防抖：5min tick 命中同一包时按 (pkg, time) 二次去重
+          const nowTs = Date.now()
+          const lastTs = lastTriggerPerPkg.get(info.packageName) ?? 0
+          if (nowTs - lastTs < TRIGGER_COOL_DOWN_MS_PER_PKG) {
+            console.log('[App.uvue] 跳过同包重复触发: ' + info.packageName)
+            return
+          }
+          lastTriggerPerPkg.set(info.packageName, nowTs)
           // doPoll 已保证 info.continuousMs >= thresholdMs（聚合数据触发判定已通过）
           // 首次见到该 App 立即入册 app_tags
           try { ensureAppCategory(info.packageName, info.packageName) } catch (_) {}
@@ -649,7 +731,11 @@ onLaunch(() => {
       const thresholdMs = getInt('app_duration_threshold', 60) * 60000
       const triggerEnabled = getBool('trigger_enabled', true)
       // 5 分钟轮询：聚合数据查今日累计前台时长（INTERVAL_DAILY 一定有数据）
-      startUsageMonitor(callbacks, thresholdMs, 5 * 60 * 1000, triggerEnabled)
+      try {
+        startUsageMonitor(callbacks, thresholdMs, 5 * 60 * 1000, triggerEnabled)
+      } catch (e) {
+        console.error('[App.uvue] startUsageMonitor 失败: ' + JSON.stringify(e))
+      }
     } else {
       console.warn('[App.uvue] 启动时未授予使用情况权限，需在引导页授权')
     }

@@ -16,6 +16,7 @@ export type EffectiveTriggerRule = {
   timeWindow: TimeWindow | null
   screenConditions: ScreenConditions | null
   timeThresholdMinutes: number
+  categoryFilter: string | null
   source: 'local' | 'llm' | 'user' | 'system'
   enabled: boolean
   createdAt: number

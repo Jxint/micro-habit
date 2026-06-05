@@ -2,6 +2,7 @@ import * as AppTagsDao from '../database/AppTagsDao'
 import { AppTag, AppCategory } from '../models/AppTag'
 import { callMinimaxChat } from './CloudService'
 import { today } from '../utils/TimeUtils'
+import { shouldFilterPackage } from '../utils/SystemAppUtils'
 
 const SYSTEM_PROMPT_CLASSIFY =
   '你是一个 App 分类助手。\n根据用户的应用名和包名，分类到以下之一：social | video | game | work | study | reading | other\n严格按 JSON 输出，不要任何额外文字：{"results":[{"packageName":"...","category":"..."}]}'
@@ -16,6 +17,8 @@ function isValidCategory(s: string): boolean {
 }
 
 export function ensureCategory(pkg: string, appLabel: string): void {
+  // 系统包不入册：避免污染 app_tags / 拖到 LLM 分类 / 出现在 pie chart
+  if (shouldFilterPackage(pkg, '')) return
   try {
     const existing = AppTagsDao.getByPackage(pkg)
     if (existing != null) {
@@ -60,6 +63,8 @@ export function batchClassifyTodayNewApps(onComplete: ((n: number) => void) | nu
         let n = 0
         for (let i = 0; i < obj.length; i++) {
           const item = obj[i]
+          // 二次保险：LLM 返回的包名也按系统包过滤
+          if (shouldFilterPackage(item.pkg, '')) continue
           const tag = AppTagsDao.getByPackage(item.pkg)
           if (tag == null) continue
           if (tag.isUserLocked) continue

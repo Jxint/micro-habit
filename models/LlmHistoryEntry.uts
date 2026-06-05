@@ -22,5 +22,9 @@ export type LlmHistoryEntry = {
   adhocText: string | null
   suggestedRule: EffectiveTriggerRule | null
   reasoning: string | null
+  decision: string | null
+  targetRuleId: number | null
+  userAccepted: number | null
+  confidence: number
   createdAt: number
 }

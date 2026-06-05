@@ -40,9 +40,21 @@
       }
     },
     {
+      "path": "pages/debug/llm-rules",
+      "style": {
+        "navigationBarTitleText": "LLM 规则审核"
+      }
+    },
+    {
       "path": "pages/settings/app-categories/index",
       "style": {
         "navigationBarTitleText": "App 分类管理"
+      }
+    },
+    {
+      "path": "pages/settings/blacklist",
+      "style": {
+        "navigationBarTitleText": "不提醒这些 App"
       }
     }
   ],

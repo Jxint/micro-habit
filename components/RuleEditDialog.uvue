@@ -155,6 +155,69 @@ let ruleCreatedAt: number = 0
 let ruleSourceHistoryId: number | null = null
 let ruleExpiresAt: number | null = null
 
+function parseToRule(o: UTSJSONObject | null): PersistedEffectiveRule {
+  if (o == null) {
+    return {
+      id: 0,
+      actionId: '',
+      appPackages: [] as string[],
+      timeWindow: null,
+      timeThresholdMinutes: 60,
+      triggerLevel: 'gentle' as TriggerLevel,
+      categoryFilter: null,
+      source: 'user' as 'user' | 'llm' | 'system',
+      sourceHistoryId: null,
+      expiresAt: null,
+      enabled: true,
+      priority: 0,
+      createdAt: Math.floor(Date.now() / 1000),
+      updatedAt: Math.floor(Date.now() / 1000)
+    }
+  }
+  const pkgArr: string[] = []
+  const rawPkgs = o['appPackages'] as Array<any> | null
+  if (rawPkgs != null) {
+    for (let i = 0; i < rawPkgs.length; i++) {
+      const v = rawPkgs[i] as string | null
+      if (v != null && v.length > 0) pkgArr.push(v)
+    }
+  }
+  const twRaw = o['timeWindow']
+  let tw: TimeWindow | null = null
+  if (twRaw != null) {
+    const twObj = twRaw as UTSJSONObject
+    const s = twObj['start'] as string | null
+    const e = twObj['end'] as string | null
+    if (s != null && e != null && s.length > 0 && e.length > 0) {
+      tw = { start: s!!, end: e!! }
+    }
+  }
+  const srcRaw = (o['source'] as string | null) ?? 'user'
+  const src: 'user' | 'llm' | 'system' = srcRaw == 'llm' ? 'llm' : (srcRaw == 'system' ? 'system' : 'user')
+  const lvlRaw = (o['triggerLevel'] as string | null) ?? 'gentle'
+  const lvl: TriggerLevel = lvlRaw == 'strong' ? 'strong' : (lvlRaw == 'forced' ? 'forced' : 'gentle')
+  const histRaw = o['sourceHistoryId']
+  const histId: number | null = histRaw == null ? null : (histRaw as number)
+  const expRaw = o['expiresAt']
+  const expAt: number | null = expRaw == null ? null : (expRaw as number)
+  return {
+    id: (o['id'] as number) ?? 0,
+    actionId: (o['actionId'] as string) ?? '',
+    appPackages: pkgArr,
+    timeWindow: tw,
+    timeThresholdMinutes: (o['timeThresholdMinutes'] as number) ?? 60,
+    triggerLevel: lvl,
+    categoryFilter: (o['categoryFilter'] as string | null) ?? null,
+    source: src,
+    sourceHistoryId: histId,
+    expiresAt: expAt,
+    enabled: (o['enabled'] as boolean) == true,
+    priority: (o['priority'] as number) ?? 0,
+    createdAt: (o['createdAt'] as number) ?? 0,
+    updatedAt: (o['updatedAt'] as number) ?? 0
+  }
+}
+
 function resetDraft(): void {
   // 解析 ruleJson（基础类型 prop 无 reactive 包装问题，AGENTS §13/§49）
   if (props.ruleJson.length < 1) {
@@ -174,7 +237,8 @@ function resetDraft(): void {
     ruleExpiresAt = null
     return
   }
-  const r: PersistedEffectiveRule = JSON.parse(props.ruleJson) as PersistedEffectiveRule
+  const obj: UTSJSONObject = JSON.parse(props.ruleJson) as UTSJSONObject
+  const r: PersistedEffectiveRule = parseToRule(obj)
   ruleId = r.id
   isDefault = r.source == 'system'
   draftActionId = r.actionId

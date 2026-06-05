@@ -2,8 +2,8 @@
 	"name": "微习惯健康伴侣",
 	"appid": "__UNI__B805CE2",
 	"description": "一个在你不经意间，悄悄改善健康的 AI 微习惯伙伴",
-	"versionName": "1.0.4",
-	"versionCode": "104",
+	"versionName": "1.0.5",
+	"versionCode": "105",
 	"uni-app-x": {
 		"styleIsolationVersion": "2"
 	},

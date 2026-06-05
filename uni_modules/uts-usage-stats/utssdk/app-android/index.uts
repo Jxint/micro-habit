@@ -9,7 +9,6 @@ export {
   isMonitoring,
   isUsagePermissionGranted,
   getSelfPackageName,
-  getCurrentForeground,
   queryUsageStatsOnce
 } from './UsageStatsForegroundService'
 

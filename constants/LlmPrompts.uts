@@ -141,7 +141,7 @@ export function buildPreTriggerPrompt(context: PreTriggerContext): string {
     histLines.join('\n') + '\n' +
     (ruleLines.length > 0 ? ruleLines.join('\n') + '\n' : '') +
     '\n请基于以上状态生成：\n' +
-    '1. adhocText：一句 10-30 字的 TTS 即兴文案，温暖+轻度幽默，要提到当前 app 和时长\n' +
+    '1. adhocText：一句 10-30 字的 TTS 即兴文案\n' +
     '2. stateDescription：用 5-15 字概括当前状态（用于"为什么提醒我"展示）\n\n' +
     '严格按 JSON 格式输出：{"adhocText": "...", "stateDescription": "..."}'
 }
@@ -191,17 +191,18 @@ export function buildPostActionPrompt(context: PostActionContext): string {
     '\n请评估：\n' +
     '1. 用户的健康习惯是否稳定？是否需要调整触发频率或类型？\n' +
     '2. 是否需要新增/修改/删除某条触发规则？\n\n' +
-    '严格按以下 JSON 格式输出：\n' +
-    '{"decision": "create_rule" | "modify_rule" | "delete_rule" | "no_change", "targetRuleId": 0, "suggestedRule": {"actionId": "eye_blink", "appPackages": ["com.zhihu.android"], "timeWindow": {"start": "22:00", "end": "07:00"}, "timeThresholdMinutes": 60, "triggerLevel": "gentle", "categoryFilter": null}, "reasoning": "...", "confidence": 0.85, "alternatives": []}\n\n' +
+    '严格按以下 JSON 格式输出（decision 必须是以下之一：create_rule / modify_rule / delete_rule / no_change）：\n' +
+    '{"decision": "create_rule", "targetRuleId": 0, "suggestedRule": {"actionId": "eye_blink", "screenConditions": {"appPackages": ["com.zhihu.android"], "includeHome": false}, "timeWindow": {"start": "22:00", "end": "07:00"}, "timeThresholdMinutes": 60}, "reasoning": "...", "confidence": 0.85, "alternatives": []}\n\n' +
     '如果不调整，输出：\n' +
     '{"decision": "no_change", "targetRuleId": 0, "suggestedRule": null, "reasoning": "当前规则合理，继续观察", "confidence": 0.7, "alternatives": []}\n\n' +
     '说明：\n' +
     '- decision: no_change（不动）/ create_rule（新增）/ modify_rule（修改 targetRuleId）/ delete_rule（删除 targetRuleId）\n' +
     '- targetRuleId: 仅 modify/delete 时填对应 rule id\n' +
-    '- suggestedRule.appPackages: 命中的应用包名列表\n' +
+    '- suggestedRule.actionId: 动作 ID（必填）\n' +
+    '- suggestedRule.screenConditions.appPackages: 命中的应用包名列表（数组）\n' +
+    '- suggestedRule.screenConditions.includeHome: 是否包含桌面（boolean）\n' +
     '- suggestedRule.timeWindow: {start, end} 格式 "HH:MM"；不需要时填 null\n' +
-    '- suggestedRule.triggerLevel: gentle（温和）/ strong（强提醒）/ forced（强打断）\n' +
-    '- suggestedRule.categoryFilter: 仅在指定分类触发时填，如 "social"；不需要时填 null\n' +
+    '- suggestedRule.timeThresholdMinutes: 连续前台分钟阈值（数字）\n' +
     '- confidence: 0~1，你对这个建议的把握度\n' +
     '- alternatives: 备选方案数组（可为空）'
 }

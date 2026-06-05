@@ -590,8 +590,6 @@ onShow((): void => {
   margin-top: 3px;
 }
 .demo-action {
-  font-size: 12px;
-  color: #4A9B7B;
   background-color: #EAF8F1;
   border-radius: 14px;
   padding: 6px 10px;

@@ -265,6 +265,15 @@ function createTables(): void {
     updated_at INTEGER NOT NULL
   )`)
   runSql("CREATE INDEX IF NOT EXISTS idx_effective_rules_enabled ON effective_rules(enabled)")
+
+  runSql(`CREATE TABLE IF NOT EXISTS user_achievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    achievement_id TEXT NOT NULL UNIQUE,
+    unlocked_at INTEGER NOT NULL,
+    current_progress REAL NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`)
+  runSql("CREATE INDEX IF NOT EXISTS idx_user_achievements_unlocked ON user_achievements(unlocked_at)")
 }
 
 function insertDefaultSettings(): void {

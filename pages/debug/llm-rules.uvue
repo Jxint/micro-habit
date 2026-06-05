@@ -1,0 +1,360 @@
+<template>
+  <view class="page">
+    <view class="page-bg">
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
+    </view>
+    <view class="header">
+      <view class="header-left" @tap="goBack">
+        <text class="header-back">‹</text>
+      </view>
+      <text class="header-title">LLM 规则审核</text>
+      <view class="header-right" @tap="refresh">
+        <text class="header-refresh">↻</text>
+      </view>
+    </view>
+
+    <view class="stats-row">
+      <view class="stat-card">
+        <text class="stat-num">{{ pendingList.length }}</text>
+        <text class="stat-label">待审核</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-num">{{ acceptedCount }}</text>
+        <text class="stat-label">已接受</text>
+      </view>
+      <view class="stat-card">
+        <text class="stat-num">{{ rejectedCount }}</text>
+        <text class="stat-label">已拒绝</text>
+      </view>
+    </view>
+
+    <scroll-view class="log-scroll" scroll-y="true">
+      <view v-if="pendingList.length < 1" class="empty">
+        <text class="empty-text">暂无待审核的 AI 规则</text>
+        <text class="empty-hint">完成微动作后，AI 会评估是否需要新增/修改/删除触发规则</text>
+      </view>
+      <view
+        v-for="(item, idx) in pendingList"
+        :key="'p-' + item.id"
+        class="review-card"
+        @tap="openReview(idx)"
+      >
+        <view class="card-row1">
+          <text class="card-decision" :class="'dec-' + (item.decision ?? '')">{{ decisionText(item.decision) }}</text>
+          <text class="card-time">{{ formatTime(item.createdAt) }}</text>
+        </view>
+        <text v-if="item.suggestedRule != null" class="card-action">
+          {{ formatAction(item.suggestedRule.actionId) }}
+        </text>
+        <text v-if="item.reasoning != null && item.reasoning.length > 0" class="card-reason">
+          {{ item.reasoning }}
+        </text>
+        <view class="card-row2">
+          <text class="card-conf">把握度 {{ formatConf(item.confidence) }}%</text>
+          <text class="card-go">点击审核 →</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <LlmRuleReviewDialog
+      :visible="dialogVisible"
+      :historyId="dialogPayload.historyId"
+      :decision="dialogPayload.decision"
+      :targetRuleId="dialogPayload.targetRuleId"
+      :reasoning="dialogPayload.reasoning"
+      :confidence="dialogPayload.confidence"
+      :suggestedRule="dialogPayload.suggestedRule"
+      @close="onDialogClose"
+      @accept="onAccept"
+      @reject="onReject"
+    />
+  </view>
+</template>
+
+<script setup lang="uts">
+import LlmRuleReviewDialog from '../../components/LlmRuleReviewDialog.uvue'
+import { LlmHistoryEntry } from '../../models/LlmHistoryEntry'
+import { EffectiveTriggerRule } from '../../models/EffectiveTriggerRule'
+import { getPendingRuleReviews, getAcceptanceRate } from '../../database/LlmHistoryDao'
+import { getActionById } from '../../constants/Actions'
+
+const pendingList = ref<LlmHistoryEntry[]>([])
+const acceptedCount = ref<number>(0)
+const rejectedCount = ref<number>(0)
+const dialogVisible = ref<boolean>(false)
+const activeItem = ref<LlmHistoryEntry | null>(null)
+
+type ReviewPayload = {
+  historyId: number
+  decision: string
+  targetRuleId: number
+  reasoning: string
+  confidence: number
+  suggestedRule: EffectiveTriggerRule | null
+}
+
+const emptyPayload: ReviewPayload = {
+  historyId: 0,
+  decision: '',
+  targetRuleId: 0,
+  reasoning: '',
+  confidence: 0,
+  suggestedRule: null
+}
+
+const dialogPayload = ref<ReviewPayload>(emptyPayload)
+
+function pad2(n: number): string {
+  return n < 10 ? '0' + n : '' + n
+}
+
+function formatTime(t: number): string {
+  if (t == null || t <= 0) return '-'
+  const d = new Date(t * 1000)
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  const h = d.getHours()
+  const mi = d.getMinutes()
+  return m + '/' + day + ' ' + pad2(h) + ':' + pad2(mi)
+}
+
+function formatConf(c: number): string {
+  if (c == null || c <= 0) return '0'
+  return '' + Math.floor(c * 100)
+}
+
+function formatAction(id: string): string {
+  if (id == null || id.length < 1) return '-'
+  const a = getActionById(id)
+  return a != null ? a.name : id
+}
+
+function decisionText(d: string | null): string {
+  if (d == 'create_rule') return '新增'
+  if (d == 'modify_rule') return '修改'
+  if (d == 'delete_rule') return '删除'
+  if (d == null || d.length < 1) return '建议'
+  return d
+}
+
+function openReview(idx: number): void {
+  if (idx < 0 || idx >= pendingList.value.length) return
+  const item = pendingList.value[idx]
+  if (item == null) return
+  activeItem.value = item
+  const p: ReviewPayload = {
+    historyId: item.id,
+    decision: item.decision != null ? item.decision : '',
+    targetRuleId: item.targetRuleId != null ? item.targetRuleId : 0,
+    reasoning: item.reasoning != null ? item.reasoning : '',
+    confidence: item.confidence,
+    suggestedRule: item.suggestedRule
+  }
+  dialogPayload.value = p
+  dialogVisible.value = true
+}
+
+function onDialogClose(): void {
+  dialogVisible.value = false
+  activeItem.value = null
+  dialogPayload.value = emptyPayload
+}
+
+function refresh(): void {
+  try {
+    pendingList.value = getPendingRuleReviews(50)
+  } catch (e) {
+    console.warn('[llm-rules] refresh 异常: ' + JSON.stringify(e))
+    pendingList.value = []
+  }
+  try {
+    const rate = getAcceptanceRate(30)
+    acceptedCount.value = rate.accepted
+    rejectedCount.value = rate.rejected
+  } catch (e) {
+    acceptedCount.value = 0
+    rejectedCount.value = 0
+  }
+}
+
+function onAccept(_payload: any): void {
+  dialogVisible.value = false
+  activeItem.value = null
+  refresh()
+  uni.showToast({ title: '已接受', icon: 'none' })
+}
+
+function onReject(_payload: any): void {
+  dialogVisible.value = false
+  activeItem.value = null
+  refresh()
+  uni.showToast({ title: '已拒绝', icon: 'none' })
+}
+
+function goBack(): void {
+  uni.navigateBack({})
+}
+
+onPageShow(() => {
+  refresh()
+})
+</script>
+
+<style scoped>
+.page {
+  flex: 1;
+  background-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+.page-bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+.page-bg-img {
+  width: 100%;
+  height: 100%;
+}
+.header,
+.stats-row,
+.log-scroll {
+  position: relative;
+  z-index: 1;
+}
+.header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  padding-top: 50px;
+  background-color: #FFFFFF;
+  border-bottom-width: 1px;
+  border-bottom-color: #ECF0F1;
+  border-bottom-style: solid;
+}
+.header-left,
+.header-right {
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+}
+.header-back {
+  font-size: 28px;
+  color: #2C3E50;
+}
+.header-title {
+  font-size: 17px;
+  font-weight: bold;
+  color: #2C3E50;
+}
+.header-refresh {
+  font-size: 22px;
+  color: #3498DB;
+}
+.stats-row {
+  flex-direction: row;
+  padding: 12px 8px;
+  background-color: #FFFFFF;
+  margin-bottom: 8px;
+}
+.stat-card {
+  flex: 1;
+  align-items: center;
+  padding: 4px 0;
+}
+.stat-num {
+  font-size: 20px;
+  font-weight: bold;
+  color: #3498DB;
+  margin-bottom: 2px;
+}
+.stat-label {
+  font-size: 11px;
+  color: #7F8C8D;
+}
+.log-scroll {
+  flex: 1;
+  padding: 8px 12px;
+}
+.empty {
+  align-items: center;
+  padding: 60px 20px;
+}
+.empty-text {
+  font-size: 14px;
+  color: #7F8C8D;
+  margin-bottom: 6px;
+}
+.empty-hint {
+  font-size: 12px;
+  color: #95A5A6;
+  text-align: center;
+}
+.review-card {
+  background-color: #FFFFFF;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 8px;
+  flex-direction: column;
+}
+.card-row1 {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.card-decision {
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+}
+.dec-create_rule {
+  background-color: #D5F5E3;
+  color: #239B56;
+}
+.dec-modify_rule {
+  background-color: #FCF3CF;
+  color: #B7950B;
+}
+.dec-delete_rule {
+  background-color: #FADBD8;
+  color: #C0392B;
+}
+.card-time {
+  font-size: 11px;
+  color: #95A5A6;
+  font-family: monospace;
+}
+.card-action {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2C3E50;
+  margin-bottom: 4px;
+}
+.card-reason {
+  font-size: 12px;
+  color: #34495E;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.card-row2 {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-conf {
+  font-size: 11px;
+  color: #7F8C8D;
+}
+.card-go {
+  font-size: 11px;
+  color: #3498DB;
+  font-weight: bold;
+}
+</style>

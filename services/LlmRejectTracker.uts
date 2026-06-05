@@ -1,9 +1,9 @@
-import * as LlmHistoryDao from '../database/LlmHistoryDao'
+import { existsRejectedByRule, updateUserAccepted } from '../database/LlmHistoryDao'
 
 export function hasBeenRejected(targetRuleId: number, decision: string): boolean {
   if (targetRuleId < 1) return false
   try {
-    return LlmHistoryDao.existsRejectedByRule(targetRuleId, decision)
+    return existsRejectedByRule(targetRuleId, decision)
   } catch (e) {
     console.warn('[LlmRejectTracker] hasBeenRejected 异常: ' + JSON.stringify(e))
     return false
@@ -12,7 +12,7 @@ export function hasBeenRejected(targetRuleId: number, decision: string): boolean
 
 export function markAccepted(historyId: number): void {
   try {
-    LlmHistoryDao.updateUserAccepted(historyId, 1)
+    updateUserAccepted(historyId, 1)
   } catch (e) {
     console.warn('[LlmRejectTracker] markAccepted 失败: ' + JSON.stringify(e))
   }
@@ -20,7 +20,7 @@ export function markAccepted(historyId: number): void {
 
 export function markRejected(historyId: number): void {
   try {
-    LlmHistoryDao.updateUserAccepted(historyId, 0)
+    updateUserAccepted(historyId, 0)
   } catch (e) {
     console.warn('[LlmRejectTracker] markRejected 失败: ' + JSON.stringify(e))
   }

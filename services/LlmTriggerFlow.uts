@@ -1,6 +1,8 @@
 import { callLlmEvaluate } from './CloudService'
-import * as LlmHistoryDao from '../database/LlmHistoryDao'
+import { insertHistory as insertLlmHistory } from '../database/LlmHistoryDao'
+import { insertRule as insertEffectiveRule, updateRule as updateEffectiveRule, deleteRule as deleteEffectiveRule } from '../database/EffectiveRuleDao'
 import { EffectiveTriggerRule, TimeWindow, ScreenConditions, TriggerLevel } from '../models/EffectiveTriggerRule'
+import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
 import { ParsedLlmResult, LlmHistoryStage } from '../models/LlmHistoryEntry'
 import {
   PreTriggerContext,
@@ -48,6 +50,32 @@ export function clearPostContext(): void {
   postContextCache = null
 }
 
+// 把内存态 EffectiveTriggerRule 转为持久化形态（落库前必走）
+export function fromEffectiveTriggerRule(rule: EffectiveTriggerRule): PersistedEffectiveRule {
+  let pkgList: string[] = []
+  if (rule.screenConditions != null) {
+    pkgList = rule.screenConditions.appPackages
+  }
+  const nowSec = Math.floor(Date.now() / 1000)
+  return {
+    id: rule.id,
+    actionId: rule.actionId,
+    appPackages: pkgList,
+    timeWindow: rule.timeWindow,
+    timeThresholdMinutes: rule.timeThresholdMinutes,
+    // 后续可按 rule.screenConditions.includeHome 区分 'gentle' / 'normal'，当前统一 gentle 避免误触
+    triggerLevel: 'gentle',
+    categoryFilter: rule.categoryFilter,
+    source: rule.source == 'local' ? 'user' : rule.source,
+    sourceHistoryId: null,
+    expiresAt: null,
+    enabled: rule.enabled,
+    priority: 5,
+    createdAt: rule.createdAt > 0 ? rule.createdAt : nowSec,
+    updatedAt: nowSec
+  }
+}
+
 export function evaluatePre(
   onReady: (result: PreTriggerResult) => void,
   onFail: () => void
@@ -74,7 +102,7 @@ export function evaluatePre(
           const adhoc = parsed.adhocText != null ? parsed.adhocText : getFallbackAdhoc()
           const stateDesc = parsed.stateDescription != null ? parsed.stateDescription : '检测到需要休息'
           try {
-            LlmHistoryDao.insertHistory('pre', contextJson, raw, parsed, adhoc, null, stateDesc)
+            insertLlmHistory('pre', contextJson, raw, parsed, adhoc, null, stateDesc)
           } catch (e) {
             console.warn('[LlmTriggerFlow] 写 pre history 失败: ' + JSON.stringify(e))
           }
@@ -88,7 +116,7 @@ export function evaluatePre(
           console.warn('[LlmTriggerFlow] pre parse 失败: ' + JSON.stringify(e))
           const fallback: PreTriggerResult = buildFallbackPre()
           try {
-            LlmHistoryDao.insertHistory('pre', contextJson, raw, {}, fallback.adhocText, null, fallback.stateDescription)
+            insertLlmHistory('pre', contextJson, raw, {}, fallback.adhocText, null, fallback.stateDescription)
           } catch (_) {}
           onReady(fallback)
         }
@@ -97,7 +125,7 @@ export function evaluatePre(
         console.warn('[LlmFlow] evaluatePre LLM 请求失败，使用 fallback')
         const fallback: PreTriggerResult = buildFallbackPre()
         try {
-          LlmHistoryDao.insertHistory('pre', contextJson, '', {}, fallback.adhocText, null, fallback.stateDescription)
+          insertLlmHistory('pre', contextJson, '', {}, fallback.adhocText, null, fallback.stateDescription)
         } catch (_) {}
         onReady(fallback)
       }
@@ -165,7 +193,7 @@ export function evaluatePost(
           }
           let historyId = 0
           try {
-            historyId = LlmHistoryDao.insertHistory(
+            historyId = insertLlmHistory(
               'post',
               contextJson,
               raw,
@@ -182,6 +210,27 @@ export function evaluatePost(
           } catch (e) {
             console.warn('[LlmTriggerFlow] 写 post history 失败: ' + JSON.stringify(e))
           }
+          // 把 LLM 建议真写入 effective_rules（评估链路闭环）
+          try {
+            const targetId = parsed.targetRuleId != null ? parsed.targetRuleId : 0
+            if (finalDecision == 'create_rule' && finalRule != null) {
+              const persisted = fromEffectiveTriggerRule(finalRule)
+              persisted.sourceHistoryId = historyId
+              insertEffectiveRule(persisted)
+              console.log('[LlmFlow] create_rule 已落库 actionId=' + finalRule.actionId)
+            } else if (finalDecision == 'modify_rule' && finalRule != null && targetId > 0) {
+              const persisted = fromEffectiveTriggerRule(finalRule)
+              persisted.id = targetId
+              persisted.sourceHistoryId = historyId
+              updateEffectiveRule(persisted)
+              console.log('[LlmFlow] modify_rule 已落库 id=' + targetId)
+            } else if (finalDecision == 'delete_rule' && targetId > 0) {
+              deleteEffectiveRule(targetId)
+              console.log('[LlmFlow] delete_rule 已落库 id=' + targetId)
+            }
+          } catch (e) {
+            console.warn('[LlmFlow] apply rule fail: ' + JSON.stringify(e))
+          }
           const result: PostActionResult = {
             suggestedRule: finalRule,
             decision: finalDecision,
@@ -196,7 +245,7 @@ export function evaluatePost(
           console.warn('[LlmTriggerFlow] post parse 失败: ' + JSON.stringify(e))
           let hid = 0
           try {
-            hid = LlmHistoryDao.insertHistory('post', contextJson, raw, {}, null, null, '', 0, null, null, null, null)
+            hid = insertLlmHistory('post', contextJson, raw, {}, null, null, '', 0, null, null, null, null)
           } catch (_) {}
           const result: PostActionResult = {
             suggestedRule: null,
@@ -213,7 +262,7 @@ export function evaluatePost(
       (): void => {
         let hid = 0
         try {
-          hid = LlmHistoryDao.insertHistory('post', contextJson, '', {}, null, null, '', 0, null, null, null, null)
+          hid = insertLlmHistory('post', contextJson, '', {}, null, null, '', 0, null, null, null, null)
         } catch (_) {}
         const result: PostActionResult = {
           suggestedRule: null,
@@ -342,12 +391,18 @@ function normalizeRule(raw: UTSJSONObject): EffectiveTriggerRule | null {
   if (typeof thresholdRaw === 'number') {
     threshold = (thresholdRaw as number).toInt()
   }
+  let categoryFilter: string | null = null
+  const cfRaw = raw['categoryFilter']
+  if (typeof cfRaw === 'string' && (cfRaw as string).length > 0) {
+    categoryFilter = cfRaw as string
+  }
   const rule: EffectiveTriggerRule = {
     id: 0,
     actionId: actionIdStr,
     timeWindow: timeWindow,
     screenConditions: screenConditions,
     timeThresholdMinutes: threshold,
+    categoryFilter: categoryFilter,
     source: 'llm',
     enabled: true,
     createdAt: Math.floor(Date.now() / 1000)

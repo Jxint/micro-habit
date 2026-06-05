@@ -7,3 +7,14 @@ export function md5(text: string): string {
   }
   return Math.abs(hash).toString(16).padStart(8, '0')
 }
+
+// FNV-1a 32bit hash，用于 TTS 文本缓存键
+export function textHash(text: string): string {
+  let hash: number = 2166136261
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i) as number
+    hash = (hash ^ code) * 16777619
+    hash = hash & 0xFFFFFFFF
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}

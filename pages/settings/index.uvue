@@ -96,6 +96,13 @@
           </view>
           <text class="setting-value">›</text>
         </view>
+        <view class="setting-item" @tap="goBlacklist">
+          <view class="setting-left">
+            <text class="setting-label">不提醒这些 App</text>
+            <text class="setting-hint">系统应用已默认排除，此处可补充不希望被提醒的第三方 App</text>
+          </view>
+          <text class="setting-value">{{ blacklistCount }} 个 ›</text>
+        </view>
       </view>
 
       <view class="settings-section">
@@ -108,7 +115,7 @@
         </view>
         <view class="setting-item" @tap="goDebugDB">
           <view class="setting-left">
-            <text class="setting-label">数据库巡检 & 配置</text>
+            <text class="setting-label">查看调试日志</text>
           </view>
           <text class="setting-value">›</text>
         </view>
@@ -229,6 +236,7 @@ const rules = ref<PersistedEffectiveRule[]>([])
 const triggerEnabled = ref<boolean>(getBool('trigger_enabled', true))
 const llmEnabled = ref<boolean>(getBool('llm_trigger_enabled', true))
 const askEachTime = ref<boolean>(getBool('llm_trigger_ask_each_time', true))
+const blacklistCount = ref<number>(0)
 
 const dndStart = computed<string>(() : string => pad2(dndStartHour.value) + ':00')
 const dndEnd = computed<string>(() : string => pad2(dndEndHour.value) + ':00')
@@ -376,6 +384,26 @@ function goAppCategories(): void {
   uni.navigateTo({ url: '/pages/settings/app-categories/index' })
 }
 
+function readBlacklistCount(): number {
+  try {
+    const raw = getSetting('app_blacklist', '[]')
+    const arr = JSON.parse(raw) as Array<any>
+    if (arr == null) return 0
+    let n = 0
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i]
+      if (typeof v === 'string' && v.length > 0) n++
+    }
+    return n
+  } catch (_) {
+    return 0
+  }
+}
+
+function goBlacklist(): void {
+  uni.navigateTo({ url: '/pages/settings/blacklist' })
+}
+
 const showRuleEditor = ref<boolean>(false)
 const editingRuleJson = ref<string>('')
 
@@ -508,6 +536,7 @@ onPageShow(() => {
   llmEnabled.value = getBool('llm_trigger_enabled', true)
   askEachTime.value = getBool('llm_trigger_ask_each_time', true)
   triggerEnabled.value = getBool('trigger_enabled', true)
+  blacklistCount.value = readBlacklistCount()
 })
 </script>
 

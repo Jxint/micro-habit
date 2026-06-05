@@ -52,6 +52,7 @@ open class GenPagesSettingsIndex : BasePage {
             val triggerEnabled = ref<Boolean>(getBool("trigger_enabled", true))
             val llmEnabled = ref<Boolean>(getBool("llm_trigger_enabled", true))
             val askEachTime = ref<Boolean>(getBool("llm_trigger_ask_each_time", true))
+            val blacklistCount = ref<Number>(0)
             val dndStart = computed<String>(fun(): String {
                 return pad2(dndStartHour.value) + ":00"
             }
@@ -125,7 +126,7 @@ open class GenPagesSettingsIndex : BasePage {
                     return "无条件"
                 }
                 try {
-                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:275") as UTSJSONObject
+                    val obj = UTSAndroid.consoleDebugError(JSON.parse(json), " at pages/settings/index.uvue:283") as UTSJSONObject
                     if (obj == null) {
                         return json.substring(0, 20)
                     }
@@ -243,13 +244,13 @@ open class GenPagesSettingsIndex : BasePage {
                             uni_showToast(ShowToastOptions(title = "已重置成就", icon = "none"))
                         }
                          catch (e: Throwable) {
-                            console.warn("[settings] resetAchievements 回调异常: " + JSON.stringify(e), " at pages/settings/index.uvue:366")
+                            console.warn("[settings] resetAchievements 回调异常: " + JSON.stringify(e), " at pages/settings/index.uvue:374")
                         }
                     }
                     ))
                 }
                  catch (e: Throwable) {
-                    console.warn("[settings] resetAchievements 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:371")
+                    console.warn("[settings] resetAchievements 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:379")
                 }
             }
             val resetAchievements = ::gen_resetAchievements_fn
@@ -257,6 +258,35 @@ open class GenPagesSettingsIndex : BasePage {
                 uni_navigateTo(NavigateToOptions(url = "/pages/settings/app-categories/index"))
             }
             val goAppCategories = ::gen_goAppCategories_fn
+            fun gen_readBlacklistCount_fn(): Number {
+                try {
+                    val raw = getSetting("app_blacklist", "[]")
+                    val arr = UTSAndroid.consoleDebugError(JSON.parse(raw), " at pages/settings/index.uvue:390") as UTSArray<Any>
+                    if (arr == null) {
+                        return 0
+                    }
+                    var n: Number = 0
+                    run {
+                        var i: Number = 0
+                        while(i < arr.length){
+                            val v = arr[i]
+                            if (UTSAndroid.`typeof`(v) === "string" && (v as String).length > 0) {
+                                n++
+                            }
+                            i++
+                        }
+                    }
+                    return n
+                }
+                 catch (_: Throwable) {
+                    return 0
+                }
+            }
+            val readBlacklistCount = ::gen_readBlacklistCount_fn
+            fun gen_goBlacklist_fn(): Unit {
+                uni_navigateTo(NavigateToOptions(url = "/pages/settings/blacklist"))
+            }
+            val goBlacklist = ::gen_goBlacklist_fn
             val showRuleEditor = ref<Boolean>(false)
             val editingRuleJson = ref<String>("")
             fun gen_onEditRule_fn(r: PersistedEffectiveRule): Unit {
@@ -289,7 +319,7 @@ open class GenPagesSettingsIndex : BasePage {
                     uni_showToast(ShowToastOptions(title = "已保存", icon = "success"))
                 }
                  catch (e: Throwable) {
-                    console.warn("[settings] onRuleSave 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:407")
+                    console.warn("[settings] onRuleSave 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:435")
                     uni_showToast(ShowToastOptions(title = "保存失败", icon = "none"))
                 }
             }
@@ -310,7 +340,7 @@ open class GenPagesSettingsIndex : BasePage {
                     uni_showToast(ShowToastOptions(title = "已删除", icon = "success"))
                 }
                  catch (e: Throwable) {
-                    console.warn("[settings] onRuleDelete 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:420")
+                    console.warn("[settings] onRuleDelete 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:448")
                     uni_showToast(ShowToastOptions(title = "删除失败", icon = "none"))
                 }
             }
@@ -340,7 +370,7 @@ open class GenPagesSettingsIndex : BasePage {
                     uni_showToast(ShowToastOptions(title = "正在检查...", icon = "none", position = "bottom"))
                 }
                  catch (e: Throwable) {
-                    console.warn("[settings] manualTrigger 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:445")
+                    console.warn("[settings] manualTrigger 异常: " + JSON.stringify(e), " at pages/settings/index.uvue:473")
                 }
             }
             val onManualTrigger = ::gen_onManualTrigger_fn
@@ -386,7 +416,7 @@ open class GenPagesSettingsIndex : BasePage {
                     setTriggerEnabled(enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onTriggerEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:475")
+                    console.warn("[settings] onTriggerEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:503")
                 }
             }
             val onTriggerEnabledChange = ::gen_onTriggerEnabledChange_fn
@@ -400,7 +430,7 @@ open class GenPagesSettingsIndex : BasePage {
                     putBool("llm_trigger_enabled", enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onLlmEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:486")
+                    console.warn("[settings] onLlmEnabledChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:514")
                 }
             }
             val onLlmEnabledChange = ::gen_onLlmEnabledChange_fn
@@ -414,7 +444,7 @@ open class GenPagesSettingsIndex : BasePage {
                     putBool("llm_trigger_ask_each_time", enabled)
                 }
                  catch (err: Throwable) {
-                    console.warn("[settings] onAskEachTimeChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:497")
+                    console.warn("[settings] onAskEachTimeChange 异常: " + JSON.stringify(err), " at pages/settings/index.uvue:525")
                 }
             }
             val onAskEachTimeChange = ::gen_onAskEachTimeChange_fn
@@ -433,6 +463,7 @@ open class GenPagesSettingsIndex : BasePage {
                 llmEnabled.value = getBool("llm_trigger_enabled", true)
                 askEachTime.value = getBool("llm_trigger_ask_each_time", true)
                 triggerEnabled.value = getBool("trigger_enabled", true)
+                blacklistCount.value = readBlacklistCount()
             }
             )
             return fun(): Any? {
@@ -554,6 +585,13 @@ open class GenPagesSettingsIndex : BasePage {
                                     _cE("text", _uM("class" to "setting-hint"), "手动调整每个 App 的分类，锁定后 LLM 不会覆盖")
                                 )),
                                 _cE("text", _uM("class" to "setting-value"), "›")
+                            )),
+                            _cE("view", _uM("class" to "setting-item", "onClick" to goBlacklist), _uA(
+                                _cE("view", _uM("class" to "setting-left"), _uA(
+                                    _cE("text", _uM("class" to "setting-label"), "不提醒这些 App"),
+                                    _cE("text", _uM("class" to "setting-hint"), "系统应用已默认排除，此处可补充不希望被提醒的第三方 App")
+                                )),
+                                _cE("text", _uM("class" to "setting-value"), _tD(unref(blacklistCount)) + " 个 ›", 1)
                             ))
                         )),
                         _cE("view", _uM("class" to "settings-section"), _uA(
@@ -566,7 +604,7 @@ open class GenPagesSettingsIndex : BasePage {
                             )),
                             _cE("view", _uM("class" to "setting-item", "onClick" to goDebugDB), _uA(
                                 _cE("view", _uM("class" to "setting-left"), _uA(
-                                    _cE("text", _uM("class" to "setting-label"), "数据库巡检 & 配置")
+                                    _cE("text", _uM("class" to "setting-label"), "查看调试日志")
                                 )),
                                 _cE("text", _uM("class" to "setting-value"), "›")
                             )),

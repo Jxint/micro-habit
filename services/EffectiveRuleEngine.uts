@@ -4,6 +4,7 @@ import { TriggerContext } from './TriggerEngine'
 import { isInTimeRange } from '../utils/TimeUtils'
 import { PersistedEffectiveRule } from '../models/PersistedEffectiveRule'
 import { MicroAction } from '../models/MicroAction'
+import { isSystemPackage } from '../utils/SystemAppUtils'
 
 export type EffectiveRuleMatch = {
   rule: PersistedEffectiveRule
@@ -12,6 +13,10 @@ export type EffectiveRuleMatch = {
 }
 
 export function evaluate(ctx: TriggerContext): EffectiveRuleMatch | null {
+  // 系统包兜底：通用规则（appPackages 为空）也会无差别匹配所有包，
+  // 即使 TriggerEngine 已过滤，这里也要再挡一次，防止直接调用 evaluate 的旁路污染
+  if (isSystemPackage(ctx.appPackage)) return null
+
   let candidates: PersistedEffectiveRule[] = []
   const all = getActiveRules()
   console.log('[EffectiveRuleEngine] all rules=' + all.length + ' pkg=' + ctx.appPackage + ' mins=' + ctx.continuousMinutes)

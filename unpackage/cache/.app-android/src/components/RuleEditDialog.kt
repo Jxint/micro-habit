@@ -48,6 +48,69 @@ open class GenComponentsRuleEditDialog : VueComponent {
             var ruleCreatedAt: Number = 0
             var ruleSourceHistoryId: Number? = null
             var ruleExpiresAt: Number? = null
+            fun gen_parseToRule_fn(o: UTSJSONObject?): PersistedEffectiveRule {
+                if (o == null) {
+                    return PersistedEffectiveRule(id = 0, actionId = "", appPackages = _uA<String>(), timeWindow = null, timeThresholdMinutes = 60, triggerLevel = "gentle" as TriggerLevel, categoryFilter = null, source = "user" as String, sourceHistoryId = null, expiresAt = null, enabled = true, priority = 0, createdAt = Math.floor(Date.now() / 1000), updatedAt = Math.floor(Date.now() / 1000))
+                }
+                val pkgArr: UTSArray<String> = _uA()
+                val rawPkgs = o["appPackages"] as UTSArray<Any>?
+                if (rawPkgs != null) {
+                    run {
+                        var i: Number = 0
+                        while(i < rawPkgs.length){
+                            val v = rawPkgs[i] as String?
+                            if (v != null && v.length > 0) {
+                                pkgArr.push(v)
+                            }
+                            i++
+                        }
+                    }
+                }
+                val twRaw = o["timeWindow"]
+                var tw: TimeWindow? = null
+                if (twRaw != null) {
+                    val twObj = twRaw as UTSJSONObject
+                    val s = twObj["start"] as String?
+                    val e = twObj["end"] as String?
+                    if (s != null && e != null && s.length > 0 && e.length > 0) {
+                        tw = TimeWindow(start = s!!!!, end = e!!!!)
+                    }
+                }
+                val srcRaw = (o["source"] as String?) ?: "user"
+                val src: String = if (srcRaw == "llm") {
+                    "llm"
+                } else {
+                    if (srcRaw == "system") {
+                        "system"
+                    } else {
+                        "user"
+                    }
+                }
+                val lvlRaw = (o["triggerLevel"] as String?) ?: "gentle"
+                val lvl: TriggerLevel = if (lvlRaw == "strong") {
+                    "strong"
+                } else {
+                    if (lvlRaw == "forced") {
+                        "forced"
+                    } else {
+                        "gentle"
+                    }
+                }
+                val histRaw = o["sourceHistoryId"]
+                val histId: Number? = if (histRaw == null) {
+                    null
+                } else {
+                    (histRaw as Number)
+                }
+                val expRaw = o["expiresAt"]
+                val expAt: Number? = if (expRaw == null) {
+                    null
+                } else {
+                    (expRaw as Number)
+                }
+                return PersistedEffectiveRule(id = (o["id"] as Number) ?: 0, actionId = (o["actionId"] as String) ?: "", appPackages = pkgArr, timeWindow = tw, timeThresholdMinutes = (o["timeThresholdMinutes"] as Number) ?: 60, triggerLevel = lvl, categoryFilter = (o["categoryFilter"] as String?) ?: null, source = src, sourceHistoryId = histId, expiresAt = expAt, enabled = (o["enabled"] as Boolean) == true, priority = (o["priority"] as Number) ?: 0, createdAt = (o["createdAt"] as Number) ?: 0, updatedAt = (o["updatedAt"] as Number) ?: 0)
+            }
+            val parseToRule = ::gen_parseToRule_fn
             fun gen_resetDraft_fn(): Unit {
                 if (props.ruleJson.length < 1) {
                     draftActionId = ""
@@ -66,7 +129,8 @@ open class GenComponentsRuleEditDialog : VueComponent {
                     ruleExpiresAt = null
                     return
                 }
-                val r: PersistedEffectiveRule = UTSAndroid.consoleDebugError(JSON.parse(props.ruleJson), " at components/RuleEditDialog.uvue:177") as PersistedEffectiveRule
+                val obj: UTSJSONObject = UTSAndroid.consoleDebugError(JSON.parse(props.ruleJson), " at components/RuleEditDialog.uvue:240") as UTSJSONObject
+                val r: PersistedEffectiveRule = parseToRule(obj)
                 ruleId = r.id
                 isDefault = r.source == "system"
                 draftActionId = r.actionId

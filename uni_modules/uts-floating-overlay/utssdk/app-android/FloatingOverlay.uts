@@ -96,6 +96,12 @@ class FloatingOverlayManager {
 
   show(config: OverlayConfig, callbacks: OverlayCallbacks): void {
     if (this.showing) return
+    // 防御：showing=false 但 rootView 残留（上一次 dismiss 抛错导致）
+    if (this.rootView != null) {
+      try { this.wm?.removeView(this.rootView) } catch (_) {}
+      this.rootView = null
+      this.wm = null
+    }
     this.callbacks = callbacks
     this.config = config
     this.totalMs = config.durationMs
@@ -124,12 +130,14 @@ class FloatingOverlayManager {
     this.showing = false
     this.state = 'hidden'
     this.stopCountdown()
-    if (this.rootView != null && this.wm != null) {
+    if (this.rootView != null) {
       try {
-        this.wm.removeView(this.rootView)
-      } catch (_) {}
+        this.wm?.removeView(this.rootView)
+      } catch (e) {
+        console.warn('[FloatingOverlay] removeView 失败: ' + JSON.stringify(e))
+      }
+      this.rootView = null
     }
-    this.rootView = null
     this.wm = null
     this.callbacks = null
     this.config = null
