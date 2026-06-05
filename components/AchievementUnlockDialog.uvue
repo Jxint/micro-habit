@@ -47,94 +47,18 @@ function onViewDetail(): void { emit('viewDetail') }
 </script>
 
 <style scoped>
-.unlock-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.65);
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.unlock-card {
-  width: 80%;
-  max-width: 380px;
-  background-color: #FFFFFF;
-  border-radius: 20px;
-  padding: 24px 20px 20px 20px;
-  flex-direction: column;
-  align-items: center;
-  border: 3px solid #F39C12;
-}
-.unlock-fire {
-  font-size: 48px;
-  margin-bottom: 8px;
-}
-.unlock-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: #D35400;
-  margin-bottom: 16px;
-}
-.unlock-badge {
-  width: 88px;
-  height: 88px;
-  border-radius: 44px;
-  background-color: #FEF5E7;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 14px;
-  border: 3px solid #F39C12;
-}
-.unlock-icon {
-  font-size: 48px;
-}
-.unlock-name {
-  font-size: 22px;
-  font-weight: bold;
-  color: #2C3E50;
-  margin-bottom: 6px;
-}
-.unlock-desc {
-  font-size: 13px;
-  color: #7F8C8D;
-  text-align: center;
-  margin-bottom: 12px;
-  line-height: 1.5;
-}
-.unlock-reward {
-  font-size: 13px;
-  color: #27AE60;
-  font-weight: bold;
-  margin-bottom: 20px;
-}
-.unlock-buttons {
-  flex-direction: row;
-  width: 100%;
-}
-.unlock-btn {
-  flex: 1;
-  height: 42px;
-  border-radius: 21px;
-  align-items: center;
-  justify-content: center;
-  background-color: #ECF0F1;
-  margin-right: 8px;
-}
-.unlock-btn-primary {
-  background-color: #E67E22;
-  margin-right: 0;
-  margin-left: 8px;
-}
-.unlock-btn-text {
-  font-size: 14px;
-  color: #2C3E50;
-}
-.unlock-btn-text-primary {
-  font-size: 14px;
-  font-weight: bold;
-  color: #FFFFFF;
-}
+.unlock-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.62); align-items: center; justify-content: center; z-index: 999; }
+.unlock-card { width: 82%; background-color: rgba(29, 25, 62, 0.96); background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.94) 0%, rgba(84, 65, 124, 0.82) 56%, rgba(198, 141, 192, 0.18) 100%); border-radius: 28px; padding: 24px 20px; align-items: center; border-width: 1px; border-color: rgba(219, 200, 237, 0.22); border-style: solid; }
+.unlock-fire { font-size: 30px; margin-bottom: 8px; }
+.unlock-title { color: #DBC8ED; font-size: 15px; font-weight: bold; margin-bottom: 14px; }
+.unlock-badge { width: 88px; height: 88px; border-radius: 44px; background-color: rgba(219, 200, 237, 0.18); align-items: center; justify-content: center; border-width: 1px; border-color: rgba(219, 200, 237, 0.34); border-style: solid; }
+.unlock-icon { font-size: 42px; }
+.unlock-name { color: #FFFFFF; font-size: 20px; font-weight: bold; margin-top: 16px; }
+.unlock-desc { color: rgba(255, 255, 255, 0.72); font-size: 13px; line-height: 20px; text-align: center; margin-top: 8px; }
+.unlock-reward { color: #DBC8ED; font-size: 13px; margin-top: 12px; text-align: center; }
+.unlock-buttons { width: 100%; flex-direction: row; margin-top: 20px; }
+.unlock-btn { flex: 1; padding: 12px; border-radius: 18px; align-items: center; justify-content: center; background-color: rgba(255, 255, 255, 0.1); margin-right: 8px; }
+.unlock-btn-primary { background-color: #DBC8ED; margin-right: 0; margin-left: 8px; }
+.unlock-btn-text { color: rgba(255, 255, 255, 0.72); font-size: 14px; }
+.unlock-btn-text-primary { color: #161A33; font-size: 14px; font-weight: bold; }
 </style>

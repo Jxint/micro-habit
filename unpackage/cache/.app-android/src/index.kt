@@ -141,9 +141,15 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
     )
 }
 fun initRuntimeSocketService(): UTSPromise<Boolean> {
+<<<<<<< HEAD
     val hosts: String = "172.24.90.1,127.0.0.1"
     val port: String = "8090"
     val id: String = "app-android_L5D_tz"
+=======
+    val hosts: String = "127.0.0.1,172.21.18.17,172.16.253.1,192.168.238.1"
+    val port: String = "8090"
+    val id: String = "app-android_6DhOvg"
+>>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
     if (hosts == "" || port == "" || id == "") {
         return UTSPromise.resolve(false)
     }
@@ -10372,7 +10378,11 @@ open class DbTableInfo (
     open var count: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+<<<<<<< HEAD
         return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 178, 6)
+=======
+        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 173, 6)
+>>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return DbTableInfoReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -10424,7 +10434,11 @@ open class ConfigItem (
     open var value: String,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+<<<<<<< HEAD
         return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 182, 6)
+=======
+        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 177, 6)
+>>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return ConfigItemReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -10752,8 +10766,8 @@ fun definePageRoutes() {
     __uniRoutes.push(UniPageRoute(path = "pages/guide/index", component = GenPagesGuideIndexClass, meta = UniPageMeta(isQuit = true), style = _uM("navigationStyle" to "custom", "navigationBarTitleText" to "")))
     __uniRoutes.push(UniPageRoute(path = "pages/home/index", component = GenPagesHomeIndexClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationStyle" to "custom", "navigationBarTitleText" to "")))
     __uniRoutes.push(UniPageRoute(path = "pages/action/execute", component = GenPagesActionExecuteClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationStyle" to "custom", "navigationBarTitleText" to "")))
-    __uniRoutes.push(UniPageRoute(path = "pages/data/dashboard", component = GenPagesDataDashboardClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "数据看板")))
-    __uniRoutes.push(UniPageRoute(path = "pages/settings/index", component = GenPagesSettingsIndexClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "设置")))
+    __uniRoutes.push(UniPageRoute(path = "pages/data/dashboard", component = GenPagesDataDashboardClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationStyle" to "custom", "navigationBarTitleText" to "")))
+    __uniRoutes.push(UniPageRoute(path = "pages/settings/index", component = GenPagesSettingsIndexClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationStyle" to "custom", "navigationBarTitleText" to "")))
     __uniRoutes.push(UniPageRoute(path = "pages/debug/logs", component = GenPagesDebugLogsClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "调试日志")))
     __uniRoutes.push(UniPageRoute(path = "pages/debug/llm-rules", component = GenPagesDebugLlmRulesClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "LLM 规则审核")))
     __uniRoutes.push(UniPageRoute(path = "pages/settings/app-categories/index", component = GenPagesSettingsAppCategoriesIndexClass, meta = UniPageMeta(isQuit = false), style = _uM("navigationBarTitleText" to "App 分类管理")))

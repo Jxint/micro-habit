@@ -63,68 +63,17 @@ function onTap(): void {
 </script>
 
 <style scoped>
-.action-card {
-  flex-direction: row;
-  align-items: center;
-  padding: 12px 16px;
-  margin: 4px 16px;
-  background-color: #F8F9FA;
-  border-radius: 12px;
-  border-width: 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-}
-.card-recommend {
-  background-color: #F0F9F4;
-  border-left-width: 4px;
-  border-left-color: #2ECC71;
-  border-left-style: solid;
-}
-.card-library {
-  background-color: #FFFFFF;
-  border-width: 1px;
-  border-color: #ECF0F1;
-  border-style: solid;
-}
-.action-icon-wrap {
-  width: 46px;
-  height: 46px;
-  border-radius: 23px;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-}
-.icon-wrap-recommend {
-  background-color: #D5F5E3;
-}
-.icon-wrap-library {
-  background-color: #F0F3F4;
-}
-.action-icon-img {
-  width: 42px;
-  height: 42px;
-}
-.action-info {
-  flex: 1;
-  flex-direction: column;
-}
-.action-name {
-  font-size: 15px;
-  font-weight: bold;
-  color: #2C3E50;
-}
-.action-duration-text {
-  font-size: 12px;
-  color: #95A5A6;
-  margin-top: 2px;
-}
-.action-arrow {
-  font-size: 22px;
-  font-weight: bold;
-}
-.arrow-recommend {
-  color: #2ECC71;
-}
-.arrow-library {
-  color: #BDC3C7;
-}
+.action-card { flex-direction: row; align-items: center; padding: 12px 14px; margin: 6px 16px; border-radius: 18px; border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; background-color: rgba(255, 255, 255, 0.1); }
+.card-recommend { background-color: rgba(219, 200, 237, 0.16); border-color: rgba(219, 200, 237, 0.34); }
+.card-library { background-color: rgba(255, 255, 255, 0.08); }
+.action-icon-wrap { width: 46px; height: 46px; border-radius: 23px; align-items: center; justify-content: center; margin-right: 12px; }
+.icon-wrap-recommend { background-color: rgba(219, 200, 237, 0.2); }
+.icon-wrap-library { background-color: rgba(194, 224, 238, 0.12); }
+.action-icon-img { width: 42px; height: 42px; }
+.action-info { flex: 1; flex-direction: column; }
+.action-name { font-size: 15px; font-weight: bold; color: #FFFFFF; }
+.action-duration-text { font-size: 12px; color: rgba(255, 255, 255, 0.62); margin-top: 2px; }
+.action-arrow { font-size: 22px; font-weight: bold; }
+.arrow-recommend { color: #DBC8ED; }
+.arrow-library { color: rgba(255, 255, 255, 0.45); }
 </style>

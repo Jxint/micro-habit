@@ -5,14 +5,53 @@
     "compiler_version": "5.11.2026052520-alpha"
   },
   "files": {
+<<<<<<< HEAD
     "components/FeedbackDialog.kt": {
       "md5": "20c966cdce079d9cf855c094e9f8ae0b985bd1bd",
       "class": "GenComponentsFeedbackDialog"
+=======
+    "uniCloud/cloudfunctions/GenCloudObjLlmRuleSuggest.kt": {
+      "md5": "f069c8e8edba1b5ccf1d6e3f3ddc808d82feee48",
+      "class": "GenCloudObjLlmRuleSuggest"
+    },
+    "components/AchievementDetailDialog.kt": {
+      "class": "GenComponentsAchievementDetailDialog",
+      "md5": "b41a766b3d2431935eda88671f65b279bd0d2a1d"
+    },
+    "components/NumberPickerDialog.kt": {
+      "class": "GenComponentsNumberPickerDialog",
+      "md5": "73161c83b29b032611b0d44d0c7a1783231d2622"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmWeekly.kt": {
+      "md5": "d8372e5bea68f528e3c9ea0a754b2cc8f209e6ce",
+      "class": "GenCloudObjLlmWeekly"
+    },
+    "pages/action/execute.kt": {
+      "md5": "7405a2983d384a1752a00116e90e212124d79349",
+      "class": "GenPagesActionExecute"
+    },
+    "pages/settings/app-categories/index.kt": {
+      "md5": "03811e90853ca7ecacae53e9f011053427fd059c",
+      "class": "GenPagesSettingsAppCategoriesIndex"
+    },
+    "components/PhoneUsageDialog.kt": {
+      "md5": "213ce6bec98466a369d916516a39f3f72a43656a",
+      "class": "GenComponentsPhoneUsageDialog"
+    },
+    "components/TimeRangePickerDialog.kt": {
+      "md5": "869b1bda78a306b82e26a05c6782998d651bef17",
+      "class": "GenComponentsTimeRangePickerDialog"
+    },
+    "pages/guide/index.kt": {
+      "md5": "4be8a196d71e72c1438ca22bac90de2b3d03d82e",
+      "class": "GenPagesGuideIndex"
+>>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
     },
     "components/LineChart.kt": {
       "class": "GenComponentsLineChart",
-      "md5": "ca85062c01a3f54119c1de208b2aed2c9d63a272"
+      "md5": "cf97d483dea81b60fda1e856e298012d3e90ee67"
     },
+<<<<<<< HEAD
     "components/EncourageToast.kt": {
       "class": "GenComponentsEncourageToast",
       "md5": "a98481b3a473d9578e42e5732d74fdf4962f1703"
@@ -48,10 +87,39 @@
     "pages/action/execute.kt": {
       "md5": "c0fdf6c2cb79f050dbcc8281aff79184f4364f85",
       "class": "GenPagesActionExecute"
+=======
+    "components/CountdownBar.kt": {
+      "class": "GenComponentsCountdownBar",
+      "md5": "0f3695ec8107665133961661daba8b602c07a51b"
     },
-    "pages/settings/app-categories/index.kt": {
-      "md5": "1ec67b305dc5eff9c7d8a042eb70d42a0cb59fb1",
-      "class": "GenPagesSettingsAppCategoriesIndex"
+    "components/StatusIndicator.kt": {
+      "class": "GenComponentsStatusIndicator",
+      "md5": "fec3ae3060a4f120ec1adefcad8c0747fc26d8ab"
+>>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
+    },
+    "components/FeedbackDialog.kt": {
+      "class": "GenComponentsFeedbackDialog",
+      "md5": "af74f54f4fe83aacbf7afbe9a507ebd067a624ac"
+    },
+    "components/HeatmapCalendar.kt": {
+      "class": "GenComponentsHeatmapCalendar",
+      "md5": "e9a38175ea6ff81dfeab350139c26626d7f346c9"
+    },
+    "pages/settings/index.kt": {
+      "class": "GenPagesSettingsIndex",
+      "md5": "f35bd6819e67f32391247dbd1e27d20ba1b6f2b5"
+    },
+    "components/AchievementUnlockDialog.kt": {
+      "class": "GenComponentsAchievementUnlockDialog",
+      "md5": "ae9f3adde14b1ddb7965b0c025fee50a74dcfbf3"
+    },
+    "uniCloud/cloudfunctions/GenCloudObjLlmDaily.kt": {
+      "md5": "0c3cd1a85a1135e443a8557d9edbfc4ce3f51e7f",
+      "class": "GenCloudObjLlmDaily"
+    },
+    "pages/home/index.kt": {
+      "class": "GenPagesHomeIndex",
+      "md5": "ce494c9e92804ce814371b5b1c78788be542766f"
     },
     "pages/debug/llm-rules.kt": {
       "class": "GenPagesDebugLlmRules",
@@ -95,8 +163,9 @@
     },
     "components/BarChart.kt": {
       "class": "GenComponentsBarChart",
-      "md5": "f33a3d008627366c374df7d0de7c641c7b6b030b"
+      "md5": "b0a3e254803ad0069686106f3a4da5b163d8f42d"
     },
+<<<<<<< HEAD
     "pages/debug/logs.kt": {
       "class": "GenPagesDebugLogs",
       "md5": "9478bc8a085ff72a14db204f664d7330ecae1d24"
@@ -124,6 +193,35 @@
     "components/StatusIndicator.kt": {
       "md5": "3a645e1ff357981330bfa1f5d2494272687bbeee",
       "class": "GenComponentsStatusIndicator"
+=======
+    "pages/data/dashboard.kt": {
+      "class": "GenPagesDataDashboard",
+      "md5": "6a1394a95444315e3499c24e83816787dd32bbf9"
+    },
+    "components/ActionCard.kt": {
+      "md5": "f13004a7a49465839feeef284aa03feef9ec8b06",
+      "class": "GenComponentsActionCard"
+    },
+    "components/TriggerRuleDialog.kt": {
+      "class": "GenComponentsTriggerRuleDialog",
+      "md5": "a6765c7f88fc6878e7807c6dbe2dfe1cc7570c57"
+    },
+    "components/LlmHistoryCard.kt": {
+      "md5": "861869202c972e848380f99879393a3a788f722b",
+      "class": "GenComponentsLlmHistoryCard"
+    },
+    "components/EncourageToast.kt": {
+      "class": "GenComponentsEncourageToast",
+      "md5": "51419c12331c0a2131e67fd52e1ab8bd6c9a328c"
+    },
+    "index.kt": {
+      "md5": "3b064d34d76df105822ae0820fadca7c8c16db85",
+      "class": ""
+    },
+    "pages/debug/logs.kt": {
+      "class": "GenPagesDebugLogs",
+      "md5": "817121f512afc55b4c58c6e9e0da09937b675678"
+>>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
     }
   }
 }

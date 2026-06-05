@@ -79,139 +79,70 @@ function onMaskTap(): void { close() }
 </script>
 
 <style scoped>
-.dialog-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-.dialog-card {
-  width: 90%;
-  max-width: 420px;
-  background-color: #FFFFFF;
-  border-radius: 16px;
-  padding: 16px;
-  flex-direction: column;
-}
-.dialog-header {
-  flex-direction: row;
-  align-items: center;
-  padding: 4px 4px 12px 4px;
-}
-.dialog-icon-wrap {
-  width: 56px;
-  height: 56px;
-  border-radius: 28px;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-}
-.icon-unlocked {
-  background-color: #FEF5E7;
-}
-.icon-locked {
-  background-color: #F0F3F4;
-}
-.dialog-icon {
-  font-size: 32px;
-}
-.dialog-title-wrap {
-  flex: 1;
-  flex-direction: column;
-}
-.dialog-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: #2C3E50;
-  margin-bottom: 2px;
-}
-.dialog-cat {
-  font-size: 11px;
-  color: #95A5A6;
-}
-.dialog-close {
-  width: 28px;
-  height: 28px;
-  border-radius: 14px;
-  background-color: #F0F3F4;
-  align-items: center;
-  justify-content: center;
-}
-.dialog-close-text {
-  font-size: 18px;
-  color: #7F8C8D;
-  font-weight: bold;
-}
-.dialog-body {
-  padding: 4px 4px 0 4px;
-}
-.achv-desc {
-  font-size: 14px;
-  color: #34495E;
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-.achv-status-row {
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 14px;
-}
-.achv-status-on {
-  font-size: 13px;
-  font-weight: bold;
-  color: #27AE60;
-}
-.achv-status-off {
-  font-size: 13px;
-  font-weight: bold;
-  color: #95A5A6;
-}
-.achv-date {
-  font-size: 12px;
-  color: #7F8C8D;
-}
-.achv-section-title {
-  font-size: 11px;
-  color: #95A5A6;
-  margin-top: 10px;
-  margin-bottom: 4px;
-}
-.achv-reward {
-  font-size: 14px;
-  color: #2C3E50;
-  font-weight: bold;
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-.achv-progress-wrap {
-  flex-direction: column;
-  margin-bottom: 4px;
-}
-.achv-progress-track {
-  height: 8px;
-  background-color: #ECF0F1;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 4px;
-}
-.achv-progress-fill {
-  height: 8px;
-  background-color: #3498DB;
-  border-radius: 4px;
-}
-.achv-progress-text {
-  font-size: 12px;
-  color: #7F8C8D;
-}
-.achv-history {
-  font-size: 13px;
-  color: #34495E;
-  line-height: 1.5;
-  margin-bottom: 8px;
-}
+.dialog-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.58); align-items: center; justify-content: center; z-index: 999; }
+.dialog-card { width: 90%; max-width: 420px; max-height: 560px; background-color: rgba(29, 25, 62, 0.96); background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.94) 0%, rgba(84, 65, 124, 0.82) 56%, rgba(198, 141, 192, 0.18) 100%); border-radius: 24px; padding: 16px; flex-direction: column; border-width: 1px; border-color: rgba(219, 200, 237, 0.2); border-style: solid; }
+.dialog-header { flex-direction: row; justify-content: space-between; align-items: center; padding: 4px 4px 12px 4px; }
+.dialog-title { font-size: 17px; font-weight: bold; color: #FFFFFF; }
+.dialog-close { width: 30px; height: 30px; border-radius: 15px; background-color: rgba(255, 255, 255, 0.1); align-items: center; justify-content: center; }
+.dialog-close-text { font-size: 18px; color: rgba(255, 255, 255, 0.72); font-weight: bold; }
+.hint-block,
+.summary-row,
+.ai-block,
+.preview-block,
+.picker-value-box,
+.time-value-box,
+.history-rule,
+.achv-progress-wrap { background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.14); border-style: solid; border-radius: 18px; }
+.hint-block { padding: 10px 12px; margin-bottom: 14px; }
+.hint-text,
+.summary-stat-label,
+.legend-label,
+.legend-percent,
+.legend-minutes,
+.empty-text,
+.empty-hint,
+.ai-text,
+.ai-placeholder-text,
+.preview-text,
+.range-label,
+.picker-unit,
+.achv-desc,
+.achv-date,
+.achv-history { color: rgba(255, 255, 255, 0.72); }
+.action-row,
+.dialog-buttons,
+.unlock-buttons { flex-direction: row; margin-top: 16px; }
+.action-btn,
+.btn,
+.unlock-btn { flex: 1; padding: 11px; border-radius: 16px; align-items: center; justify-content: center; }
+.action-cancel,
+.btn-secondary { margin-right: 8px; background-color: rgba(255, 255, 255, 0.1); }
+.action-confirm,
+.btn-primary,
+.unlock-btn-primary { margin-left: 8px; background-color: #DBC8ED; }
+.action-cancel-text,
+.btn-text,
+.unlock-btn-text { color: rgba(255, 255, 255, 0.72); font-size: 14px; }
+.action-confirm-text,
+.unlock-btn-text-primary { color: #161A33; font-size: 14px; font-weight: bold; }
+
+.dialog-header { align-items: center; }
+.dialog-icon-wrap { width: 56px; height: 56px; border-radius: 28px; align-items: center; justify-content: center; margin-right: 12px; }
+.icon-unlocked { background-color: rgba(219, 200, 237, 0.2); }
+.icon-locked { background-color: rgba(255, 255, 255, 0.1); }
+.dialog-icon { font-size: 28px; }
+.dialog-title-wrap { flex: 1; flex-direction: column; }
+.dialog-cat { color: rgba(255, 255, 255, 0.62); font-size: 12px; margin-top: 3px; }
+.dialog-body { padding: 6px 2px; }
+.achv-desc { font-size: 13px; line-height: 19px; }
+.achv-status-row { flex-direction: row; align-items: center; margin-top: 12px; }
+.achv-status-on { color: #8FF0C3; font-size: 12px; font-weight: bold; }
+.achv-status-off { color: rgba(255, 255, 255, 0.58); font-size: 12px; }
+.achv-section-title { color: #DBC8ED; font-size: 12px; font-weight: bold; margin-top: 14px; }
+.achv-reward { color: #FFFFFF; font-size: 13px; line-height: 19px; margin-top: 4px; }
+.achv-progress-wrap { padding: 12px; margin-top: 6px; }
+.achv-progress-track { height: 8px; background-color: rgba(255, 255, 255, 0.12); border-radius: 4px; overflow: hidden; }
+.achv-progress-fill { height: 8px; background-color: #DBC8ED; border-radius: 4px; }
+.achv-progress-text { color: rgba(255, 255, 255, 0.72); font-size: 12px; margin-top: 6px; }
+.achv-history { font-size: 12px; line-height: 18px; margin-top: 4px; }
 </style>

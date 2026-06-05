@@ -63,7 +63,7 @@
           <view class="log-row1">
             <text class="log-time">{{ formatTime(log.created_at) }}</text>
             <text class="log-tag" :class="'tag-' + log.trigger_type">{{ formatTriggerType(log.trigger_type) }}</text>
-            <text class="log-level">{{ log.trigger_level }}</text>
+            <text class="log-level">{{ formatTriggerLevel(log.trigger_level) }}</text>
           </view>
           <view class="log-row2">
             <text class="log-field-label">动作：</text>
@@ -95,19 +95,19 @@
           </view>
           <view class="log-row2">
             <text class="log-field-label">动作ID：</text>
-            <text class="log-field-val">{{ log.action_id }}</text>
+            <text class="log-field-val">{{ formatActionId(log.action_id) }}</text>
             <text class="log-field-label" style="margin-left:12px;">分类：</text>
-            <text class="log-field-val">{{ log.action_type }}</text>
+            <text class="log-field-val">{{ formatActionType(log.action_type) }}</text>
           </view>
           <view class="log-row2">
             <text class="log-field-label">用时：</text>
             <text class="log-field-val">{{ formatDuration(log.duration_ms) }} / {{ formatDuration(log.target_ms) }}</text>
             <text class="log-field-label" style="margin-left:12px;">等级：</text>
-            <text class="log-field-val">{{ log.trigger_level }}</text>
+            <text class="log-field-val">{{ formatTriggerLevel(log.trigger_level) }}</text>
           </view>
           <view v-if="log.skip_reason != null && log.skip_reason.length > 0" class="log-row3">
             <text class="log-field-label">跳过原因：</text>
-            <text class="log-skip-reason">{{ log.skip_reason }}</text>
+            <text class="log-skip-reason">{{ formatSkipReason(log.skip_reason) }}</text>
           </view>
         </view>
       </view>
@@ -118,7 +118,7 @@
         </view>
         <view v-for="(info, idx) in dbTableInfos" :key="idx" class="db-table-card">
           <view class="db-table-row">
-            <text class="db-table-name">{{ info.name }}</text>
+            <text class="db-table-name">{{ formatTableName(info.name) }}</text>
             <text class="db-table-count">{{ info.count }} 行</text>
           </view>
         </view>
@@ -128,11 +128,11 @@
         <view v-for="(log, idx) in dbRecentActions" :key="'ra-' + idx" class="log-item">
           <view class="log-row1">
             <text class="log-time">{{ formatTime(log.created_at) }}</text>
-            <text class="log-tag tag-manual">{{ log.action_id }}</text>
+            <text class="log-tag tag-manual">{{ formatActionId(log.action_id) }}</text>
             <text class="log-result" :class="'res-' + log.result">{{ formatResult(log.result) }}</text>
           </view>
           <view class="log-row2">
-            <text class="log-field-val">{{ log.action_type }} | {{ formatDuration(log.duration_ms) }} | {{ log.trigger_type }}</text>
+            <text class="log-field-val">{{ formatActionType(log.action_type) }} · {{ formatDuration(log.duration_ms) }} · {{ formatTriggerType(log.trigger_type) }}</text>
           </view>
         </view>
       </view>
@@ -146,8 +146,8 @@
         </view>
         <view v-for="(item, idx) in configList" :key="idx" class="config-item">
           <view class="config-row">
-            <text class="config-key">{{ item.key }}</text>
-            <text class="config-val">{{ item.value }}</text>
+            <text class="config-key">{{ formatConfigKey(item.key) }}</text>
+            <text class="config-val">{{ formatConfigValue(item.key, item.value) }}</text>
           </view>
         </view>
       </view>
@@ -161,6 +161,7 @@ import { getTodayLogs, countCompletedToday, countSkippedToday } from '../../data
 import { TriggerLog, UserAction } from '../../models/TriggerLog'
 import { ActionLog, ActionResult } from '../../models/ActionLog'
 import { dbManager } from '../../database/DatabaseManager'
+import { getActionById } from '../../constants/Actions'
 
 const triggerLogs = ref<TriggerLog[]>([])
 const actionLogs = ref<ActionLog[]>([])
@@ -199,11 +200,11 @@ function formatTime(t: number): string {
 }
 
 function formatDuration(ms: number): string {
-  if (ms == null || ms <= 0) return '0s'
+  if (ms == null || ms <= 0) return '0秒'
   const s = Math.floor(ms / 1000)
-  if (s < 60) return s + 's'
+  if (s < 60) return s + '秒'
   const m = Math.floor(s / 60)
-  return m + 'm' + (s % 60) + 's'
+  return m + '分' + (s % 60) + '秒'
 }
 
 function formatStr(s: string | null): string {
@@ -223,7 +224,85 @@ function formatTriggerType(t: string): string {
 
 function formatActionId(id: string | null): string {
   if (id == null || id.length < 1) return '-'
+  const a = getActionById(id)
+  if (a != null) return a.name
+  if (id === 'eye_blink') return '眨眼休息'
+  if (id === 'eye_rotate') return '眼球转动'
+  if (id === 'far_gaze') return '远眺放松'
+  if (id === 'neck_rotate') return '颈部转动'
+  if (id === 'shoulder_roll') return '肩膀绕环'
+  if (id === 'neck_stretch') return '肩颈拉伸'
+  if (id === 'core_tighten') return '核心收紧'
+  if (id === 'heel_raise') return '踮脚唤醒'
+  if (id === 'deep_breath') return '减压呼吸'
   return id
+}
+
+function formatActionType(t: string | null): string {
+  if (t == null || t.length < 1) return '-'
+  if (t === 'eye') return '护眼'
+  if (t === 'posture') return '体态'
+  if (t === 'vitality') return '活力'
+  if (t === 'breath') return '呼吸'
+  if (t === 'neck_shoulder') return '肩颈'
+  if (t === 'core') return '核心'
+  if (t === 'lower_body') return '下肢'
+  return t
+}
+
+function formatTriggerLevel(level: string | null): string {
+  if (level == null || level.length < 1) return '-'
+  if (level === 'gentle') return '轻提醒'
+  if (level === 'strong') return '强提醒'
+  if (level === 'night') return '夜间轻提醒'
+  return level
+}
+
+function formatSkipReason(reason: string | null): string {
+  if (reason == null || reason.length < 1) return '-'
+  if (reason === 'busy') return '正在忙'
+  if (reason === 'too_hard') return '动作有点难'
+  if (reason === 'bad_timing') return '时间不合适'
+  if (reason === 'dont_want') return '现在不想做'
+  if (reason === 'other') return '其他原因'
+  return reason
+}
+
+function formatTableName(name: string): string {
+  if (name === 'action_logs') return '动作记录'
+  if (name === 'trigger_logs') return '提醒触发记录'
+  if (name === 'user_settings') return '用户设置'
+  if (name === 'daily_summaries') return '每日小结'
+  if (name === 'trigger_rules') return '提醒规则'
+  if (name === 'app_usage_snapshots') return 'App 使用快照'
+  if (name === 'tts_cache') return '语音缓存'
+  if (name === 'heartbeat_logs') return '守护心跳记录'
+  if (name === 'llm_cache') return 'AI 缓存'
+  return name
+}
+
+function formatConfigKey(key: string): string {
+  if (key === 'action_duration_pref') return '默认动作时长'
+  if (key === 'category_target_count') return '每日目标次数'
+  if (key === 'dnd_start') return '免打扰开始'
+  if (key === 'dnd_end') return '免打扰结束'
+  if (key === 'guide_completed') return '引导页状态'
+  if (key === 'llm_trigger_enabled') return 'AI 实时建议'
+  if (key === 'llm_trigger_ask_each_time') return '每次询问 AI 建议'
+  if (key === 'app_duration_threshold') return '连续使用提醒阈值'
+  if (key === 'trigger_enabled') return '自动触发'
+  return key
+}
+
+function formatConfigValue(key: string, value: string): string {
+  if (key === 'guide_completed') return value === '1' ? '已完成' : '未完成'
+  if (key === 'llm_trigger_enabled' || key === 'llm_trigger_ask_each_time' || key === 'trigger_enabled') {
+    return value === 'true' || value === '1' ? '开启' : '关闭'
+  }
+  if (key === 'action_duration_pref') return value + ' 秒'
+  if (key === 'category_target_count') return value + ' 次'
+  if (key === 'app_duration_threshold') return value + ' 分钟'
+  return value
 }
 
 function formatUserAction(ua: UserAction | null): string {
@@ -342,309 +421,86 @@ onPageShow(() => {
 </script>
 
 <style scoped>
-.page {
-  flex: 1;
-  background-color: transparent;
-  position: relative;
-  overflow: hidden;
-}
-.page-bg {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-}
-.page-bg-img {
-  width: 100%;
-  height: 100%;
-}
+.page { flex: 1; background-color: #162038; position: relative; overflow: hidden; }
+.page-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
+.page-bg-img { width: 100%; height: 100%; }
 .header,
 .stats-row,
 .tab-bar,
 .log-scroll,
-.log-list {
-  position: relative;
-  z-index: 1;
-}
-.header {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  padding-top: 50px;
-  background-color: #FFFFFF;
-  border-bottom-width: 1px;
-  border-bottom-color: #ECF0F1;
-  border-bottom-style: solid;
-}
-.header-left {
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-}
-.header-back {
-  font-size: 28px;
-  color: #2C3E50;
-}
-.header-title {
-  font-size: 17px;
-  font-weight: bold;
-  color: #2C3E50;
-}
-.header-right {
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-}
-.header-refresh {
-  font-size: 22px;
-  color: #3498DB;
-}
-.stats-row {
-  flex-direction: row;
-  padding: 12px 8px;
-  background-color: #FFFFFF;
-  margin-bottom: 8px;
-}
-.nav-row {
-  flex-direction: row;
-  padding: 0 12px 8px 12px;
-  background-color: #FFFFFF;
-  margin-bottom: 8px;
-}
-.nav-btn {
-  flex: 1;
-  background-color: #3498DB;
-  border-radius: 8px;
-  padding: 10px 12px;
-  align-items: center;
-  justify-content: center;
-}
-.nav-btn-text {
-  font-size: 13px;
-  color: #FFFFFF;
-  font-weight: bold;
-}
-.stat-card {
-  flex: 1;
-  align-items: center;
-  padding: 4px 0;
-}
-.stat-num {
-  font-size: 20px;
-  font-weight: bold;
-  color: #3498DB;
-  margin-bottom: 2px;
-}
-.stat-label {
-  font-size: 11px;
-  color: #7F8C8D;
-}
-.tab-bar {
-  flex-direction: row;
-  background-color: #FFFFFF;
-  border-bottom-width: 1px;
-  border-bottom-color: #ECF0F1;
-  border-bottom-style: solid;
-}
-.tab {
-  flex: 1;
-  padding: 12px 0;
-  align-items: center;
-  border-bottom-width: 3px;
-  border-bottom-color: transparent;
-  border-bottom-style: solid;
-}
-.tab.active {
-  border-bottom-color: #3498DB;
-}
-.tab-text {
-  font-size: 14px;
-  color: #7F8C8D;
-}
-.tab.active .tab-text {
-  color: #3498DB;
-  font-weight: bold;
-}
-.log-scroll {
-  flex: 1;
-  padding: 8px 12px;
-}
-.empty {
-  align-items: center;
-  padding: 40px 20px;
-}
-.empty-text {
-  font-size: 14px;
-  color: #95A5A6;
-  margin-bottom: 6px;
-}
-.empty-hint {
-  font-size: 12px;
-  color: #BDC3C7;
-}
-.log-item {
-  background-color: #FFFFFF;
-  border-radius: 10px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-}
-.log-row1 {
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 4px;
-}
-.log-time {
-  font-size: 12px;
-  color: #7F8C8D;
-  font-family: monospace;
-  margin-right: 8px;
-}
-.log-tag {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: #ECF0F1;
-  color: #34495E;
-  margin-right: 6px;
-}
-.tag-app_duration {
-  background-color: #FCF3CF;
-  color: #B7950B;
-}
-.tag-manual {
-  background-color: #D5F5E3;
-  color: #239B56;
-}
-.tag-scheduled {
-  background-color: #D6EAF8;
-  color: #2874A6;
-}
-.log-level {
-  font-size: 10px;
-  color: #95A5A6;
-  margin-left: auto;
-}
-.log-result {
-  font-size: 11px;
-  font-weight: bold;
-  margin-left: auto;
-}
-.res-completed {
-  color: #27AE60;
-}
-.res-self_reported {
-  color: #16A085;
-}
-.res-skipped {
-  color: #E74C3C;
-}
-.res-feedback {
-  color: #8E44AD;
-}
-.log-row2 {
-  flex-direction: row;
-  align-items: center;
-  margin-top: 2px;
-}
-.log-row3 {
-  flex-direction: row;
-  align-items: center;
-  margin-top: 4px;
-  background-color: #FDF2E9;
-  border-radius: 6px;
-  padding: 4px 8px;
-}
-.log-field-label {
-  font-size: 11px;
-  color: #95A5A6;
-}
-.log-field-val {
-  font-size: 12px;
-  color: #2C3E50;
-  font-family: monospace;
-}
-.log-user-action {
-  font-size: 12px;
-  font-weight: bold;
-}
-.ua-completed {
-  color: #27AE60;
-}
-.ua-self_reported {
-  color: #16A085;
-}
-.ua-skipped {
-  color: #E74C3C;
-}
-.ua-busy_remind_later {
-  color: #E67E22;
-}
-.ua-ignored {
-  color: #95A5A6;
-}
-.ua-timeout {
-  color: #7F8C8D;
-}
-.log-skip-reason {
-  font-size: 12px;
-  color: #E67E22;
-}
-.section-header {
-  padding: 12px 4px 4px 4px;
-}
-.section-header-text {
-  font-size: 13px;
-  font-weight: bold;
-  color: #95A5A6;
-}
-.db-table-card {
-  background-color: #FFFFFF;
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 6px;
-}
-.db-table-row {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-.db-table-name {
-  font-size: 13px;
-  color: #2C3E50;
-  font-family: monospace;
-}
-.db-table-count {
-  font-size: 13px;
-  font-weight: bold;
-  color: #3498DB;
-}
-.config-item {
-  background-color: #FFFFFF;
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 4px;
-}
-.config-row {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-.config-key {
-  font-size: 12px;
-  color: #2C3E50;
-  font-family: monospace;
-  flex: 1;
-}
-.config-val {
-  font-size: 12px;
-  color: #7F8C8D;
-  font-family: monospace;
-  text-align: right;
-  max-width: 160px;
-}
+.log-item,
+.db-table-card,
+.config-item { background-color: rgba(29, 25, 62, 0.82); background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.92) 0%, rgba(84, 65, 124, 0.72) 56%, rgba(198, 141, 192, 0.18) 100%); border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; box-shadow: 0 14px 32px rgba(5, 6, 20, 0.28); }
+.header,
+.stats-row,
+.tab-bar,
+.log-scroll { position: relative; z-index: 1; }
+.header { flex-direction: row; align-items: center; justify-content: space-between; padding: 14px 16px; padding-top: 50px; border-bottom-width: 0; }
+.header-left,
+.header-right { width: 34px; height: 34px; border-radius: 17px; background-color: rgba(255, 255, 255, 0.1); align-items: center; justify-content: center; }
+.header-back,
+.header-refresh { color: #FFFFFF; font-weight: bold; }
+.header-back { font-size: 28px; }
+.header-refresh { font-size: 22px; }
+.header-title { font-size: 17px; font-weight: bold; color: #FFFFFF; }
+.stats-row { flex-direction: row; padding: 12px 8px; margin: 10px 12px; border-radius: 22px; }
+.stat-card { flex: 1; align-items: center; padding: 4px 0; }
+.stat-num { font-size: 20px; font-weight: bold; color: #DBC8ED; margin-bottom: 2px; }
+.stat-label { font-size: 11px; color: rgba(255, 255, 255, 0.68); }
+.tab-bar { flex-direction: row; margin: 0 12px 8px 12px; border-radius: 20px; overflow: hidden; }
+.tab { flex: 1; padding: 12px 0; align-items: center; border-bottom-width: 3px; border-bottom-color: transparent; border-bottom-style: solid; }
+.active { border-bottom-color: #DBC8ED; background-color: rgba(219, 200, 237, 0.12); }
+.tab-text { font-size: 14px; color: rgba(255, 255, 255, 0.72); }
+.log-scroll { flex: 1; padding: 8px 12px; background-color: transparent; background-image: none; border-width: 0; box-shadow: none; }
+.empty { align-items: center; padding: 40px 20px; }
+.empty-text { font-size: 14px; color: rgba(255, 255, 255, 0.72); margin-bottom: 6px; }
+.empty-hint { font-size: 12px; color: rgba(255, 255, 255, 0.52); }
+.log-item { border-radius: 18px; padding: 12px; margin-bottom: 8px; }
+.log-row1,
+.log-row2,
+.log-row3 { flex-direction: row; align-items: center; }
+.log-row1 { margin-bottom: 4px; }
+.log-row2 { margin-top: 2px; }
+.log-row3 { margin-top: 4px; background-color: rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 5px 8px; }
+.log-time,
+.log-field-label,
+.log-level,
+.section-header-text { color: rgba(255, 255, 255, 0.58); }
+.log-time { font-size: 12px; margin-right: 8px; }
+.log-tag,
+.log-result,
+.log-user-action,
+.log-skip-reason { font-size: 11px; font-weight: bold; }
+.log-tag { padding: 3px 7px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.1); color: #FFFFFF; margin-right: 6px; }
+.tag-app_duration { background-color: rgba(219, 200, 237, 0.18); color: #DBC8ED; }
+.tag-manual { background-color: rgba(143, 240, 195, 0.12); color: #8FF0C3; }
+.tag-scheduled { background-color: rgba(194, 224, 238, 0.14); color: #C2E0EE; }
+.log-level,
+.log-result { margin-left: auto; }
+.res-completed,
+.ua-completed,
+.ua-self_reported { color: #8FF0C3; }
+.res-self_reported { color: #C2E0EE; }
+.res-skipped,
+.ua-skipped { color: #FF8FA6; }
+.res-feedback,
+.ua-busy_remind_later,
+.log-skip-reason { color: #DBC8ED; }
+.ua-ignored,
+.ua-timeout { color: rgba(255, 255, 255, 0.58); }
+.log-field-label { font-size: 11px; }
+.log-field-val { font-size: 12px; color: #FFFFFF; }
+.section-header { padding: 12px 4px 4px 4px; }
+.section-header-text { font-size: 13px; font-weight: bold; }
+.db-table-card,
+.config-item { border-radius: 16px; padding: 10px 12px; margin-bottom: 6px; }
+.db-table-row,
+.config-row { flex-direction: row; justify-content: space-between; align-items: center; }
+.db-table-name,
+.config-key { color: #FFFFFF; }
+.db-table-name { font-size: 13px; }
+.db-table-count { font-size: 13px; font-weight: bold; color: #DBC8ED; }
+.config-key { font-size: 12px; flex: 1; }
+.config-val { font-size: 12px; color: rgba(255, 255, 255, 0.72); text-align: right; max-width: 160px; }
+.log-list { position: relative; z-index: 1; }
 </style>

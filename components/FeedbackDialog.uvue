@@ -67,83 +67,17 @@ function onConfirm(): void {
 </script>
 
 <style scoped>
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  justify-content: center;
-  align-items: center;
-  background-color: rgba(0, 0, 0, 0.4);
-  z-index: 999;
-}
-.dialog-content {
-  width: 280px;
-  background-color: #FFFFFF;
-  border-radius: 14px;
-  padding: 20px;
-  flex-direction: column;
-}
-.dialog-title {
-  font-size: 17px;
-  font-weight: bold;
-  color: #2C3E50;
-  text-align: center;
-  margin-bottom: 16px;
-}
-.reason-list {
-  flex-direction: column;
-}
-.reason-item {
-  padding: 10px 12px;
-  margin: 3px 0;
-  border-radius: 8px;
-  background-color: #F8F9FA;
-  border-width: 1px;
-  border-color: #E8E8E8;
-  border-style: solid;
-}
-.reason-item.selected {
-  background-color: #EBF5FB;
-  border-color: #3498DB;
-}
-.reason-text {
-  font-size: 14px;
-  color: #2C3E50;
-}
-.custom-input {
-  border-width: 1px;
-  border-color: #E0E0E0;
-  border-style: solid;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-  margin-top: 8px;
-}
-.dialog-actions {
-  flex-direction: row;
-  justify-content: space-between;
-  margin-top: 16px;
-}
-.cancel-btn {
-  flex: 1;
-  margin-right: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  background-color: #ECF0F1;
-  color: #7F8C8D;
-  font-size: 14px;
-  text-align: center;
-}
-.confirm-btn {
-  flex: 1;
-  margin-left: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  background-color: #3498DB;
-  color: #FFFFFF;
-  font-size: 14px;
-  text-align: center;
-}
+.dialog-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.46); z-index: 999; }
+.dialog-content { width: 280px; background-color: rgba(29, 25, 62, 0.96); border-radius: 24px; padding: 20px; flex-direction: column; border-width: 1px; border-color: rgba(219, 200, 237, 0.2); border-style: solid; }
+.dialog-title { font-size: 17px; font-weight: bold; color: #FFFFFF; text-align: center; margin-bottom: 16px; }
+.reason-list { flex-direction: column; }
+.reason-item { padding: 10px 12px; margin: 3px 0; border-radius: 14px; background-color: rgba(255, 255, 255, 0.08); border-width: 1px; border-color: rgba(219, 200, 237, 0.14); border-style: solid; }
+.selected { background-color: rgba(219, 200, 237, 0.2); border-color: rgba(219, 200, 237, 0.42); }
+.reason-text { font-size: 14px; color: #FFFFFF; }
+.custom-input { border-width: 1px; border-color: rgba(219, 200, 237, 0.2); border-style: solid; border-radius: 14px; padding: 8px 12px; font-size: 14px; margin-top: 8px; color: #FFFFFF; background-color: rgba(255, 255, 255, 0.08); }
+.dialog-actions { flex-direction: row; justify-content: space-between; margin-top: 16px; }
+.cancel-btn,
+.confirm-btn { flex: 1; padding: 10px; border-radius: 14px; font-size: 14px; text-align: center; border-width: 0; }
+.cancel-btn { margin-right: 8px; background-color: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.72); }
+.confirm-btn { margin-left: 8px; background-color: #DBC8ED; color: #161A33; }
 </style>
