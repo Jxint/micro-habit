@@ -23,17 +23,17 @@ function getDisplayPercent(): number {
 }
 
 function getBarColor(): string {
-  if (props.status === 'no_data') return '#D5D8DC'
-  if (props.status === 'good') return '#2ECC71'
-  if (props.status === 'normal') return '#F39C12'
-  return '#E74C3C'
+  if (props.status === 'no_data') return 'rgba(255, 255, 255, 0.22)'
+  if (props.status === 'good') return '#7EF0C2'
+  if (props.status === 'normal') return '#DBC8ED'
+  return '#FF8FA6'
 }
 
 function getTextColor(): string {
-  if (props.status === 'no_data') return '#95A5A6'
-  if (props.status === 'good') return '#27AE60'
-  if (props.status === 'normal') return '#E67E22'
-  return '#C0392B'
+  if (props.status === 'no_data') return 'rgba(255, 255, 255, 0.58)'
+  if (props.status === 'good') return '#7EF0C2'
+  if (props.status === 'normal') return '#DBC8ED'
+  return '#FF8FA6'
 }
 
 function getStatusText(): string {
@@ -50,37 +50,10 @@ const statusText = computed<string>(getStatusText)
 </script>
 
 <style scoped>
-.status-card {
-  flex-direction: column;
-  padding: 14px 16px;
-  margin: 6px 16px;
-  background-color: #FFFFFF;
-  border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-.status-header {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.status-title {
-  font-size: 14px;
-  font-weight: bold;
-  color: #2C3E50;
-}
-.status-label {
-  font-size: 12px;
-  font-weight: bold;
-}
-.progress-track {
-  height: 8px;
-  background-color: #F0F3F4;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 8px;
-  border-radius: 4px;
-}
+.status-card { flex-direction: column; padding: 14px 16px; margin: 7px 12px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; border-radius: 18px; }
+.status-header { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.status-title { font-size: 14px; font-weight: bold; color: #FFFFFF; }
+.status-label { font-size: 12px; font-weight: bold; }
+.progress-track { height: 8px; background-color: rgba(255, 255, 255, 0.12); border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 8px; border-radius: 4px; }
 </style>

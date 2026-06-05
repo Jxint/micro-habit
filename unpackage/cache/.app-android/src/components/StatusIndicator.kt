@@ -33,28 +33,28 @@ open class GenComponentsStatusIndicator : VueComponent {
             val getDisplayPercent = ::gen_getDisplayPercent_fn
             fun gen_getBarColor_fn(): String {
                 if (props.status === "no_data") {
-                    return "#D5D8DC"
+                    return "rgba(255, 255, 255, 0.22)"
                 }
                 if (props.status === "good") {
-                    return "#2ECC71"
+                    return "#7EF0C2"
                 }
                 if (props.status === "normal") {
-                    return "#F39C12"
+                    return "#DBC8ED"
                 }
-                return "#E74C3C"
+                return "#FF8FA6"
             }
             val getBarColor = ::gen_getBarColor_fn
             fun gen_getTextColor_fn(): String {
                 if (props.status === "no_data") {
-                    return "#95A5A6"
+                    return "rgba(255, 255, 255, 0.58)"
                 }
                 if (props.status === "good") {
-                    return "#27AE60"
+                    return "#7EF0C2"
                 }
                 if (props.status === "normal") {
-                    return "#E67E22"
+                    return "#DBC8ED"
                 }
-                return "#C0392B"
+                return "#FF8FA6"
             }
             val getTextColor = ::gen_getTextColor_fn
             fun gen_getStatusText_fn(): String {
@@ -93,7 +93,7 @@ open class GenComponentsStatusIndicator : VueComponent {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("status-card" to _pS(_uM("flexDirection" to "column", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 14, "paddingLeft" to 16, "marginTop" to 6, "marginRight" to 16, "marginBottom" to 6, "marginLeft" to 16, "backgroundColor" to "#FFFFFF", "borderTopLeftRadius" to 14, "borderTopRightRadius" to 14, "borderBottomRightRadius" to 14, "borderBottomLeftRadius" to 14, "boxShadow" to "0 2px 8px rgba(0, 0, 0, 0.04)")), "status-header" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "marginBottom" to 8)), "status-title" to _pS(_uM("fontSize" to 14, "fontWeight" to "bold", "color" to "#2C3E50")), "status-label" to _pS(_uM("fontSize" to 12, "fontWeight" to "bold")), "progress-track" to _pS(_uM("height" to 8, "backgroundColor" to "#F0F3F4", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "overflow" to "hidden")), "progress-fill" to _pS(_uM("height" to 8, "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4)))
+                return _uM("status-card" to _pS(_uM("flexDirection" to "column", "paddingTop" to 14, "paddingRight" to 16, "paddingBottom" to 14, "paddingLeft" to 16, "marginTop" to 7, "marginRight" to 12, "marginBottom" to 7, "marginLeft" to 12, "backgroundColor" to "rgba(255,255,255,0.1)", "borderTopWidth" to 1, "borderRightWidth" to 1, "borderBottomWidth" to 1, "borderLeftWidth" to 1, "borderTopColor" to "rgba(219,200,237,0.16)", "borderRightColor" to "rgba(219,200,237,0.16)", "borderBottomColor" to "rgba(219,200,237,0.16)", "borderLeftColor" to "rgba(219,200,237,0.16)", "borderTopStyle" to "solid", "borderRightStyle" to "solid", "borderBottomStyle" to "solid", "borderLeftStyle" to "solid", "borderTopLeftRadius" to 18, "borderTopRightRadius" to 18, "borderBottomRightRadius" to 18, "borderBottomLeftRadius" to 18)), "status-header" to _pS(_uM("flexDirection" to "row", "justifyContent" to "space-between", "alignItems" to "center", "marginBottom" to 8)), "status-title" to _pS(_uM("fontSize" to 14, "fontWeight" to "bold", "color" to "#FFFFFF")), "status-label" to _pS(_uM("fontSize" to 12, "fontWeight" to "bold")), "progress-track" to _pS(_uM("height" to 8, "backgroundColor" to "rgba(255,255,255,0.12)", "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4, "overflow" to "hidden")), "progress-fill" to _pS(_uM("height" to 8, "borderTopLeftRadius" to 4, "borderTopRightRadius" to 4, "borderBottomRightRadius" to 4, "borderBottomLeftRadius" to 4)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

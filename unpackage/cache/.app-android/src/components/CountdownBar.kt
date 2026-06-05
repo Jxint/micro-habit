@@ -53,7 +53,7 @@ open class GenComponentsCountdownBar : VueComponent {
         }
         val styles0: Map<String, Map<String, Map<String, Any>>>
             get() {
-                return _uM("countdown-container" to _pS(_uM("flexDirection" to "column", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 8, "paddingLeft" to 16)), "countdown-track" to _pS(_uM("width" to "100%", "height" to 10, "backgroundColor" to "#ECF0F1", "borderTopLeftRadius" to 5, "borderTopRightRadius" to 5, "borderBottomRightRadius" to 5, "borderBottomLeftRadius" to 5, "overflow" to "hidden")), "countdown-fill" to _pS(_uM("height" to 10, "backgroundColor" to "#3498DB", "borderTopLeftRadius" to 5, "borderTopRightRadius" to 5, "borderBottomRightRadius" to 5, "borderBottomLeftRadius" to 5)), "countdown-text" to _pS(_uM("fontSize" to 14, "color" to "#7F8C8D", "marginTop" to 6)))
+                return _uM("countdown-container" to _pS(_uM("flexDirection" to "column", "alignItems" to "center", "paddingTop" to 8, "paddingRight" to 16, "paddingBottom" to 8, "paddingLeft" to 16, "width" to "100%")), "countdown-track" to _pS(_uM("width" to "100%", "height" to 10, "backgroundColor" to "rgba(255,255,255,0.12)", "borderTopLeftRadius" to 5, "borderTopRightRadius" to 5, "borderBottomRightRadius" to 5, "borderBottomLeftRadius" to 5, "overflow" to "hidden")), "countdown-fill" to _pS(_uM("height" to 10, "backgroundColor" to "#DBC8ED", "borderTopLeftRadius" to 5, "borderTopRightRadius" to 5, "borderBottomRightRadius" to 5, "borderBottomLeftRadius" to 5)), "countdown-text" to _pS(_uM("fontSize" to 14, "color" to "rgba(255,255,255,0.72)", "marginTop" to 6)))
             }
         var inheritAttrs = true
         var inject: Map<String, Map<String, Any?>> = _uM()

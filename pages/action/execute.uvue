@@ -331,538 +331,51 @@ onUnload((): void => {
 <style scoped>
 .page {
   flex: 1;
-  background-color: #F5F6FA;
-  justify-content: center;
-  align-items: center;
-}
-.action-container {
-  width: 85%;
-  background-color: #FFFFFF;
-  border-radius: 16px;
-  padding: 24px;
-  flex-direction: column;
-  align-items: center;
-}
-.action-title {
-  font-size: 22px;
-  font-weight: bold;
-  color: #2C3E50;
-  margin-bottom: 16px;
-}
-.icon-display {
-  width: 100px;
-  height: 100px;
-  justify-content: center;
-  align-items: center;
-  background-color: #F0F3F4;
-  border-radius: 50px;
-  margin-bottom: 16px;
-}
-.action-icon {
-  font-size: 48px;
-}
-.tts-text {
-  font-size: 15px;
-  color: #7F8C8D;
-  text-align: center;
-  margin-bottom: 20px;
-  padding: 0 16px;
-}
-.button-group {
-  width: 100%;
-  flex-direction: column;
-  margin-top: 16px;
-}
-.action-btn {
-  width: 100%;
-  padding: 14px;
-  border-radius: 10px;
-  font-size: 16px;
-  text-align: center;
-  margin-bottom: 8px;
-  border-width: 0;
-}
-.action-primary {
-  background-color: #DBC8ED;
-  color: #161A33;
-  font-weight: bold;
-}
-.action-secondary {
-  background-color: rgba(219, 200, 237, 0.16);
-  color: rgba(255, 255, 255, 0.72);
-}
-.action-ghost {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.72);
-}
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  justify-content: center;
-  align-items: center;
-  background-color: rgba(0, 0, 0, 0.4);
-  z-index: 999;
-}
-.dialog-content {
-  width: 280px;
-  background-color: #FFFFFF;
-  border-radius: 14px;
-  padding: 20px;
-  flex-direction: column;
-}
-.dialog-title {
-  font-size: 17px;
-  font-weight: bold;
-  color: #2C3E50;
-  text-align: center;
-  margin-bottom: 12px;
-}
-.dialog-body-text {
-  font-size: 14px;
-  color: #34495E;
-  line-height: 20px;
-  text-align: center;
-  margin-bottom: 16px;
-}
-.dialog-actions {
-  flex-direction: row;
-  justify-content: space-between;
-}
-.cancel-btn {
-  flex: 1;
-  margin-right: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  background-color: #ECF0F1;
-  color: #7F8C8D;
-  font-size: 14px;
-  text-align: center;
-  border-width: 0;
-}
-.confirm-btn {
-  flex: 1;
-  margin-left: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  background-color: #DBC8ED;
-  color: #161A33;
-  font-size: 14px;
-  text-align: center;
-  border-width: 0;
-}
-
-.page {
-  background-color: #F4F8FB;
-  justify-content: flex-start;
-  align-items: center;
-  padding-top: 24px;
-}
-.action-container {
-  width: 88%;
-  background-color: #FFFFFF;
-  border-radius: 28px;
-  padding: 26px 22px 22px 22px;
-  box-shadow: 0 14px 36px rgba(88, 122, 139, 0.12);
-}
-.ritual-label {
-  font-size: 12px;
-  color: #8E7DD6;
-  font-weight: bold;
-  margin-bottom: 8px;
-}
-.action-title {
-  font-size: 25px;
-  color: #243642;
-  margin-bottom: 8px;
-}
-.action-subtitle {
-  font-size: 14px;
-  color: #6F8490;
-  text-align: center;
-  line-height: 20px;
-  margin-bottom: 18px;
-  padding: 0 10px;
-}
-.icon-display {
-  width: 128px;
-  height: 128px;
-  border-radius: 64px;
-  background-color: #EAF8F1;
-  box-shadow: 0 12px 26px rgba(138, 217, 182, 0.24);
-  margin-bottom: 18px;
-}
-.action-icon {
-  font-size: 56px;
-}
-.tts-text {
-  font-size: 14px;
-  color: #6F8490;
-  line-height: 21px;
-  margin-bottom: 18px;
-  padding: 0 10px;
-}
-.execute-guide {
-  color: #4E6370;
-}
-.button-group {
-  margin-top: 14px;
-}
-.action-btn {
-  border-radius: 18px;
-  margin-bottom: 10px;
-  border-width: 0;
-  font-size: 15px;
-}
-.primary {
-  background-color: #8C6FFF;
-  color: #FFFFFF;
-  font-weight: bold;
-}
-.secondary {
-  background-color: #F1F8F5;
-  color: #4A9B7B;
-}
-.ghost {
-  background-color: #F4F8FB;
-  color: #6F8490;
-}
-.dialog-content {
-  border-radius: 24px;
-  box-shadow: 0 14px 36px rgba(88, 122, 139, 0.18);
-}
-.dialog-title {
-  color: #243642;
-}
-.dialog-body-text {
-  color: #6F8490;
-}
-.cancel-btn {
-  border-radius: 14px;
-  background-color: #F1F6F7;
-  color: #6F8490;
-}
-.confirm-btn {
-  border-radius: 14px;
-  background-color: #8C6FFF;
-}
-
-.page {
-  background-color: #F6F2FF;
-  background-image: linear-gradient(180deg, #EFE8FF 0%, #F4FAFF 100%);
-}
-.action-container {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-width: 1px;
-  border-color: rgba(255, 255, 255, 0.78);
-  border-style: solid;
-  box-shadow: 0 20px 46px rgba(96, 84, 172, 0.22);
-}
-.ritual-label {
-  color: #8C6FFF;
-}
-.action-title {
-  color: #25223D;
-  font-size: 28px;
-}
-.action-subtitle {
-  color: #706A97;
-}
-.lottie-stage {
-  width: 100%;
-  min-height: 196px;
-  border-radius: 30px;
-  background-color: #F1EEFF;
-  background-image: linear-gradient(135deg, #F5EDFF 0%, #EAF5FF 100%);
-  align-items: center;
-  justify-content: center;
-  padding: 18px 14px;
-  margin-bottom: 18px;
-  border-width: 1px;
-  border-color: rgba(255, 255, 255, 0.75);
-  border-style: solid;
-}
-.lottie-stage-playing {
-  box-shadow: 0 16px 34px rgba(110, 90, 232, 0.2);
-}
-.lottie-stage-paused {
-  opacity: 0.86;
-}
-.lottie-glow {
-  width: 128px;
-  height: 128px;
-  border-radius: 64px;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(201, 182, 255, 0.34);
-  margin-bottom: 10px;
-}
-.lottie-orbit {
-  position: absolute;
-  width: 122px;
-  height: 48px;
-  border-radius: 61px;
-  border-width: 2px;
-  border-color: rgba(110, 90, 232, 0.42);
-  border-style: solid;
-}
-.icon-display {
-  width: 90px;
-  height: 90px;
-  border-radius: 45px;
-  background-color: #BFD5FF;
-  background-image: linear-gradient(135deg, #8C6FFF 0%, #6FB8FF 100%);
-  box-shadow: 0 14px 28px rgba(96, 84, 172, 0.24);
-}
-.action-icon {
-  font-size: 46px;
-}
-.lottie-placeholder {
-  font-size: 11px;
-  color: #8A80B3;
-  text-align: center;
-}
-.lottie-controls {
-  flex-direction: row;
-  margin-top: 10px;
-}
-.lottie-chip {
-  padding: 6px 12px;
-  border-radius: 15px;
-  background-color: rgba(255, 255, 255, 0.7);
-  margin: 0 4px;
-}
-.lottie-chip-active {
-  background-color: #25223D;
-}
-.lottie-chip-text {
-  font-size: 11px;
-  color: #8C6FFF;
-}
-.lottie-chip-text-active {
-  color: #FFFFFF;
-}
-.tts-text {
-  color: #706A97;
-}
-.action-btn {
-  border-radius: 20px;
-}
-.primary {
-  background-color: #25223D;
-  color: #FFFFFF;
-}
-.secondary {
-  background-color: #EEE9FF;
-  color: #8C6FFF;
-}
-.ghost {
-  background-color: #F4F7FF;
-  color: #706A97;
-}
-.confirm-btn {
-  background-color: #25223D;
-}
-
-.page {
-  background-color: #F8F7FC;
-  background-image: none;
+  background-color: #162038;
+  background-image: linear-gradient(180deg, #131832 0%, #283252 45%, #4F587D 100%);
   position: relative;
   overflow: hidden;
+}
+.scroll-area {
+  flex: 1;
+  position: relative;
+  z-index: 1;
 }
 .bg-glow {
   position: absolute;
   border-radius: 999px;
-  opacity: 0.48;
   z-index: 0;
 }
 .glow-purple {
-  width: 190px;
-  height: 190px;
-  left: -70px;
+  width: 210px;
+  height: 210px;
+  left: -82px;
   top: -54px;
-  background-color: #CBB8FF;
-}
-.glow-blue {
-  width: 136px;
-  height: 136px;
-  right: -46px;
-  top: 72px;
-  background-color: #CFE7FF;
-}
-.glow-pink {
-  width: 150px;
-  height: 150px;
-  left: 38px;
-  bottom: 72px;
-  background-color: #FFE7F1;
-  opacity: 0.34;
-}
-.action-container {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-color: #EEEAF6;
-  box-shadow: 0 18px 42px rgba(44, 35, 80, 0.1);
-  z-index: 1;
-}
-.ritual-label,
-.lottie-chip-text,
-.lottie-chip-text-active {
-  color: #8D6BFF;
-}
-.action-title {
-  color: #191528;
-}
-.action-subtitle,
-.tts-text,
-.lottie-placeholder {
-  color: #7B758C;
-}
-.lottie-stage {
-  background-color: rgba(255, 255, 255, 0.74);
-  background-image: none;
-  border-color: #EEEAF6;
-  box-shadow: 0 14px 34px rgba(44, 35, 80, 0.08);
-}
-.lottie-glow {
-  background-color: rgba(203, 184, 255, 0.28);
-}
-.icon-display {
-  background-image: linear-gradient(135deg, #CBB8FF 0%, #CFE7FF 100%);
-}
-.lottie-orbit {
-  border-color: rgba(141, 107, 255, 0.32);
-}
-.primary,
-.lottie-chip-active,
-.confirm-btn {
-  background-color: #1F1933;
-}
-.secondary,
-.ghost {
-  background-color: #FFFFFF;
-  color: #7B758C;
-  border-width: 1px;
-  border-color: #EEEAF6;
-  border-style: solid;
-}
-.back-button {
-  position: absolute;
-  left: 18px;
-  top: 28px;
-  width: 38px;
-  height: 38px;
-  border-radius: 19px;
-  background-color: rgba(255, 255, 255, 0.86);
-  border-width: 1px;
-  border-color: #EEEAF6;
-  border-style: solid;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 10px 24px rgba(44, 35, 80, 0.08);
-  z-index: 2;
-}
-.back-icon {
-  color: #1F1933;
-  font-size: 30px;
-  line-height: 34px;
-  font-weight: bold;
-}
-
-.page {
-  background-color: #162038;
-  background-image: linear-gradient(180deg, #131832 0%, #283252 45%, #4F587D 100%);
-}
-.glow-purple {
   background-color: #776B97;
   opacity: 0.5;
 }
 .glow-blue {
+  width: 168px;
+  height: 168px;
+  right: -60px;
+  top: 104px;
   background-color: #C2E0EE;
   opacity: 0.24;
 }
 .glow-pink {
+  width: 178px;
+  height: 178px;
+  left: 42px;
+  bottom: 88px;
   background-color: #C68DC0;
   opacity: 0.18;
-}
-.action-container {
-  background-color: rgba(29, 25, 62, 0.82);
-  background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.92) 0%, rgba(84, 65, 124, 0.72) 56%, rgba(198, 141, 192, 0.18) 100%);
-  border-color: rgba(219, 200, 237, 0.18);
-  box-shadow: 0 18px 42px rgba(5, 6, 20, 0.34);
-}
-.ritual-label,
-.lottie-chip-text {
-  color: #DBC8ED;
-}
-.action-title {
-  color: #FFFFFF;
-}
-.action-subtitle,
-.tts-text,
-.lottie-placeholder {
-  color: rgba(255, 255, 255, 0.72);
-}
-.lottie-stage {
-  background-color: rgba(255, 255, 255, 0.1);
-  background-image: linear-gradient(135deg, rgba(79, 88, 125, 0.28) 0%, rgba(219, 200, 237, 0.12) 100%);
-  border-color: rgba(219, 200, 237, 0.16);
-  box-shadow: 0 14px 34px rgba(5, 6, 20, 0.24);
-}
-.lottie-glow {
-  background-color: rgba(219, 200, 237, 0.16);
-}
-.icon-display {
-  background-color: rgba(219, 200, 237, 0.18);
-  background-image: linear-gradient(135deg, #DBC8ED 0%, #C68DC0 42%, #4F587D 100%);
-}
-.lottie-orbit {
-  border-color: rgba(219, 200, 237, 0.38);
-}
-.lottie-chip {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-.primary,
-.lottie-chip-active,
-.confirm-btn {
-  background-color: #DBC8ED;
-  color: #161A33;
-}
-.secondary,
-.ghost,
-.action-secondary,
-.action-ghost {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.72);
-  border-color: rgba(219, 200, 237, 0.16);
-}
-.action-primary {
-  background-color: #DBC8ED;
-  color: #161A33;
-  border-width: 1px;
-  border-color: rgba(255, 255, 255, 0.16);
-  border-style: solid;
-}
-.action-secondary {
-  background-color: rgba(219, 200, 237, 0.16);
-}
-.action-ghost {
-  background-color: rgba(255, 255, 255, 0.08);
-}
-.back-button {
-  background-color: rgba(255, 255, 255, 0.12);
-  border-color: rgba(219, 200, 237, 0.16);
-}
-.back-icon {
-  color: #FFFFFF;
 }
 .sky-star {
   position: absolute;
   width: 3px;
   height: 3px;
   border-radius: 2px;
-  background-color: rgba(255, 255, 255, 0.86);
+  background-color: rgba(255, 255, 255, 0.74);
   z-index: 0;
 }
 .star-a { left: 36px; top: 88px; }
@@ -877,23 +390,44 @@ onUnload((): void => {
 .star-j { right: 148px; top: 276px; width: 3px; height: 3px; border-radius: 2px; }
 .star-k { left: 178px; top: 392px; width: 2px; height: 2px; border-radius: 1px; }
 .star-l { right: 64px; top: 560px; width: 3px; height: 3px; border-radius: 2px; }
-.dialog-content {
-  background-color: rgba(29, 25, 62, 0.94);
-  border-width: 1px;
-  border-color: rgba(219, 200, 237, 0.18);
-  border-style: solid;
-}
-.dialog-title {
-  color: #FFFFFF;
-}
-.dialog-body-text {
-  color: rgba(255, 255, 255, 0.72);
-}
-.cancel-btn {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.72);
-}
-.page {
-  background-color: #F7FAFF;
-}
+
+.page { justify-content: flex-start; align-items: center; padding-top: 70px; }
+.back-button { position: absolute; left: 18px; top: 28px; width: 38px; height: 38px; border-radius: 19px; background-color: rgba(255, 255, 255, 0.12); border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; align-items: center; justify-content: center; z-index: 2; }
+.back-icon { color: #FFFFFF; font-size: 30px; line-height: 34px; font-weight: bold; }
+.action-container { width: 88%; background-color: rgba(29, 25, 62, 0.82); background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.92) 0%, rgba(84, 65, 124, 0.72) 56%, rgba(198, 141, 192, 0.18) 100%); border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; border-radius: 28px; padding: 26px 22px 22px 22px; box-shadow: 0 18px 42px rgba(5, 6, 20, 0.34); flex-direction: column; align-items: center; z-index: 1; }
+.ritual-label { font-size: 12px; color: #DBC8ED; font-weight: bold; margin-bottom: 8px; }
+.action-title { font-size: 28px; font-weight: bold; color: #FFFFFF; margin-bottom: 8px; text-align: center; }
+.action-subtitle,
+.tts-text,
+.lottie-placeholder { color: rgba(255, 255, 255, 0.72); }
+.action-subtitle { font-size: 14px; text-align: center; line-height: 20px; margin-bottom: 18px; padding: 0 10px; }
+.lottie-stage { width: 100%; min-height: 196px; border-radius: 30px; background-color: rgba(255, 255, 255, 0.1); background-image: linear-gradient(135deg, rgba(79, 88, 125, 0.28) 0%, rgba(219, 200, 237, 0.12) 100%); align-items: center; justify-content: center; padding: 18px 14px; margin-bottom: 18px; border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; }
+.lottie-stage-playing { box-shadow: 0 14px 34px rgba(5, 6, 20, 0.24); }
+.lottie-stage-paused { opacity: 0.86; }
+.lottie-glow { width: 128px; height: 128px; border-radius: 64px; align-items: center; justify-content: center; background-color: rgba(219, 200, 237, 0.16); margin-bottom: 10px; }
+.lottie-orbit { position: absolute; width: 122px; height: 48px; border-radius: 61px; border-width: 2px; border-color: rgba(219, 200, 237, 0.38); border-style: solid; }
+.icon-display { width: 90px; height: 90px; border-radius: 45px; justify-content: center; align-items: center; background-color: rgba(219, 200, 237, 0.18); background-image: linear-gradient(135deg, #DBC8ED 0%, #C68DC0 42%, #4F587D 100%); }
+.action-icon { font-size: 46px; }
+.lottie-placeholder { font-size: 11px; text-align: center; }
+.lottie-controls { flex-direction: row; margin-top: 10px; }
+.lottie-chip { padding: 6px 12px; border-radius: 15px; background-color: rgba(255, 255, 255, 0.1); margin: 0 4px; }
+.lottie-chip-active { background-color: #DBC8ED; }
+.lottie-chip-text { font-size: 11px; color: #DBC8ED; }
+.lottie-chip-text-active { color: #161A33; }
+.tts-text { font-size: 14px; line-height: 21px; text-align: center; margin-bottom: 18px; padding: 0 10px; }
+.execute-guide { color: rgba(255, 255, 255, 0.86); }
+.button-group { width: 100%; flex-direction: column; margin-top: 14px; }
+.action-btn { width: 100%; padding: 14px; border-radius: 20px; font-size: 15px; text-align: center; margin-bottom: 10px; border-width: 1px; border-style: solid; }
+.action-primary { background-color: #DBC8ED; color: #161A33; border-color: rgba(255, 255, 255, 0.16); font-weight: bold; }
+.action-secondary { background-color: rgba(219, 200, 237, 0.16); color: rgba(255, 255, 255, 0.78); border-color: rgba(219, 200, 237, 0.16); }
+.action-ghost { background-color: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.72); border-color: rgba(219, 200, 237, 0.16); }
+.dialog-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.4); z-index: 999; }
+.dialog-content { width: 280px; background-color: rgba(29, 25, 62, 0.94); border-radius: 24px; padding: 20px; flex-direction: column; border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; }
+.dialog-title { font-size: 17px; font-weight: bold; color: #FFFFFF; text-align: center; margin-bottom: 12px; }
+.dialog-body-text { font-size: 14px; color: rgba(255, 255, 255, 0.72); line-height: 20px; text-align: center; margin-bottom: 16px; }
+.dialog-actions { flex-direction: row; justify-content: space-between; }
+.cancel-btn,
+.confirm-btn { flex: 1; padding: 10px; border-radius: 14px; font-size: 14px; text-align: center; border-width: 0; }
+.cancel-btn { margin-right: 8px; background-color: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.72); }
+.confirm-btn { margin-left: 8px; background-color: #DBC8ED; color: #161A33; }
 </style>

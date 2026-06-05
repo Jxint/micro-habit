@@ -24,13 +24,15 @@
     {
       "path": "pages/data/dashboard",
       "style": {
-        "navigationBarTitleText": "数据看板"
+        "navigationStyle": "custom",
+        "navigationBarTitleText": ""
       }
     },
     {
       "path": "pages/settings/index",
       "style": {
-        "navigationBarTitleText": "设置"
+        "navigationStyle": "custom",
+        "navigationBarTitleText": ""
       }
     },
     {
