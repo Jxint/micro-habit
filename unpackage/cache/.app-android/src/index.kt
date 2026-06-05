@@ -9236,7 +9236,7 @@ open class DbTableInfo (
     open var count: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 170, 6)
+        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 173, 6)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return DbTableInfoReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -9288,7 +9288,7 @@ open class ConfigItem (
     open var value: String,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 174, 6)
+        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 177, 6)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return ConfigItemReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)

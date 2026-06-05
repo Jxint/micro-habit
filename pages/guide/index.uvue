@@ -1,5 +1,8 @@
 <template>
   <view class="page">
+    <view class="page-bg">
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
+    </view>
     <view class="bg-glow glow-purple"></view>
     <view class="bg-glow glow-blue"></view>
     <view class="bg-glow glow-pink"></view>
@@ -23,10 +26,7 @@
           <text class="hero-subtitle">它会观察你的使用节奏，在合适的时候提醒你眨眨眼、松松肩、慢慢呼吸。</text>
         </view>
         <view class="hero-planet-card">
-          <view class="hero-orbit"></view>
-          <view class="hero-icon-wrap">
-            <text class="hero-icon">◐</text>
-          </view>
+          <image class="hero-mascot-img" src="/static/images/micro-planet-mascot.png" mode="aspectFit"></image>
           <text class="hero-chip">不说教 · 不打扰</text>
         </view>
       </view>
@@ -282,10 +282,11 @@ onShow((): void => {
 .page {
   flex: 1;
   background-color: #162038;
-  background-image: linear-gradient(180deg, #131832 0%, #283252 45%, #4F587D 100%);
   position: relative;
   overflow: hidden;
 }
+.page-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
+.page-bg-img { width: 100%; height: 100%; }
 .scroll-area {
   flex: 1;
   position: relative;
@@ -381,7 +382,8 @@ onShow((): void => {
 .cta-btn-secondary-text,
 .footer-text { color: rgba(255, 255, 255, 0.72); }
 .hero-subtitle { font-size: 13px; line-height: 21px; text-align: left; padding: 0; }
-.hero-planet-card { position: relative; width: 112px; height: 136px; border-radius: 28px; background-color: rgba(255, 255, 255, 0.14); border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; align-items: center; justify-content: center; }
+.hero-planet-card { position: relative; width: 124px; height: 142px; border-radius: 28px; background-color: rgba(255, 255, 255, 0.14); border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; align-items: center; justify-content: center; overflow: visible; }
+.hero-mascot-img { width: 118px; height: 96px; margin-bottom: 8px; }
 .hero-orbit,
 .demo-stage-orbit { position: absolute; border-width: 2px; border-color: rgba(219, 200, 237, 0.38); border-style: solid; transform: rotate(-20deg); }
 .hero-orbit { width: 86px; height: 34px; border-radius: 43px; }

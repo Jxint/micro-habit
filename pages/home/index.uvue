@@ -1,5 +1,8 @@
 <template>
   <view class="page">
+    <view class="page-bg">
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
+    </view>
     <view class="bg-glow glow-purple"></view>
     <view class="bg-glow glow-blue"></view>
     <view class="bg-glow glow-pink"></view>
@@ -37,15 +40,7 @@
           </view>
           <view class="greeting-right">
             <view class="mini-planet" @tap="openPhoneDialog">
-              <view class="mini-orbit"></view>
-              <view class="mini-orbit mini-orbit-back"></view>
-              <view class="mini-star mini-star-a"></view>
-              <view class="mini-star mini-star-b"></view>
-              <view class="mini-satellite"></view>
-              <view class="mini-planet-core">
-                <view class="mini-planet-shine"></view>
-                <view class="mini-planet-halo"></view>
-              </view>
+              <image class="mini-planet-img" src="/static/images/micro-planet-mascot.png" mode="aspectFit"></image>
             </view>
             <view class="settings-icon" @tap="goSettings">
               <text class="settings-icon-text">⚙</text>
@@ -62,37 +57,6 @@
           </view>
           <view class="hero-main-cta" @tap="startHeroAction">
             <text class="hero-main-cta-text">开始一个微动作</text>
-          </view>
-        </view>
-      </view>
-
-      <view class="achievement-section">
-        <view class="achievement-header" @tap="toggleAchievementsCollapsed">
-          <view class="achievement-title-wrap">
-            <text class="achievement-title">成就栏</text>
-            <text class="achievement-count">{{ unlockedCount }} / 12</text>
-            <view v-if="newUnlockedCount > 0" class="achievement-red-dot"></view>
-          </view>
-          <text class="achievement-toggle">{{ achievementsCollapsed ? '展开' : '收起' }}</text>
-        </view>
-        <view v-if="achievementsCollapsed" class="achievement-collapsed-scroll">
-          <scroll-view class="achievement-scroll-x" scroll-x="true" show-scrollbar="false">
-            <view v-for="(a, i) in achievements" :key="'ac-' + i" class="achv-chip" :class="a.isUnlocked ? 'achv-chip-on' : 'achv-chip-off'" @tap="onAchievementChipTap(a)">
-              <text class="achv-chip-icon">{{ a.def.icon }}</text>
-              <text v-if="a.isUnlocked" class="achv-chip-mark">✓</text>
-              <text v-else class="achv-chip-mark achv-chip-mark-lock">锁</text>
-              <view v-if="a.isNew" class="achv-chip-newdot"></view>
-            </view>
-          </scroll-view>
-        </view>
-        <view v-else class="achievement-grid">
-          <view v-for="(a, i) in achievements" :key="'ag-' + i" class="achv-grid-card" :class="a.isUnlocked ? 'achv-grid-on' : 'achv-grid-off'" @tap="onAchievementGridTap(a)">
-            <text class="achv-grid-icon">{{ a.def.icon }}</text>
-            <text class="achv-grid-name">{{ a.def.name }}</text>
-            <text class="achv-grid-cat">{{ a.def.category }}</text>
-            <text class="achv-grid-prog" v-if="a.isUnlocked">已达成</text>
-            <text class="achv-grid-prog achv-grid-prog-off" v-else>{{ a.currentProgress }} / {{ a.def.threshold }}</text>
-            <view v-if="a.isNew" class="achv-grid-newdot"></view>
           </view>
         </view>
       </view>
@@ -195,6 +159,37 @@
             variant="library"
             @actionTap="startAction"
           />
+        </view>
+      </view>
+
+      <view class="achievement-section">
+        <view class="achievement-header" @tap="toggleAchievementsCollapsed">
+          <view class="achievement-title-wrap">
+            <text class="achievement-title">成就栏</text>
+            <text class="achievement-count">{{ unlockedCount }} / 12</text>
+            <view v-if="newUnlockedCount > 0" class="achievement-red-dot"></view>
+          </view>
+          <text class="achievement-toggle">{{ achievementsCollapsed ? '展开' : '收起' }}</text>
+        </view>
+        <view v-if="achievementsCollapsed" class="achievement-collapsed-scroll">
+          <scroll-view class="achievement-scroll-x" scroll-x="true" show-scrollbar="false">
+            <view v-for="(a, i) in achievements" :key="'ac-' + i" class="achv-chip" :class="a.isUnlocked ? 'achv-chip-on' : 'achv-chip-off'" @tap="onAchievementChipTap(a)">
+              <text class="achv-chip-icon">{{ a.def.icon }}</text>
+              <text v-if="a.isUnlocked" class="achv-chip-mark">✓</text>
+              <text v-else class="achv-chip-mark achv-chip-mark-lock">锁</text>
+              <view v-if="a.isNew" class="achv-chip-newdot"></view>
+            </view>
+          </scroll-view>
+        </view>
+        <view v-else class="achievement-grid">
+          <view v-for="(a, i) in achievements" :key="'ag-' + i" class="achv-grid-card" :class="a.isUnlocked ? 'achv-grid-on' : 'achv-grid-off'" @tap="onAchievementGridTap(a)">
+            <text class="achv-grid-icon">{{ a.def.icon }}</text>
+            <text class="achv-grid-name">{{ a.def.name }}</text>
+            <text class="achv-grid-cat">{{ a.def.category }}</text>
+            <text class="achv-grid-prog" v-if="a.isUnlocked">已达成</text>
+            <text class="achv-grid-prog achv-grid-prog-off" v-else>{{ a.currentProgress }} / {{ a.def.threshold }}</text>
+            <view v-if="a.isNew" class="achv-grid-newdot"></view>
+          </view>
         </view>
       </view>
 
@@ -795,10 +790,11 @@ onUnload((): void => {
 .page {
   flex: 1;
   background-color: #162038;
-  background-image: linear-gradient(180deg, #131832 0%, #283252 45%, #4F587D 100%);
   position: relative;
   overflow: hidden;
 }
+.page-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
+.page-bg-img { width: 100%; height: 100%; }
 .scroll-area { flex: 1; position: relative; z-index: 1; }
 .bg-glow { position: absolute; border-radius: 999px; z-index: 0; }
 .glow-purple { width: 210px; height: 210px; left: -82px; top: -54px; background-color: #776B97; opacity: 0.5; }
@@ -856,16 +852,8 @@ onUnload((): void => {
 .hero-stat-label { color: rgba(255, 255, 255, 0.74); }
 .greeting-date { font-size: 12px; margin-top: 4px; }
 .greeting-hint { font-size: 13px; margin-top: 8px; line-height: 19px; }
-.mini-planet { width: 112px; height: 112px; border-radius: 56px; background-color: rgba(255, 255, 255, 0.18); align-items: center; justify-content: center; overflow: hidden; }
-.mini-orbit { position: absolute; width: 122px; height: 48px; border-radius: 61px; border-width: 2px; border-color: rgba(128, 171, 255, 0.58); border-style: solid; transform: rotate(-18deg); }
-.mini-orbit-back { width: 100px; height: 38px; border-color: rgba(219, 200, 237, 0.36); transform: rotate(18deg); }
-.mini-star { position: absolute; width: 6px; height: 6px; border-radius: 3px; background-color: #DBC8ED; }
-.mini-star-a { right: 14px; top: 18px; }
-.mini-star-b { left: 16px; bottom: 18px; background-color: #C2E0EE; }
-.mini-satellite { position: absolute; width: 12px; height: 12px; border-radius: 6px; right: 10px; bottom: 30px; background-color: #8DA2FF; }
-.mini-planet-core { width: 58px; height: 58px; border-radius: 29px; background-color: #DCC6FF; align-items: center; justify-content: center; }
-.mini-planet-shine { width: 20px; height: 20px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.44); align-self: flex-start; margin-top: 10px; margin-left: 10px; }
-.mini-planet-halo { position: absolute; width: 92px; height: 92px; border-radius: 46px; background-color: rgba(203, 184, 255, 0.18); }
+.mini-planet { width: 134px; height: 112px; align-items: center; justify-content: center; overflow: visible; }
+.mini-planet-img { width: 134px; height: 112px; }
 .settings-icon,
 .phone-usage-hint,
 .hero-stat-pill,

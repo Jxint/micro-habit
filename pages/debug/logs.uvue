@@ -1,5 +1,8 @@
 <template>
   <view class="page">
+    <view class="page-bg">
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
+    </view>
     <view class="header">
       <view class="header-left" @tap="goBack">
         <text class="header-back">‹</text>
@@ -408,13 +411,20 @@ onPageShow(() => {
 </script>
 
 <style scoped>
-.page { flex: 1; background-color: #162038; background-image: linear-gradient(180deg, #131832 0%, #283252 45%, #4F587D 100%); position: relative; overflow: hidden; }
+.page { flex: 1; background-color: #162038; position: relative; overflow: hidden; }
+.page-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
+.page-bg-img { width: 100%; height: 100%; }
 .header,
 .stats-row,
 .tab-bar,
+.log-scroll,
 .log-item,
 .db-table-card,
 .config-item { background-color: rgba(29, 25, 62, 0.82); background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.92) 0%, rgba(84, 65, 124, 0.72) 56%, rgba(198, 141, 192, 0.18) 100%); border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; box-shadow: 0 14px 32px rgba(5, 6, 20, 0.28); }
+.header,
+.stats-row,
+.tab-bar,
+.log-scroll { position: relative; z-index: 1; }
 .header { flex-direction: row; align-items: center; justify-content: space-between; padding: 14px 16px; padding-top: 50px; border-bottom-width: 0; }
 .header-left,
 .header-right { width: 34px; height: 34px; border-radius: 17px; background-color: rgba(255, 255, 255, 0.1); align-items: center; justify-content: center; }
@@ -431,7 +441,7 @@ onPageShow(() => {
 .tab { flex: 1; padding: 12px 0; align-items: center; border-bottom-width: 3px; border-bottom-color: transparent; border-bottom-style: solid; }
 .active { border-bottom-color: #DBC8ED; background-color: rgba(219, 200, 237, 0.12); }
 .tab-text { font-size: 14px; color: rgba(255, 255, 255, 0.72); }
-.log-scroll { flex: 1; padding: 8px 12px; }
+.log-scroll { flex: 1; padding: 8px 12px; background-color: transparent; background-image: none; border-width: 0; box-shadow: none; }
 .empty { align-items: center; padding: 40px 20px; }
 .empty-text { font-size: 14px; color: rgba(255, 255, 255, 0.72); margin-bottom: 6px; }
 .empty-hint { font-size: 12px; color: rgba(255, 255, 255, 0.52); }

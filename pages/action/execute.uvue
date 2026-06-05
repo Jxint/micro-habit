@@ -1,5 +1,8 @@
 <template>
   <view class="page">
+    <view class="page-bg">
+      <image class="page-bg-img" src="/static/images/micro-habit-page-bg.png" mode="aspectFill"></image>
+    </view>
     <view class="bg-glow glow-purple"></view>
     <view class="bg-glow glow-blue"></view>
     <view class="bg-glow glow-pink"></view>
@@ -27,7 +30,7 @@
         <view class="lottie-glow">
           <view class="lottie-orbit"></view>
           <view class="icon-display">
-            <text class="action-icon">{{ iconEmoji }}</text>
+            <image class="action-icon-img" :src="actionIconSrc" mode="aspectFit"></image>
           </view>
         </view>
         <text class="lottie-placeholder">{{ lottieStateText }}</text>
@@ -123,20 +126,9 @@ const actionDuration = computed<number>((): number => {
   return a != null ? a.defaultDurationMs : 0
 })
 
-const iconEmoji = computed<string>((): string => {
+const actionIconSrc = computed<string>((): string => {
   const a = action.value
-  if (a == null) return '?'
-  const id = a.id
-  if (id === 'eye_blink') return '👁'
-  if (id === 'eye_rotate') return '👀'
-  if (id === 'neck_rotate') return '🔄'
-  if (id === 'shoulder_roll') return '💪'
-  if (id === 'neck_stretch') return '🧘'
-  if (id === 'core_tighten') return '🔥'
-  if (id === 'heel_raise') return '🦶'
-  if (id === 'deep_breath') return '🌬'
-  if (id === 'far_gaze') return '🏔'
-  return '?'
+  return a != null ? a.iconPath : '/static/icons/eye_blink.png'
 })
 
 const executeIntro = computed<string>((): string => getExecuteIntro(actionId.value))
@@ -332,10 +324,11 @@ onUnload((): void => {
 .page {
   flex: 1;
   background-color: #162038;
-  background-image: linear-gradient(180deg, #131832 0%, #283252 45%, #4F587D 100%);
   position: relative;
   overflow: hidden;
 }
+.page-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
+.page-bg-img { width: 100%; height: 100%; }
 .scroll-area {
   flex: 1;
   position: relative;
@@ -406,8 +399,8 @@ onUnload((): void => {
 .lottie-stage-paused { opacity: 0.86; }
 .lottie-glow { width: 128px; height: 128px; border-radius: 64px; align-items: center; justify-content: center; background-color: rgba(219, 200, 237, 0.16); margin-bottom: 10px; }
 .lottie-orbit { position: absolute; width: 122px; height: 48px; border-radius: 61px; border-width: 2px; border-color: rgba(219, 200, 237, 0.38); border-style: solid; }
-.icon-display { width: 90px; height: 90px; border-radius: 45px; justify-content: center; align-items: center; background-color: rgba(219, 200, 237, 0.18); background-image: linear-gradient(135deg, #DBC8ED 0%, #C68DC0 42%, #4F587D 100%); }
-.action-icon { font-size: 46px; }
+.icon-display { width: 90px; height: 90px; border-radius: 45px; justify-content: center; align-items: center; background-color: rgba(219, 200, 237, 0.18); }
+.action-icon-img { width: 78px; height: 78px; }
 .lottie-placeholder { font-size: 11px; text-align: center; }
 .lottie-controls { flex-direction: row; margin-top: 10px; }
 .lottie-chip { padding: 6px 12px; border-radius: 15px; background-color: rgba(255, 255, 255, 0.1); margin: 0 4px; }
