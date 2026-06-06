@@ -1,6 +1,5 @@
 import { TriggerLog } from '../models/TriggerLog'
 import { selectAction, isFrequencyReduced, onConsecutiveSkip, onCompleted } from './RuleEngine'
-import { isNewbie, getMinTriggerIntervalMs, getNewbieTriggerLevel } from './NewbieGuard'
 import { insertTriggerLog } from '../database/TriggerLogDao'
 import { insertActionLog } from '../database/ActionLogDao'
 import { getInt, getBool, getSetting as getSettingVal } from '../database/SettingsDao'
@@ -40,7 +39,23 @@ export type TriggerDecision = {
 
 let currentState: TriggerState = TriggerState.IDLE
 let lastTriggerTime: number = 0
-const COOL_DOWN_MS: number = 5 * 60 * 1000
+
+// 两次成功触发之间的最小间隔（毫秒）。
+// 每次调用都从设置里读，便于用户在设置页实时调整。
+const DEFAULT_COOLDOWN_MIN: number = 10
+
+function getCooldownMs(): number {
+  const min = getInt('trigger_cooldown_min', DEFAULT_COOLDOWN_MIN)
+  if (min < 1) return DEFAULT_COOLDOWN_MIN * 60 * 1000
+  return min * 60 * 1000
+}
+
+export function getRemainingCooldownMs(): number {
+  if (lastTriggerTime < 1) return 0
+  const cd = getCooldownMs()
+  const remain = cd - (Date.now() - lastTriggerTime)
+  return remain > 0 ? remain : 0
+}
 
 export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
   if (currentState !== TriggerState.IDLE) {
@@ -49,8 +64,9 @@ export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
   }
 
   const nowMs = Date.now()
-  if (nowMs - lastTriggerTime < COOL_DOWN_MS) {
-    console.log('[TriggerEngine] skip: cooldown remaining=' + (COOL_DOWN_MS - (nowMs - lastTriggerTime)))
+  const cooldownMs = getCooldownMs()
+  if (nowMs - lastTriggerTime < cooldownMs) {
+    console.log('[TriggerEngine] skip: cooldown remaining=' + (cooldownMs - (nowMs - lastTriggerTime)))
     return null
   }
 
@@ -64,11 +80,6 @@ export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
   let blacklisted = false
   try { blacklisted = isBlacklisted(context.appPackage) } catch (e) { console.warn('[TriggerEngine] isBlacklisted: ' + e) }
   if (blacklisted) return null
-
-  if (isNewbie()) {
-    const minInterval = getMinTriggerIntervalMs()
-    if (nowMs - lastTriggerTime < minInterval) return null
-  }
 
   if (isFrequencyReduced(context.triggerType)) return null
 
@@ -96,9 +107,6 @@ export function shouldTrigger(context: TriggerContext): TriggerDecision | null {
   if (action == null) return null
 
   let triggerLevel = decideTriggerLevel(context)
-  if (isNewbie()) {
-    triggerLevel = getNewbieTriggerLevel(triggerLevel)
-  }
   if (match == null) {
     triggerLevel = 'gentle'
   }
@@ -146,11 +154,12 @@ export function forceIdle(): void {
 }
 
 function scheduleCooldownEnd(): void {
+  const cd = getCooldownMs()
   scheduleTimer(() : void => {
     if (currentState === TriggerState.COOLING_DOWN) {
       currentState = TriggerState.IDLE
     }
-  }, COOL_DOWN_MS)
+  }, cd)
 }
 
 function isInDndPeriod(): boolean {

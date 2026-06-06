@@ -1,0 +1,161 @@
+<template>
+  <view class="ai-panel">
+    <view v-if="summaryAppCount > 0" class="summary-row">
+      <view class="summary-num-block">
+        <text class="summary-num">{{ hourTextStr }}</text>
+        <text class="summary-num-sub">{{ minuteTextStr }}</text>
+      </view>
+      <view class="summary-stat">
+        <text class="summary-stat-num">{{ appCountStr }}</text>
+        <text class="summary-stat-label">个应用</text>
+      </view>
+    </view>
+
+    <view v-if="segments.length > 0" class="chart-block">
+      <view class="stacked-bar">
+        <view
+          v-for="(seg, si) in segments"
+          :key="'sg-' + si"
+          class="stacked-seg"
+          :style="{
+            flexGrow: seg.minutes > 0 ? seg.minutes : 0,
+            backgroundColor: seg.color
+          }"
+        ></view>
+      </view>
+      <view
+        v-for="(seg, si) in segments"
+        :key="'lg-' + si"
+        class="legend-row"
+      >
+        <view class="legend-dot" :style="{ backgroundColor: seg.color }"></view>
+        <text class="legend-label">{{ seg.label }}</text>
+        <text class="legend-percent">{{ seg.percent }}%</text>
+        <text class="legend-minutes">{{ seg.minutes }}分</text>
+      </view>
+    </view>
+
+    <view v-else class="empty-block">
+      <text class="empty-text">今日暂无手机使用数据</text>
+    </view>
+
+    <view class="ai-block">
+      <view class="ai-block-header">
+        <text class="ai-block-title">AI 评价</text>
+        <view v-if="aiText.length > 0" class="ai-action-row">
+          <view class="ai-action-btn" @tap="onCopy">
+            <text class="ai-action-text">复制</text>
+          </view>
+          <view class="ai-action-btn" @tap="onListen">
+            <text class="ai-action-text">{{ listening ? '停止' : '朗读' }}</text>
+          </view>
+        </view>
+      </view>
+      <view v-if="aiLoading" class="ai-loading">
+        <text class="ai-loading-text">AI 正在生成评价…</text>
+      </view>
+      <view v-else-if="aiText.length > 0" class="ai-content">
+        <text class="ai-text" :selectable="true" :user-select="true">{{ aiText }}</text>
+      </view>
+      <view v-else class="ai-placeholder">
+        <text class="ai-placeholder-text">点击下方按钮，AI 将根据今日使用情况生成评价</text>
+      </view>
+      <view class="ai-btn" :class="aiLoading ? 'ai-btn-loading' : ''" @tap="onAiTap">
+        <text class="ai-btn-text">{{ aiLoading ? '生成中…' : aiText.length > 0 ? '重新生成' : '立即生成 AI 评价' }}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import type { PieSegment } from '../services/PhoneUsageService'
+
+const props = withDefaults(defineProps<{
+  summaryHourText: string
+  summaryMinuteText: string
+  summaryAppCount: number
+  segments: PieSegment[]
+  aiText: string
+  aiLoading: boolean
+}>(), {
+  summaryHourText: '0 小时',
+  summaryMinuteText: '0 分钟',
+  summaryAppCount: 0,
+  segments: () => [],
+  aiText: '',
+  aiLoading: false
+})
+
+const emit = defineEmits<{
+  (e: 'regenerate'): void
+  (e: 'speak', text: string): void
+  (e: 'stopSpeak'): void
+}>()
+
+let listening: boolean = false
+
+const hourTextStr = computed<string>(() : string => props.summaryHourText)
+const minuteTextStr = computed<string>(() : string => props.summaryMinuteText)
+const appCountStr = computed<string>(() : string => '' + props.summaryAppCount)
+
+function onAiTap(): void {
+  if (props.aiLoading) return
+  emit('regenerate')
+}
+
+function onCopy(): void {
+  try {
+    uni.setClipboardData({ data: props.aiText })
+    uni.showToast({ title: '已复制', icon: 'success' })
+  } catch (e) {
+    console.warn('[AiPhoneEvalPanel] onCopy 异常: ' + JSON.stringify(e))
+  }
+}
+
+function onListen(): void {
+  if (listening) {
+    listening = false
+    emit('stopSpeak')
+    return
+  }
+  if (props.aiText.length < 1) return
+  listening = true
+  emit('speak', props.aiText)
+}
+</script>
+
+<style scoped>
+.ai-panel { flex-direction: column; }
+.summary-row { flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 16px; margin-bottom: 12px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.14); border-style: solid; border-radius: 18px; }
+.summary-num-block, .summary-stat { flex-direction: row; align-items: flex-end; }
+.summary-num, .summary-num-sub, .summary-stat-num, .ai-block-title { color: #FFFFFF; font-weight: bold; }
+.summary-num { font-size: 24px; }
+.summary-num-sub { font-size: 16px; margin-left: 4px; }
+.summary-stat-num { font-size: 18px; }
+.summary-stat-label { font-size: 12px; margin-left: 4px; color: rgba(255, 255, 255, 0.7); }
+.chart-block { flex-direction: column; padding: 8px 4px; margin-bottom: 12px; }
+.stacked-bar { width: 100%; height: 16px; flex-direction: row; border-radius: 8px; overflow: hidden; background-color: rgba(255, 255, 255, 0.12); margin-bottom: 8px; }
+.stacked-seg { height: 100%; }
+.legend-row { flex-direction: row; align-items: center; margin-bottom: 6px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 5px; margin-right: 6px; }
+.legend-label { flex: 1; font-size: 12px; color: rgba(255, 255, 255, 0.78); }
+.legend-percent { font-size: 12px; font-weight: bold; color: #FFFFFF; margin-right: 4px; }
+.legend-minutes { font-size: 11px; width: 32px; text-align: right; color: rgba(255, 255, 255, 0.62); }
+.empty-block { padding: 30px 16px; align-items: center; margin-bottom: 12px; background-color: rgba(255, 255, 255, 0.08); border-radius: 18px; }
+.empty-text { font-size: 13px; color: rgba(255, 255, 255, 0.78); }
+.ai-block { padding: 14px 16px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.14); border-style: solid; border-radius: 18px; flex-direction: column; }
+.ai-block-header { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.ai-block-title { font-size: 14px; }
+.ai-action-row { flex-direction: row; }
+.ai-action-btn { padding: 5px 10px; background-color: rgba(255, 255, 255, 0.14); border-radius: 12px; margin-left: 6px; }
+.ai-action-text { font-size: 11px; color: #DBC8ED; }
+.ai-content { padding: 4px 0; }
+.ai-text { font-size: 14px; line-height: 22px; color: #FFFFFF; }
+.ai-placeholder { padding: 4px 0; }
+.ai-placeholder-text { font-size: 12px; line-height: 18px; color: rgba(255, 255, 255, 0.62); }
+.ai-loading { padding: 16px 0; align-items: center; }
+.ai-loading-text { font-size: 12px; color: rgba(255, 255, 255, 0.78); }
+.ai-btn { margin-top: 12px; padding: 11px 14px; background-color: #DBC8ED; border-radius: 16px; align-items: center; justify-content: center; }
+.ai-btn-loading { background-color: rgba(255, 255, 255, 0.18); }
+.ai-btn-text { font-size: 13px; color: #161A33; font-weight: bold; }
+</style>

@@ -21,22 +21,22 @@ export function playUrl(url: string, callbacks: AudioPlayerCallbacks): void {
 }
 
 export function pause(): void {
-  if (player != null) player.pause()
+  if (player != null) player!!.pause()
 }
 
 export function resume(): void {
-  if (player != null) player.resume()
+  if (player != null) player!!.resume()
 }
 
 export function stop(): void {
   if (player != null) {
-    player.stop()
+    player!!.stop()
     player = null
   }
 }
 
 export function setVolume(vol: number): void {
-  if (player != null) player.setVolume(vol)
+  if (player != null) player!!.setVolume(vol)
 }
 
 export function isPlaying(): boolean {

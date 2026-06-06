@@ -19,11 +19,13 @@ export const DEFAULT_SETTINGS: DefaultSetting[] = [
   { key: 'daily_summary_time', value: '21:00' },
   { key: 'weekly_report_enabled', value: '1' },
   { key: 'dark_mode', value: 'system' },
-  { key: 'newbie_mode', value: '1' },
   { key: 'guide_completed', value: '0' },
   { key: 'health_preference', value: 'balanced' },
   { key: 'body_limit', value: 'none' },
   { key: 'llm_trigger_enabled', value: '1' },
   { key: 'llm_trigger_ask_each_time', value: '1' },
-  { key: 'trigger_enabled', value: '1' }
+  { key: 'trigger_enabled', value: '1' },
+  { key: 'trigger_poll_interval_min', value: '10' },
+  { key: 'trigger_cooldown_min', value: '10' },
+  { key: 'trigger_pkg_cooldown_min', value: '20' }
 ]

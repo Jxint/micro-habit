@@ -1,0 +1,41 @@
+import type { MoodWord } from '../models/MoodWord'
+
+const SYSTEM_PROMPT_MOOD_CLOUD: string = '你是微憩星球里的"小星球"，温柔、不评判。'
+  + '任务：从用户近期的状态描述/触发提醒文本中，提取 10-18 个心情/状态关键词。'
+  + '输出必须是严格的 JSON 数组，不允许其他内容，不允许 markdown 包裹。'
+  + '格式：[{ "word": "疲惫", "weight": 8 }, { "word": "专注", "weight": 5 }]'
+  + 'weight 范围 1-10，数字越大表示出现频次/强度越高。'
+  + '去重后输出，相似含义的词合并（如"累"和"疲惫"合并为"疲惫"）。'
+  + '如果文本信息不足，输出空数组 []。'
+  + '禁止使用表情符号。'
+
+function buildMoodCloudPrompt(rawTexts: string[]): string {
+  if (rawTexts.length < 1) {
+    return '用户暂无历史状态记录。请输出空数组 []。'
+  }
+  const joined: string = rawTexts.map((s: string, i: number): string => (i + 1) + '. ' + s).join('\n')
+  return '请从以下 ' + rawTexts.length + ' 条用户历史状态/触发提醒中提取心情/状态关键词：\n'
+    + joined
+    + '\n\n'
+    + '要求：\n'
+    + '1. 只输出 JSON 数组，不要任何解释。\n'
+    + '2. 词数控制在 10-18 个。\n'
+    + '3. weight 是相对值（1-10），表示这个词的"重要度"。\n'
+    + '4. 词性以形容词/状态名词为主（如"专注""疲惫""放松""焦虑"）。'
+}
+
+const FALLBACK_MOOD_WORDS: MoodWord[] = [
+  { word: '平静', weight: 4 },
+  { word: '专注', weight: 3 },
+  { word: '稍累', weight: 2 }
+]
+
+function getFallbackMoodWords(): MoodWord[] {
+  return FALLBACK_MOOD_WORDS
+}
+
+export {
+  SYSTEM_PROMPT_MOOD_CLOUD,
+  buildMoodCloudPrompt,
+  getFallbackMoodWords
+}

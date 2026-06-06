@@ -124,6 +124,14 @@ export function getHistoryByStage(stage: LlmHistoryStage, limit: number): LlmHis
   return mapRows(rows)
 }
 
+export function getAllStateAndAdhocTexts(limit: number): LlmHistoryEntry[] {
+  const rows = dbManager.query(
+    "SELECT * FROM llm_history WHERE stage = 'pre' ORDER BY created_at DESC LIMIT ?",
+    [limit]
+  )
+  return mapRows(rows)
+}
+
 export function getRecentDecisions(limit: number): LlmHistoryEntry[] {
   const rows = dbManager.query(
     "SELECT * FROM llm_history WHERE stage = 'post' AND decision IS NOT NULL ORDER BY created_at DESC LIMIT ?",

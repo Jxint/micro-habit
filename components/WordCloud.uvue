@@ -1,0 +1,103 @@
+<template>
+  <view class="word-cloud">
+    <view v-if="words.length < 1" class="wc-empty">
+      <text class="wc-empty-text">暂无数据</text>
+    </view>
+    <view v-else class="wc-wrap">
+      <view
+        v-for="(w, idx) in words"
+        :key="'w-' + idx"
+        class="wc-word"
+        :style="{
+          fontSize: fontSizeFor(w.weight) + 'px',
+          color: colorFor(w.word),
+          transform: rotateFor(idx) + ' translateY(' + yOffsetFor(idx) + 'px)',
+          opacity: opacityFor(w.weight)
+        }"
+      >{{ w.word }}</view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { type MoodWord } from '../services/MoodCloudService'
+
+const props = withDefaults(defineProps<{
+  words: MoodWord[]
+  maxFontSize?: number
+  minFontSize?: number
+}>(), {
+  words: () => [],
+  maxFontSize: 30,
+  minFontSize: 13
+})
+
+let maxWeight: number = 1
+let baseSeed: number = 0
+
+function seedFor(idx: number): number {
+  // 稳定伪随机：基于 word + idx
+  let h = baseSeed + idx * 2654435761
+  if (h < 0) h = -h
+  return h % 1000
+}
+
+function fontSizeFor(weight: number): number {
+  if (maxWeight < 1) return props.minFontSize
+  const ratio: number = weight / maxWeight
+  return Math.floor(props.minFontSize + ratio * (props.maxFontSize - props.minFontSize))
+}
+
+function colorFor(word: string): string {
+  // 简单 hash 选色
+  let h: number = 0
+  for (let i = 0; i < word.length; i++) {
+      h = (h * 31 + (word.charCodeAt(i) as number)) % 1000
+  }
+  const palette: string[] = [
+    '#E8D8F5', '#8FF0C3', '#FFCAD4', '#D4ECF7', '#FFE4B5', '#B3D9F7', '#FFE8BF', '#C8E8D0'
+  ]
+  return palette[h % palette.length] as string
+}
+
+function rotateFor(idx: number): string {
+  const s: number = seedFor(idx)
+  const deg: number = (s % 30) - 15
+  return 'rotate(' + deg + 'deg)'
+}
+
+function yOffsetFor(idx: number): number {
+  const s: number = seedFor(idx)
+  return ((s % 7) - 3)
+}
+
+function opacityFor(weight: number): number {
+  if (maxWeight < 1) return 0.5
+  return 0.75 + (weight / maxWeight) * 0.25
+}
+
+function recompute(): void {
+  maxWeight = 1
+  baseSeed = Math.floor(Date.now() / 1000) % 100
+  for (let i = 0; i < props.words.length; i++) {
+    const w = props.words[i]
+    if (w != null && w.weight > maxWeight) maxWeight = w.weight
+  }
+}
+
+onMounted((): void => {
+  recompute()
+})
+
+watch((): MoodWord[] => props.words, (_v: MoodWord[]): void => {
+  recompute()
+}, { deep: true })
+</script>
+
+<style scoped>
+.word-cloud { padding: 8px 0; min-height: 160px; }
+.wc-empty { padding: 40px 0; align-items: center; }
+.wc-empty-text { font-size: 13px; color: rgba(255, 255, 255, 0.6); }
+.wc-wrap { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; padding: 4px; }
+.wc-word { font-weight: bold; margin: 4px 8px; padding: 2px 4px; }
+</style>

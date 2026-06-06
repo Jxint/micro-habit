@@ -1,5 +1,5 @@
 import { dbManager } from '../database/DatabaseManager'
-import { getInt, getBool, getSetting } from '../database/SettingsDao'
+import { getInt, getSetting } from '../database/SettingsDao'
 import { countCompletedToday, getTotalCompletedDurationSec } from '../database/ActionLogDao'
 import { countTriggersToday } from '../database/TriggerLogDao'
 import { getNum, getStr } from '../utils/DbRowUtils'
@@ -28,7 +28,8 @@ function safeBodyLimit(v: string): 'none' | 'neck' | 'waist' | 'knee' {
 export function getUserProfile(): UserProfile {
   const focus = safeHealthFocus(getSetting('health_preference', 'balanced'))
   const limit = safeBodyLimit(getSetting('body_limit', 'none'))
-  const newbie = getBool('newbie_mode', true)
+  // 新手保护模式已废弃（见 services/NewbieGuard.uts）。
+  // 字段保留以兼容旧调用方（LLM 提示中可能引用），统一返回 false。
   const preferred: number[] = []
   try {
     const rows = dbManager.query(
@@ -60,7 +61,7 @@ export function getUserProfile(): UserProfile {
   return {
     healthFocus: focus,
     bodyLimit: limit,
-    newbieMode: newbie,
+    newbieMode: false,
     preferredHours: preferred,
     totalActiveDays: totalDays,
     avgDailyCompletes: Math.round(avg * 10) / 10,

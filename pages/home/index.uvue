@@ -50,6 +50,10 @@
         <view class="phone-usage-hint" @tap="openPhoneDialog">
           <text class="phone-usage-hint-text">{{ phoneUsageHint }}</text>
         </view>
+        <view class="ai-eval-entry" @tap="onGenerateAiEval">
+          <text class="ai-eval-entry-icon">·</text>
+          <text class="ai-eval-entry-text">生成 AI 评价今日手机使用</text>
+        </view>
         <view class="hero-action-row">
           <view class="hero-stat-pill">
             <text class="hero-stat-num">{{ guardCount }}</text>
@@ -69,6 +73,15 @@
             <text class="planet-count-unit">次</text>
           </view>
           <text class="planet-guard-text">{{ guardMinuteText }}</text>
+          <view class="penetration-inline">
+            <view class="penetration-inline-header">
+              <text class="section-label">习惯渗透度</text>
+              <text class="penetration-value-inline">{{ penetrationStr }}</text>
+            </view>
+            <view class="penetration-track-inline">
+              <view class="penetration-fill-inline" :style="{ width: (penetration * 10 > 100 ? 100 : penetration * 10) + '%' }"></view>
+            </view>
+          </view>
           <text class="planet-kind-text">每一次短暂停顿，都是身体收到的善意</text>
         </view>
         <view class="planet-visual" :class="planetVisualClass">
@@ -83,48 +96,40 @@
       </view>
 
       <view class="cockpit-grid">
-        <view class="health-cluster">
-          <view class="section-header-row compact-header">
-            <text class="section-title">三颗健康星球</text>
-            <text class="section-caption">护眼 · 体态 · 活力</text>
+        <scroll-view class="health-scroll" scroll-x="true" show-scrollbar="true">
+          <view class="health-cluster">
+            <StatusIndicator variant="orb" title="护眼" :percent="eyeScore" :status="eyeStatus" />
+            <StatusIndicator variant="orb" title="体态" :percent="postureScore" :status="postureStatus" />
+            <StatusIndicator variant="orb" title="活力" :percent="vitalityScore" :status="vitalityStatus" />
           </view>
-          <StatusIndicator title="护眼" :percent="eyeScore" :status="eyeStatus" />
-          <StatusIndicator title="体态" :percent="postureScore" :status="postureStatus" />
-          <StatusIndicator title="活力" :percent="vitalityScore" :status="vitalityStatus" />
+        </scroll-view>
+        <view class="section-header-row compact-header">
+          <text class="section-title">三颗健康星球</text>
+          <text class="section-caption">护眼 · 体态 · 活力</text>
         </view>
+      </view>
 
-        <view class="cockpit-side">
-          <view class="penetration-section">
-            <view class="penetration-copy">
-              <text class="section-label">习惯渗透度</text>
-              <text class="penetration-sub">星环正在慢慢变亮</text>
-            </view>
-            <view class="penetration-track">
-              <view class="penetration-fill" :style="{ width: (penetration * 10 > 100 ? 100 : penetration * 10) + '%' }"></view>
-            </view>
-            <text class="penetration-value">{{ penetrationStr }}</text>
-          </view>
-
-          <view class="summary-card" v-if="dailySummary != null">
-            <text class="summary-eyebrow">AI 今日判断</text>
-            <text class="summary-oneliner">{{ summaryOneLiner }}</text>
-            <text v-if="summaryBody.length > 0" class="summary-body">{{ summaryBody }}</text>
-            <view v-if="summaryGoal.length > 0" class="summary-goal-row">
-              <text class="summary-goal-label">明日轨道</text>
-              <text class="summary-goal-text">{{ summaryGoal }}</text>
-            </view>
-            <text v-if="summaryEncourage.length > 0" class="summary-encourage">{{ summaryEncourage }}</text>
-            <view class="ai-feedback-row">
-              <view class="ai-feedback-chip"><text class="ai-feedback-text">有帮助</text></view>
-              <view class="ai-feedback-chip"><text class="ai-feedback-text">不太准</text></view>
-            </view>
-          </view>
-          <view class="summary-card summary-empty" v-else>
-            <text class="summary-eyebrow">AI 今日判断</text>
-            <text class="summary-empty-text">{{ summaryPlaceholder }}</text>
-            <text class="summary-empty-hint">完成更多微动作后，我会更懂你的节奏</text>
-          </view>
+      <view class="summary-standalone" v-if="dailySummary != null">
+        <view class="summary-standalone-header">
+          <text class="summary-eyebrow">AI 今日判断</text>
+          <text class="summary-standalone-hour">{{ summaryHour }}</text>
         </view>
+        <text class="summary-oneliner">{{ summaryOneLiner }}</text>
+        <text v-if="summaryBody.length > 0" class="summary-body">{{ summaryBody }}</text>
+        <view v-if="summaryGoal.length > 0" class="summary-goal-row">
+          <text class="summary-goal-label">明日轨道</text>
+          <text class="summary-goal-text">{{ summaryGoal }}</text>
+        </view>
+        <text v-if="summaryEncourage.length > 0" class="summary-encourage">{{ summaryEncourage }}</text>
+        <view class="ai-feedback-row">
+          <view class="ai-feedback-chip" @tap="onFeedback('helpful')"><text class="ai-feedback-text">有帮助</text></view>
+          <view class="ai-feedback-chip" @tap="onFeedback('not_accurate')"><text class="ai-feedback-text">不太准</text></view>
+        </view>
+      </view>
+      <view class="summary-standalone summary-standalone-empty" v-else>
+        <text class="summary-eyebrow">AI 今日判断</text>
+        <text class="summary-empty-text">{{ summaryPlaceholder }}</text>
+        <text class="summary-empty-hint">完成更多微动作后，我会更懂你的节奏</text>
       </view>
 
       <view class="recommend-section">
@@ -205,11 +210,27 @@
         </view>
         <HeatmapCalendar :dates="homeHeatmapDates" :counts="homeHeatmapCounts" :height="260" />
       </view>
-      <LlmHistoryCard :entries="llmHistoryEntries" />
 
       <view class="bottom-spacer" />
     </scroll-view>
     <PhoneUsageDialog :visible="showPhoneDialog" @close="closePhoneDialog" />
+    <RightSidebar
+      :visible="showAiEvalSidebar"
+      title="今日手机使用 · AI 评价"
+      @close="closeAiEvalSidebar"
+    >
+      <AiPhoneEvalPanel
+        :summary-hour-text="phoneUsageHourText"
+        :summary-minute-text="phoneUsageMinuteText"
+        :summary-app-count="phoneUsageAppCount"
+        :segments="phoneUsageSegments"
+        :ai-text="aiEvalText"
+        :ai-loading="aiEvalLoading"
+        @regenerate="onGenerateAiEval"
+        @speak="onSpeakAiEval"
+        @stopSpeak="onStopSpeak"
+      />
+    </RightSidebar>
     <TriggerRuleDialog
       :visible="showRuleDialog"
       :action-name="ruleActionName"
@@ -253,7 +274,8 @@
 import StatusIndicator from '../../components/StatusIndicator.uvue'
 import ActionCard from '../../components/ActionCard.uvue'
 import PhoneUsageDialog from '../../components/PhoneUsageDialog.uvue'
-import LlmHistoryCard from '../../components/LlmHistoryCard.uvue'
+import RightSidebar from '../../components/RightSidebar.uvue'
+import AiPhoneEvalPanel from '../../components/AiPhoneEvalPanel.uvue'
 import TriggerRuleDialog from '../../components/TriggerRuleDialog.uvue'
 import HeatmapCalendar from '../../components/HeatmapCalendar.uvue'
 import { useAppStore, DailyOutput } from '../../stores/appStore'
@@ -269,6 +291,9 @@ import { getActionById } from '../../constants/Actions'
 import { getGreetingHint } from '../../constants/MicroPlanetCopy'
 import { getAchievementDef } from '../../constants/Achievements'
 import { getProgressText as computeProgressText } from '../../services/AchievementService'
+import { aiEvaluateTodayUsage, getTodayPhoneUsageSummary, getTodayPieSegments } from '../../services/PhoneUsageService'
+import type { PhoneUsageSummary, PieSegment } from '../../services/PhoneUsageService'
+import { speakAdhoc, stopSpeech } from '../../services/TtsService'
 import AchievementDetailDialog from '../../components/AchievementDetailDialog.uvue'
 import AchievementUnlockDialog from '../../components/AchievementUnlockDialog.uvue'
 
@@ -438,6 +463,69 @@ function onUnlockViewDetail(): void {
     }
     tryShowNextUnlock()
   }, 200)
+}
+
+function onFeedback(kind: string): void {
+  if (kind == 'helpful') {
+    uni.showToast({ title: '已记录，谢谢反馈', icon: 'success' })
+  } else {
+    uni.showToast({ title: '收到，会继续调优', icon: 'none' })
+  }
+}
+
+const showAiEvalSidebar = ref<boolean>(false)
+const aiEvalText = ref<string>('')
+const aiEvalLoading = ref<boolean>(false)
+const phoneUsageSummary = ref<PhoneUsageSummary>({ totalMinutes: 0, totalSeconds: 0, hourText: '0 小时', minuteText: '0 分钟', appCount: 0 })
+const phoneUsageSegments = ref<PieSegment[]>([])
+const phoneUsageHourText = computed<string>(() : string => phoneUsageSummary.value.hourText)
+const phoneUsageMinuteText = computed<string>(() : string => phoneUsageSummary.value.minuteText)
+const phoneUsageAppCount = computed<number>(() : number => phoneUsageSummary.value.appCount)
+function loadPhoneUsageData(): void {
+  try {
+    phoneUsageSummary.value = getTodayPhoneUsageSummary()
+    phoneUsageSegments.value = getTodayPieSegments()
+  } catch (e) {
+    console.warn('[home] loadPhoneUsageData 异常: ' + JSON.stringify(e))
+    phoneUsageSummary.value = { totalMinutes: 0, totalSeconds: 0, hourText: '0 小时', minuteText: '0 分钟', appCount: 0 }
+    phoneUsageSegments.value = []
+  }
+}
+
+function onGenerateAiEval(): void {
+  showAiEvalSidebar.value = true
+  loadPhoneUsageData()
+    if (aiEvalText.value.length > 0) return
+  aiEvalLoading.value = true
+  try {
+    aiEvaluateTodayUsage((text: string): void => {
+      aiEvalText.value = text != null ? text : ''
+      aiEvalLoading.value = false
+    })
+  } catch (e) {
+    console.warn('[home] onGenerateAiEval 异常: ' + JSON.stringify(e))
+    aiEvalLoading.value = false
+  }
+}
+
+function closeAiEvalSidebar(): void {
+  showAiEvalSidebar.value = false
+}
+
+function onSpeakAiEval(text: string): void {
+  try {
+    speakAdhoc(text)
+  } catch (e) {
+    console.warn('[home] onSpeakAiEval 异常: ' + JSON.stringify(e))
+  }
+}
+
+function onStopSpeak(): void {
+  try {
+    stopSpeech()
+  } catch (e) {
+    console.warn('[home] onStopSpeak 异常: ' + JSON.stringify(e))
+  }
 }
 
 function onAchievementChipTap(item: AchievementItem): void {
@@ -830,6 +918,7 @@ onUnload((): void => {
 .planet-hero-card,
 .health-cluster,
 .summary-card,
+.summary-standalone,
 .recommend-section,
 .library-section,
 .light-record-card {
@@ -862,6 +951,9 @@ onUnload((): void => {
 .settings-icon-text { color: #FFFFFF; font-size: 18px; }
 .phone-usage-hint { flex-direction: row; align-items: center; justify-content: center; padding: 11px 16px; border-radius: 18px; margin-top: 8px; }
 .phone-usage-hint-text { font-size: 12px; font-weight: 500; }
+.ai-eval-entry { flex-direction: row; align-items: center; justify-content: center; padding: 11px 16px; border-radius: 18px; margin-top: 8px; background-color: rgba(126, 240, 194, 0.16); border-width: 1px; border-color: rgba(126, 240, 194, 0.34); border-style: solid; }
+.ai-eval-entry-icon { font-size: 12px; color: #7EF0C2; font-weight: bold; margin-right: 6px; }
+.ai-eval-entry-text { font-size: 12px; font-weight: 500; color: #DBC8ED; }
 .hero-action-row { flex-direction: row; align-items: center; margin-top: 14px; }
 .hero-stat-pill { flex: 1; height: 48px; border-radius: 24px; flex-direction: row; align-items: center; justify-content: center; margin-right: 10px; }
 .hero-stat-num { font-size: 24px; color: #FFFFFF; font-weight: bold; margin-right: 5px; }
@@ -937,21 +1029,24 @@ onUnload((): void => {
 .particle-a { top: 18px; right: 18px; }
 .particle-b { bottom: 20px; left: 20px; }
 .particle-c { bottom: 28px; right: 12px; }
-.cockpit-grid { flex-direction: row; align-items: stretch; margin: 14px 12px 0 12px; padding: 10px 8px; border-radius: 28px; background-color: rgba(7, 9, 30, 0.68); background-image: linear-gradient(160deg, rgba(12, 12, 42, 0.92) 0%, rgba(48, 42, 94, 0.68) 100%); border-width: 1px; border-color: rgba(219, 200, 237, 0.13); border-style: solid; }
-.health-cluster { flex: 1; border-radius: 26px; padding: 6px 0 8px 0; margin-right: 7px; }
-.cockpit-side { width: 38%; flex-direction: column; }
+.cockpit-grid { flex-direction: column; margin: 14px 12px 0 12px; padding: 10px 8px 8px 8px; border-radius: 28px; background-color: rgba(7, 9, 30, 0.68); background-image: linear-gradient(160deg, rgba(12, 12, 42, 0.92) 0%, rgba(48, 42, 94, 0.68) 100%); border-width: 1px; border-color: rgba(219, 200, 237, 0.13); border-style: solid; }
+.health-scroll { flex-direction: row; border-radius: 22px; }
+.health-cluster { flex-direction: row; padding: 6px 4px 8px 4px; align-items: center; }
 .section-header-row { flex-direction: row; align-items: flex-end; justify-content: space-between; padding: 14px 16px 4px 16px; }
 .compact-header { padding: 8px 12px 1px 12px; flex-direction: column; align-items: flex-start; }
 .section-title { font-size: 17px; font-weight: bold; }
 .section-caption { font-size: 12px; }
-.penetration-section { flex-direction: column; align-items: flex-start; margin: 0 0 8px 0; border-radius: 22px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; min-height: 118px; padding: 14px 16px; }
-.penetration-copy { width: auto; flex-direction: column; }
-.section-label { font-size: 13px; font-weight: bold; }
-.penetration-sub { font-size: 10px; margin-top: 3px; }
-.penetration-track { width: 100%; height: 6px; margin-top: 13px; background-color: rgba(119, 107, 151, 0.18); border-radius: 3px; overflow: hidden; }
-.penetration-fill { height: 6px; background-color: #DBC8ED; border-radius: 3px; }
-.penetration-value { align-self: flex-end; font-size: 13px; font-weight: bold; margin-top: 6px; }
+.section-label { font-size: 13px; font-weight: bold; color: #FFFFFF; }
+.penetration-inline { margin-top: 10px; padding: 10px 14px; border-radius: 14px; background-color: rgba(255, 255, 255, 0.08); border-width: 1px; border-color: rgba(219, 200, 237, 0.14); border-style: solid; }
+.penetration-inline-header { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.penetration-value-inline { font-size: 14px; font-weight: bold; color: #DBC8ED; }
+.penetration-track-inline { width: 100%; height: 6px; background-color: rgba(119, 107, 151, 0.18); border-radius: 3px; overflow: hidden; }
+.penetration-fill-inline { height: 6px; background-color: #DBC8ED; border-radius: 3px; }
 .summary-card { margin: 0; padding: 14px; border-radius: 22px; min-height: 128px; flex-direction: column; }
+.summary-standalone { margin: 12px 14px 0 14px; padding: 16px 18px; border-radius: 24px; flex-direction: column; }
+.summary-standalone-header { flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.summary-standalone-hour { font-size: 11px; color: rgba(255, 255, 255, 0.5); }
+.summary-standalone-empty { min-height: 96px; justify-content: center; }
 .summary-empty { align-items: flex-start; }
 .summary-eyebrow { font-size: 12px; font-weight: bold; margin-bottom: 5px; }
 .summary-oneliner { font-size: 15px; line-height: 20px; font-weight: bold; margin-bottom: 6px; }

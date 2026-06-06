@@ -1,0 +1,100 @@
+import { getAllStateAndAdhocTexts } from '../database/LlmHistoryDao'
+import { LlmHistoryEntry } from '../models/LlmHistoryEntry'
+import { callMinimaxChat } from './CloudService'
+import {
+  SYSTEM_PROMPT_MOOD_CLOUD,
+  buildMoodCloudPrompt,
+  getFallbackMoodWords
+} from '../constants/MoodCloudPrompts'
+import type { MoodWord } from '../models/MoodWord'
+
+export type { MoodWord } from '../models/MoodWord'
+
+const MIN_SAMPLE_COUNT: number = 3
+const MAX_RAW_TEXTS: number = 80
+
+function collectRawTexts(): string[] {
+  let entries: LlmHistoryEntry[] = []
+  try { entries = getAllStateAndAdhocTexts(MAX_RAW_TEXTS) } catch (_) { entries = [] }
+  const texts: string[] = []
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i]
+    if (e == null) continue
+    const pr = e.parsedResult
+    if (pr != null) {
+      const sd = pr.stateDescription
+      if (sd != null) {
+        const sdVal = sd!!
+        if (sdVal.length > 0) texts.push(sdVal)
+      }
+    }
+    if (e.adhocText != null && e.adhocText.length > 0) texts.push(e.adhocText)
+  }
+  return texts
+}
+
+export function getMoodCloudSampleCount(): number {
+  return collectRawTexts().length
+}
+
+export function generateMoodCloud(onOK: (words: MoodWord[]) => void, onFail: (msg: string) => void): void {
+  const raw = collectRawTexts()
+  if (raw.length < MIN_SAMPLE_COUNT) {
+    onOK(getFallbackMoodWords())
+    return
+  }
+  const userPrompt = buildMoodCloudPrompt(raw)
+  console.log('[MoodCloudService] generateMoodCloud samples=' + raw.length + ' promptLen=' + userPrompt.length)
+  callMinimaxChat(SYSTEM_PROMPT_MOOD_CLOUD, userPrompt, 500,
+    (rawResp: string): void => {
+      const words = parseMoodCloudJson(rawResp)
+      if (words.length < 1) {
+        onOK(getFallbackMoodWords())
+        return
+      }
+      onOK(words)
+    },
+    (): void => {
+      console.warn('[MoodCloudService] LLM 失败')
+      onOK(getFallbackMoodWords())
+    }
+  )
+}
+
+function parseMoodCloudJson(raw: string): MoodWord[] {
+  if (raw == null || raw.length < 1) return []
+  let s: string = raw.trim()
+  if (s.startsWith('```')) {
+    const firstNl = s.indexOf('\n')
+    if (firstNl > 0) s = s.substring(firstNl + 1)
+    if (s.endsWith('```')) s = s.substring(0, s.length - 3)
+  }
+  s = s.trim()
+  const arrStart: number = s.indexOf('[')
+  const arrEnd: number = s.lastIndexOf(']')
+  if (arrStart < 0 || arrEnd <= arrStart) return []
+  const sub: string = s.substring(arrStart, arrEnd + 1)
+  try {
+    const parsed = JSON.parse(sub)
+    if (!Array.isArray(parsed)) return []
+    const out: MoodWord[] = []
+    const arr = parsed as MoodWord[]
+    for (let i = 0; i < arr.length; i++) {
+      const it = arr[i]
+      if (it == null) continue
+      const w = it.word
+      if (w == null || w.length < 1) continue
+      let wn: number = it.weight
+      if (wn == null) wn = 1
+      wn = Math.floor(wn)
+      if (wn < 1) wn = 1
+      if (wn > 10) wn = 10
+      out.push({ word: w, weight: wn })
+    }
+    return out
+  } catch (e) {
+    const msg = e != null ? ('' + e) : 'null'
+    console.warn('[MoodCloudService] JSON 解析失败: ' + msg)
+    return []
+  }
+}

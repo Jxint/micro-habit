@@ -1,8 +1,10 @@
 // 使用情况监听：前台 Service
-// 5 秒轮询 queryUsageStats(INTERVAL_DAILY, now-24h, now) 找 lastTimeUsed 最大的非自家包
-// 作为"当前前台 App"，持续时长 = now - currentStartTime（=lastTimeUsed）
-// 每 30 分钟调 maybeReconcile 跑一次诊断 log（仅 debug 用）
-// 维护 currentPkg / currentStartTime / lastTickTime / lastReconcileTime / todayDate
+// 固定 10 分钟轮询（默认值，可在启动时由 startUsageMonitor 覆盖）
+// 调用 queryUsageStats(INTERVAL_DAILY, todayStart, now) 聚合今日前台时长，
+//   累计时长 >= thresholdMs 时回调 onAppDurationTrigger。
+// 每次 tick 写一条 'alive' 心跳。
+// 每 30 分钟调 maybeReconcile 跑一次诊断 log（仅 debug 用）。
+// 维护 lastTickTime / lastReconcileTime / todayDate。
 
 import Service from 'android.app.Service'
 import Context from 'android.content.Context'
@@ -30,14 +32,16 @@ const CHANNEL_ID: string = 'micro_habit_usage_stats'
 const FOREGROUND_TYPE_SPECIAL_USE: Int = 108
 const WAKE_LOCK_TAG: string = 'MicroHabit:UsageStats'
 const SERVICE_CLASS_NAME: string = 'uts.sdk.modules.utsUsageStats.UsageStatsForegroundService'
+const DEFAULT_POLL_INTERVAL_MS: Long = 10 * 60 * 1000
 
 // 模块级共享状态
 let cachedCbs: UsageMonitorCallbacks | null = null
 let thresholdMs: number = 60 * 60 * 1000
-let pollIntervalMs: number = 5 * 60 * 1000
+let pollIntervalMs: number = 10 * 60 * 1000
 let serviceInstance: UsageStatsForegroundService | null = null
 let monitoring: boolean = false
 let lastReconcileTime: Long = 0
+let lastTickTimeMs: Long = 0
 let triggerEnabled: boolean = false
 
 function getSelfPackageNameInternal(): string {
@@ -96,12 +100,13 @@ function makeServiceIntent(ctx: Context): Intent {
 
 // ============================================================
 // 持久化偏好（SharedPreferences）
-// Service 被 START_STICKY 复活后，模块级 triggerEnabled/thresholdMs
+// Service 被 START_STICKY 复活后，模块级 triggerEnabled/thresholdMs/pollIntervalMs
 // 会被进程级 let 变量重置为默认值；通过 SharedPreferences 恢复
 // ============================================================
 const PREFS_NAME: string = 'micro_habit_prefs'
 const KEY_TRIGGER_ENABLED: string = 'trigger_enabled'
 const KEY_POLL_THRESHOLD_MS: string = 'poll_threshold_ms'
+const KEY_POLL_INTERVAL_MS: string = 'poll_interval_ms'
 
 function getPrefs(): SharedPreferences | null {
   try {
@@ -113,7 +118,7 @@ function getPrefs(): SharedPreferences | null {
   }
 }
 
-// 读回模块级 triggerEnabled / thresholdMs（默认值与模块级 let 初始值对齐）
+// 读回模块级 triggerEnabled / thresholdMs / pollIntervalMs（默认值与模块级 let 初始值对齐）
 function loadPrefsFromDisk(): void {
   try {
     const prefs = getPrefs()
@@ -122,16 +127,18 @@ function loadPrefsFromDisk(): void {
     triggerEnabled = prefs.getBoolean(KEY_TRIGGER_ENABLED, false)
     const defaultThresholdMs: number = 60 * 60 * 1000
     thresholdMs = prefs.getLong(KEY_POLL_THRESHOLD_MS, defaultThresholdMs.toLong()) as number
+    pollIntervalMs = prefs.getLong(KEY_POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS) as number
   } catch (_) {}
 }
 
-function savePrefsToDisk(triggerEnabledIn: boolean, thresholdMsIn: number): void {
+function savePrefsToDisk(triggerEnabledIn: boolean, thresholdMsIn: number, pollIntervalMsIn: number): void {
   try {
     const prefs = getPrefs()
     if (prefs == null) return
     const editor = prefs.edit()
     editor.putBoolean(KEY_TRIGGER_ENABLED, triggerEnabledIn)
     editor.putLong(KEY_POLL_THRESHOLD_MS, thresholdMsIn.toLong())
+    editor.putLong(KEY_POLL_INTERVAL_MS, pollIntervalMsIn.toLong())
     editor.apply()
   } catch (_) {}
 }
@@ -215,6 +222,15 @@ export class UsageStatsForegroundService extends Service {
     }
   }
 
+  // 公开 rescheduleTick，让 setPollIntervalMs 能立即重排下一次 tick
+  public rescheduleTick(): void {
+    if (!this.started) return
+    if (this.handler != null) {
+      this.handler!!.removeCallbacksAndMessages(null)
+    }
+    this.scheduleNextTick()
+  }
+
   private createChannel(): void {
     if (Build.VERSION.SDK_INT < 26) return
     try {
@@ -271,9 +287,10 @@ export class UsageStatsForegroundService extends Service {
     if (this.started) return
     this.handler = Handler(Looper.getMainLooper())
     this.lastTickTime = System.currentTimeMillis()
+    lastTickTimeMs = this.lastTickTime
     this.started = true
     monitoring = true
-    this.doPoll()  // 立即跑一次，不等首次 5 分钟（提升测试体验 + 启动即可拿数据）
+    this.doPoll()  // 立即跑一次，不等首次 pollIntervalMs（提升测试体验 + 启动即可拿数据）
     this.scheduleNextTick()
   }
 
@@ -287,7 +304,7 @@ export class UsageStatsForegroundService extends Service {
 
   private tick(): void {
     if (!this.started) return
-    // 每次 5 分钟 tick 写一条 'alive' 心跳，验证触发链路是否真的在跑
+    // 每次 pollIntervalMs tick 写一条 'alive' 心跳，验证触发链路是否真的在跑
     try { insertHeartbeat('alive') } catch (e) {
       console.warn('[UsageStats] heartbeat tick write failed: ' + JSON.stringify(e))
     }
@@ -296,6 +313,8 @@ export class UsageStatsForegroundService extends Service {
     } catch (e) {
       console.warn('[UsageStats] poll error: ' + JSON.stringify(e))
     }
+    this.lastTickTime = System.currentTimeMillis()
+    lastTickTimeMs = this.lastTickTime
     this.acquireWakeLock()
     this.scheduleNextTick()
   }
@@ -461,7 +480,7 @@ export function startUsageMonitor(
   }
   triggerEnabled = triggerEnabledIn
   // 持久化关键参数：START_STICKY 复活后由 onCreate 读回
-  savePrefsToDisk(triggerEnabled, thresholdMs)
+  savePrefsToDisk(triggerEnabled, thresholdMs, pollIntervalMs)
   monitoring = true
   try {
     const ctx = UTSAndroid.getAppContext()
@@ -482,6 +501,29 @@ export function setTriggerEnabled(enabled: boolean): void {
       try { svc.runImmediatePoll() } catch (_) {}
     }
   }
+}
+
+// 运行时调整轮询间隔（settings 页修改后立即生效）。
+// 若 Service 已启动，会取消当前 pending tick 并按新间隔重排。
+export function setPollIntervalMs(msIn: number): void {
+  if (msIn < 1) return
+  pollIntervalMs = msIn
+  savePrefsToDisk(triggerEnabled, thresholdMs, pollIntervalMs)
+  const svc = serviceInstance
+  if (svc != null) {
+    try { svc.rescheduleTick() } catch (_) {}
+  }
+}
+
+// 读取当前生效的轮询间隔（毫秒），供 UI 展示用。
+export function getCurrentPollIntervalMs(): number {
+  return pollIntervalMs
+}
+
+// 读取最近一次 tick 时刻（毫秒），用于 UI 倒计时。
+// Service 还没启动或还没跑过 tick 时返回 0。
+export function getLastTickTimeMs(): number {
+  return lastTickTimeMs as number
 }
 
 export function stopUsageMonitor(): void {

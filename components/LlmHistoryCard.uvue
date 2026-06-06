@@ -1,7 +1,7 @@
 <template>
   <view class="history-card">
     <view class="history-header" @tap="toggle">
-      <text class="history-title">🤖 AI 历次判断</text>
+      <text class="history-title">AI 历次判断</text>
       <text class="history-count">{{ entries.length }} 条</text>
       <text class="history-arrow">{{ expanded ? '▼' : '▶' }}</text>
     </view>
@@ -16,15 +16,15 @@
       >
         <view class="history-item-header">
           <text class="history-stage" :class="entry.stage === 'pre' ? 'stage-pre' : 'stage-post'">
-            {{ entry.stage === 'pre' ? '触发时' : '复评时' }}
+           💬 {{ entry.stage === 'pre' ? '触发时' : '复评时' }}
           </text>
           <text class="history-time">{{ formatTime(entry.createdAt) }}</text>
         </view>
         <text v-if="entry.adhocText != null && entry.adhocText.length > 0" class="history-adhoc">
-          💬 {{ entry.adhocText }}
+          🤔 {{ entry.adhocText }}
         </text>
         <text v-if="entry.reasoning != null && entry.reasoning.length > 0" class="history-reasoning">
-          🤔 {{ entry.reasoning }}
+          {{ entry.reasoning }}
         </text>
         <view v-if="entry.suggestedRule != null" class="history-rule">
           <text class="history-rule-label">建议规则</text>

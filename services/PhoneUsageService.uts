@@ -1,6 +1,15 @@
 import { getTodayAppBreakdown, getTop5Apps, getTodayTotalUsageSeconds, type AppUsageItem } from '../database/AppUsageDao'
 import { queryUsageStatsOnce } from '../uni_modules/uts-usage-stats/utssdk/app-android/index'
-import { today } from '../utils/TimeUtils'
+import { today, currentHour } from '../utils/TimeUtils'
+import { callMinimaxChat } from './CloudService'
+import { countCompletedToday } from '../database/ActionLogDao'
+import {
+  SYSTEM_PROMPT_PHONE_USAGE,
+  buildPhoneUsageEvalPrompt,
+  getFallbackPhoneUsageEval,
+  type PhoneUsageEvalInput,
+  type TopAppEntry
+} from '../constants/PhoneUsagePrompts'
 
 export type PhoneUsageSummary = {
   totalMinutes: number
@@ -102,7 +111,114 @@ export function getTop5PhoneApps(): AppUsageItem[] {
 const LLM_RESERVED_NOTE = 'LLM 接口待配置'
 
 export function aiEvaluateTodayUsage(onComplete: (text: string) => void): void {
-  onComplete(LLM_RESERVED_NOTE)
+  let summary: PhoneUsageSummary
+  try {
+    summary = getTodayPhoneUsageSummary()
+  } catch (_) {
+    summary = { totalMinutes: 0, totalSeconds: 0, hourText: '0 小时', minuteText: '0 分钟', appCount: 0 }
+  }
+  if (summary.totalSeconds < 1) {
+    try {
+      const sys = getPhoneUsageFromSystem()
+      if (sys != null && sys.summary.totalSeconds > 0) {
+        summary = sys.summary
+      }
+    } catch (_) {}
+  }
+
+  let topApps: AppUsageItem[] = []
+  try { topApps = getTop5Apps() } catch (_) { topApps = [] }
+  const topDtos: TopAppEntry[] = []
+  for (let i = 0; i < topApps.length; i++) {
+    const a = topApps[i]
+    if (a == null) continue
+    topDtos.push({
+      packageName: a.packageName,
+      appLabel: a.appLabel.length > 0 ? a.appLabel : a.packageName,
+      totalSeconds: a.foregroundSec
+    })
+  }
+
+  let guardCount = 0
+  try { guardCount = countCompletedToday() } catch (_) { guardCount = 0 }
+
+  const hourNow = currentHour()
+  const isNight = hourNow >= 22 || hourNow < 7
+  const isWorkHour = hourNow >= 9 && hourNow < 18
+
+  const input: PhoneUsageEvalInput = {
+    totalMinutes: summary.totalMinutes,
+    totalSeconds: summary.totalSeconds,
+    hourText: summary.hourText,
+    minuteText: summary.minuteText,
+    appCount: summary.appCount,
+    topApps: topDtos,
+    isNight: isNight,
+    isWorkHour: isWorkHour,
+    guardCount: guardCount
+  }
+
+  const userPrompt = buildPhoneUsageEvalPrompt(input)
+  console.log('[PhoneUsageService] aiEvaluateTodayUsage prompt len=' + userPrompt.length)
+  callMinimaxChat(SYSTEM_PROMPT_PHONE_USAGE, userPrompt, 600,
+    (raw: string): void => {
+      const cleaned = sanitizeAiEvalText(raw)
+      if (cleaned.length < 1) {
+        onComplete(getFallbackPhoneUsageEval())
+        return
+      }
+      onComplete(cleaned)
+    },
+    (): void => {
+      console.warn('[PhoneUsageService] aiEvaluateTodayUsage LLM 失败')
+      onComplete(getFallbackPhoneUsageEval())
+    }
+  )
+}
+
+function sanitizeAiEvalText(raw: string): string {
+  if (raw == null || raw.length < 1) return ''
+  let s = raw.trim()
+  // 去除 markdown 包裹
+  if (s.startsWith('```')) {
+    const firstNewline = s.indexOf('\n')
+    if (firstNewline > 0) s = s.substring(firstNewline + 1)
+    if (s.endsWith('```')) s = s.substring(0, s.length - 3)
+  }
+  s = s.trim()
+  if (s.length < 1) return ''
+  // 强制去除行内 emoji（保留末尾品牌签名 🌙）
+  s = stripEmojiExceptBrand(s)
+  // 限长 600
+  if (s.length > 600) s = s.substring(0, 600)
+  return s
+}
+
+// 去除 emoji 字符（保留 🌙 末尾品牌签名）
+function stripEmojiExceptBrand(s: string): string {
+  let out = ''
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charAt(i)
+    if (ch == '🌙') {
+      out = out + ch
+      continue
+    }
+    // 简单的 emoji 范围过滤
+    const code = s.charCodeAt(i)
+    // 高位代理区（surrogate pair）跳过
+    if (code != null && code >= 0xD800 && code <= 0xDBFF) {
+      // 检查后一个是否为低代理
+      const next = s.charAt(i + 1)
+      const nextCode = next.charCodeAt(0)
+      if (nextCode != null && nextCode >= 0xDC00 && nextCode <= 0xDFFF) {
+        // 是 emoji 字符（4 字节 UTF-16 代理对）
+        i++
+        continue
+      }
+    }
+    out = out + ch
+  }
+  return out
 }
 
 export type PhoneUsageFromSystem = {

@@ -1,0 +1,67 @@
+// 手机使用 AI 评价 prompt 模板
+
+export type TopAppEntry = {
+  packageName: string
+  appLabel: string
+  totalSeconds: number
+}
+
+export type PhoneUsageEvalInput = {
+  totalMinutes: number
+  totalSeconds: number
+  hourText: string
+  minuteText: string
+  appCount: number
+  topApps: TopAppEntry[]
+  isNight: boolean
+  isWorkHour: boolean
+  guardCount: number
+}
+
+const SYSTEM_PROMPT_PHONE_USAGE: string = '你是微憩星球里的"小星球"，温柔、不评判、不会医学恐吓。'
+  + '用中文，2-3 段，每段不超过 40 字，语气像朋友给一个温柔建议。'
+  + '禁止使用表情符号（如 😀😄💕 等 emoji），仅用纯文字。'
+  + '禁止出现"建议""应当""需要"等命令式词汇，改用"也许""或许""可以试试"。'
+  + '禁止读取任何用户隐私。'
+
+function buildPhoneUsageEvalPrompt(input: PhoneUsageEvalInput): string {
+  const topLines: string[] = []
+  for (let i = 0; i < input.topApps.length; i++) {
+    const a = input.topApps[i]
+    if (a == null) continue
+    const mins = Math.floor(a.totalSeconds / 60)
+    topLines.push('  ' + a.appLabel + '：' + mins + ' 分钟')
+  }
+  const period: string = input.isNight ? '深夜时段' : (input.isWorkHour ? '工作/学习时段' : '休息时段')
+  const topBlock: string = topLines.length > 0 ? topLines.join('\n') : '  （无具体应用数据）'
+  return '请根据以下今日手机使用情况写一段温柔的评价：\n'
+    + '- 累计使用：' + input.hourText + ' ' + input.minuteText + '\n'
+    + '- 涉及应用：' + input.appCount + ' 个\n'
+    + '- 使用时段：' + period + '\n'
+    + '- 微动作完成：' + input.guardCount + ' 次\n'
+    + '- 使用最久的应用：\n' + topBlock + '\n'
+    + '\n'
+    + '要求：\n'
+    + '1. 先用一句话温柔概括今天的使用节奏（不要评判，承认现实）。\n'
+    + '2. 如果夜间使用多，温柔提醒；如果是工作时段，肯定专注。\n'
+    + '3. 给出 1 个不强迫的微动作建议（如"下次刷完 B 站，也许可以眨眨眼睛"）。\n'
+    + '4. 末尾加一句"——微憩星球 🌙"（注意：末尾的 🌙 是允许的，作为品牌签名）。\n'
+    + '5. **全文不允许出现除末尾 🌙 之外的其他 emoji 字符**。'
+}
+
+const FALLBACK_PHONE_USAGE_EVAL_TEXTS: string[] = [
+  '今天用得有点久，别忘了眨眨眼睛、站起来走两步。\n休息是给自己的礼物。\n——微憩星球',
+  '屏幕看久了，眼睛会想你的。\n也许下次可以试试每 20 分钟看向 6 米外 20 秒。\n——微憩星球',
+  '手机是我们的工具，也是我们的牵绊。\n今天已经努力了一整天，现在可以放一放啦。\n——微憩星球'
+]
+
+function getFallbackPhoneUsageEval(): string {
+  const idx = Math.floor(Math.random() * FALLBACK_PHONE_USAGE_EVAL_TEXTS.length)
+  return FALLBACK_PHONE_USAGE_EVAL_TEXTS[idx] as string
+}
+
+export {
+  SYSTEM_PROMPT_PHONE_USAGE,
+  buildPhoneUsageEvalPrompt,
+  getFallbackPhoneUsageEval
+}

@@ -15,6 +15,8 @@ import * as LlmHistoryDao from '../database/LlmHistoryDao'
 import { LlmHistoryEntry } from '../models/LlmHistoryEntry'
 import { AchievementItem } from '../models/Achievement'
 import * as AchievementService from '../services/AchievementService'
+import { getRemainingCooldownMs } from '../services/TriggerEngine'
+import { getCurrentPollIntervalMs, getLastTickTimeMs } from '../uni_modules/uts-usage-stats/utssdk/app-android/index'
 
 export type DailyOutput = {
   bodyText: string
@@ -41,12 +43,17 @@ export type AppStore = {
   llmHistory: Ref<LlmHistoryEntry[]>
   achievements: Ref<AchievementItem[]>
   pendingUnlockIds: Ref<string[]>
+  nextCheckCountdownMs: Ref<number>
+  nextCheckCountdownText: Ref<string>
+  nextTriggerCountdownMs: Ref<number>
+  nextTriggerCountdownText: Ref<string>
   refreshHomeData(): void
   refreshWeeklyReport(): void
   refreshLlmHistory(): void
   refreshAchievements(): void
   setPendingUnlocks(ids: string[]): void
   shiftPendingUnlock(): void
+  refreshTriggerCountdowns(): void
 }
 
 const eyeScore = ref<number>(0)
@@ -69,6 +76,10 @@ const weeklyReportLoading = ref<boolean>(false)
 const llmHistory = ref<LlmHistoryEntry[]>([])
 const achievements = ref<AchievementItem[]>([])
 const pendingUnlockIds = ref<string[]>([])
+const nextCheckCountdownMs = ref<number>(0)
+const nextCheckCountdownText = ref<string>('--:--')
+const nextTriggerCountdownMs = ref<number>(0)
+const nextTriggerCountdownText = ref<string>('可触发')
 
 function emptySeenSet(): Set<string> {
   return new Set<string>()
@@ -94,6 +105,43 @@ function shiftPendingUnlockFn(): void {
     newArr.push(pendingUnlockIds.value[i])
   }
   pendingUnlockIds.value = newArr
+}
+
+function formatCountdown(ms: number): string {
+  if (ms < 1) return '00:00'
+  const totalSec = Math.floor(ms / 1000)
+  const mm = Math.floor(totalSec / 60)
+  const ss = totalSec - mm * 60
+  const pad = (n: number): string => (n < 10 ? '0' + n : '' + n)
+  return pad(mm) + ':' + pad(ss)
+}
+
+function refreshTriggerCountdownsFn(): void {
+  // ===== 下一次轮询检查倒计时 =====
+  let checkRemain = 0
+  try {
+    const lastTick = getLastTickTimeMs()
+    const pollMs = getCurrentPollIntervalMs()
+    if (lastTick > 0 && pollMs > 0) {
+      const elapsed = Date.now() - lastTick
+      checkRemain = pollMs - elapsed
+      if (checkRemain < 0) checkRemain = 0
+    }
+  } catch (_) {
+    checkRemain = 0
+  }
+  nextCheckCountdownMs.value = checkRemain
+  nextCheckCountdownText.value = formatCountdown(checkRemain)
+
+  // ===== 下一次可触发倒计时（全局冷却） =====
+  let triggerRemain = 0
+  try {
+    triggerRemain = getRemainingCooldownMs()
+  } catch (_) {
+    triggerRemain = 0
+  }
+  nextTriggerCountdownMs.value = triggerRemain
+  nextTriggerCountdownText.value = triggerRemain > 0 ? formatCountdown(triggerRemain) : '可触发'
 }
 
 function refreshLlmHistory(): void {
@@ -127,6 +175,10 @@ export function useAppStore(): AppStore {
     llmHistory,
     achievements,
     pendingUnlockIds,
+    nextCheckCountdownMs,
+    nextCheckCountdownText,
+    nextTriggerCountdownMs,
+    nextTriggerCountdownText,
 
     refreshLlmHistory(): void {
       refreshLlmHistory()
@@ -142,6 +194,10 @@ export function useAppStore(): AppStore {
 
     shiftPendingUnlock(): void {
       shiftPendingUnlockFn()
+    },
+
+    refreshTriggerCountdowns(): void {
+      refreshTriggerCountdownsFn()
     },
 
     refreshHomeData(): void {

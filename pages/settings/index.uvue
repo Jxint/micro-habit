@@ -7,11 +7,13 @@
     <view class="bg-glow glow-blue"></view>
     <view class="bg-glow glow-pink"></view>
     <scroll-view class="scroll-area" scroll-y="true">
+
+      <!-- 页眉 -->
       <view class="settings-hero">
         <view class="settings-hero-copy">
           <text class="settings-kicker">微憩星球</text>
           <text class="settings-title">守护中心</text>
-          <text class="settings-subtitle">你的小星球会记录节奏，提醒也会越来越懂你。</text>
+          <text class="settings-subtitle">在这里调整小星球的守护节奏和行为偏好</text>
         </view>
         <view class="settings-planet">
           <view class="settings-orbit"></view>
@@ -19,12 +21,9 @@
         </view>
       </view>
 
-      <view class="planet-note">
-        <text class="planet-note-title">今日也可以只做一点点</text>
-        <text class="planet-note-text">微动作不追求强度，只是在合适的时候，把你从屏幕里轻轻拉回来。</text>
-      </view>
-
-      <view class="settings-section">
+      <!-- 紫色卡：守护模式 + 触发频率 -->
+      <view class="section section-purple">
+        <view class="section-bar bar-purple"></view>
         <text class="section-title">守护模式</text>
         <view class="setting-item">
           <view class="setting-left">
@@ -38,18 +37,57 @@
             <text class="setting-label">立即检查一次</text>
             <text class="setting-hint">主动查询当前 App 使用时长并判断是否触发微动作提醒</text>
           </view>
-          <text class="setting-value">检查 ›</text>
+          <text class="setting-value setting-value-purple">检查 ›</text>
         </view>
       </view>
 
-      <view class="settings-section">
+      <view class="section section-purple">
+        <view class="section-bar bar-purple"></view>
+        <text class="section-title">触发频率</text>
+        <view class="countdown-card">
+          <view class="countdown-row">
+            <text class="countdown-label">距离下次检查</text>
+            <text class="countdown-value">{{ nextCheckCountdownText }}</text>
+          </view>
+          <view class="countdown-divider"></view>
+          <view class="countdown-row">
+            <text class="countdown-label">下次可触发</text>
+            <text class="countdown-value countdown-active">{{ nextTriggerCountdownText }}</text>
+          </view>
+        </view>
+        <view class="setting-item" @tap="openPollIntervalPicker">
+          <view class="setting-left">
+            <text class="setting-label">轮询间隔</text>
+            <text class="setting-hint">每隔多久查询一次前台 App 使用情况</text>
+          </view>
+          <text class="setting-value setting-value-purple">{{ pollIntervalMin }} 分钟 ›</text>
+        </view>
+        <view class="setting-item" @tap="openCooldownPicker">
+          <view class="setting-left">
+            <text class="setting-label">两次触发最小间隔</text>
+            <text class="setting-hint">同一时间内连续触发微动作的最小时间差</text>
+          </view>
+          <text class="setting-value setting-value-purple">{{ cooldownMin }} 分钟 ›</text>
+        </view>
+        <view class="setting-item" @tap="openPkgCooldownPicker">
+          <view class="setting-left">
+            <text class="setting-label">同一 App 重弹间隔</text>
+            <text class="setting-hint">同一个 App 触发后，间隔多久才允许再次触发</text>
+          </view>
+          <text class="setting-value setting-value-purple">{{ pkgCooldownMin }} 分钟 ›</text>
+        </view>
+      </view>
+
+      <!-- 蓝色卡：AI 分析 + 微动作 -->
+      <view class="section section-blue">
+        <view class="section-bar bar-blue"></view>
         <text class="section-title">AI 分析与提醒</text>
         <view class="setting-item" @tap="openDndPicker">
           <view class="setting-left">
             <text class="setting-label">免打扰时段</text>
             <text class="setting-hint">该时段不触发提醒</text>
           </view>
-          <text class="setting-value">{{ dndStart }} - {{ dndEnd }} ›</text>
+          <text class="setting-value setting-value-blue">{{ dndStart }} - {{ dndEnd }} ›</text>
         </view>
         <view class="setting-item">
           <view class="setting-left">
@@ -67,25 +105,35 @@
         </view>
       </view>
 
-      <view class="settings-section">
+      <view class="section section-blue">
+        <view class="section-bar bar-blue"></view>
         <text class="section-title">微动作设置</text>
+        <view class="setting-item" @tap="openThresholdPicker">
+          <view class="setting-left">
+            <text class="setting-label">连续使用提醒阈值</text>
+            <text class="setting-hint">达到该时长后弹窗提醒，建议 30-90 分钟</text>
+          </view>
+          <text class="setting-value setting-value-blue">{{ durationThreshold }} 分钟 ›</text>
+        </view>
         <view class="setting-item" @tap="openDurationPrefPicker">
           <view class="setting-left">
             <text class="setting-label">默认时长偏好</text>
             <text class="setting-hint">手动微动作的默认倒计时</text>
           </view>
-          <text class="setting-value">{{ durationPref }} 秒 ›</text>
+          <text class="setting-value setting-value-blue">{{ durationPref }} 秒 ›</text>
         </view>
         <view class="setting-item" @tap="openTargetCountPicker">
           <view class="setting-left">
             <text class="setting-label">每日目标次数</text>
             <text class="setting-hint">每类动作每天完成几次算满分</text>
           </view>
-          <text class="setting-value">{{ targetCount }} 次 ›</text>
+          <text class="setting-value setting-value-blue">{{ targetCount }} 次 ›</text>
         </view>
       </view>
 
-      <view class="settings-section">
+      <!-- 绿色卡：触发规则 -->
+      <view class="section section-green">
+        <view class="section-bar bar-green"></view>
         <text class="section-title">触发规则（{{ rules.length }} 条）</text>
         <view v-if="rules.length < 1" class="empty-rules">
           <text class="empty-text">暂无启用的触发规则</text>
@@ -107,25 +155,29 @@
         </view>
       </view>
 
-      <view class="settings-section">
+      <!-- 粉色卡：App 分类 -->
+      <view class="section section-pink">
+        <view class="section-bar bar-pink"></view>
         <text class="section-title">App 分类</text>
         <view class="setting-item" @tap="goAppCategories">
           <view class="setting-left">
             <text class="setting-label">App 分类管理</text>
             <text class="setting-hint">手动调整每个 App 的分类，锁定后 LLM 不会覆盖</text>
           </view>
-          <text class="setting-value">›</text>
+          <text class="setting-value setting-value-pink">›</text>
         </view>
         <view class="setting-item" @tap="goBlacklist">
           <view class="setting-left">
             <text class="setting-label">不提醒这些 App</text>
             <text class="setting-hint">系统应用已默认排除，此处可补充不希望被提醒的第三方 App</text>
           </view>
-          <text class="setting-value">{{ blacklistCount }} 个 ›</text>
+          <text class="setting-value setting-value-pink">{{ blacklistCount }} 个 ›</text>
         </view>
       </view>
 
-      <view class="settings-section">
+      <!-- 中性卡：调试 + 关于 -->
+      <view class="section section-neutral">
+        <view class="section-bar bar-neutral"></view>
         <text class="section-title">调试</text>
         <view class="setting-item" @tap="goDebugLogs">
           <view class="setting-left">
@@ -148,7 +200,8 @@
         </view>
       </view>
 
-      <view class="settings-section">
+      <view class="section section-neutral">
+        <view class="section-bar bar-neutral"></view>
         <text class="section-title">关于微憩星球</text>
         <view class="setting-item" @tap="handleDebugTap">
           <view class="setting-left">
@@ -157,7 +210,7 @@
           <text class="setting-value">1.0.0</text>
         </view>
       </view>
-      <view class="bottom-spacer" />
+      <view class="bottom-spacer"></view>
     </scroll-view>
 
     <NumberPickerDialog
@@ -212,6 +265,48 @@
       @confirm="onTargetCountConfirm"
     />
 
+    <NumberPickerDialog
+      :visible="showPollIntervalPicker"
+      title="轮询间隔"
+      hint="每隔多久查询一次前台 App 使用情况"
+      :initial-value="pollIntervalMin"
+      :min-value="5"
+      :max-value="60"
+      :step="5"
+      unit="分钟"
+      :quick-values="[5, 10, 15, 20, 30, 60]"
+      @close="showPollIntervalPicker = false"
+      @confirm="onPollIntervalConfirm"
+    />
+
+    <NumberPickerDialog
+      :visible="showCooldownPicker"
+      title="两次触发最小间隔"
+      hint="同一时间内连续触发微动作的最小时间差"
+      :initial-value="cooldownMin"
+      :min-value="5"
+      :max-value="60"
+      :step="5"
+      unit="分钟"
+      :quick-values="[5, 10, 15, 20, 30, 60]"
+      @close="showCooldownPicker = false"
+      @confirm="onCooldownConfirm"
+    />
+
+    <NumberPickerDialog
+      :visible="showPkgCooldownPicker"
+      title="同一 App 重弹间隔"
+      hint="同一个 App 触发后，间隔多久才允许再次触发"
+      :initial-value="pkgCooldownMin"
+      :min-value="5"
+      :max-value="120"
+      :step="5"
+      unit="分钟"
+      :quick-values="[10, 15, 20, 30, 45, 60, 90, 120]"
+      @close="showPkgCooldownPicker = false"
+      @confirm="onPkgCooldownConfirm"
+    />
+
     <RuleEditDialog
       :visible="showRuleEditor"
       :rule-json="editingRuleJson"
@@ -232,7 +327,7 @@ import { useAppStore } from '../../stores/appStore'
 import { getActiveRules, updateRule, deleteRule, insertRule } from '../../database/EffectiveRuleDao'
 import { PersistedEffectiveRule } from '../../models/PersistedEffectiveRule'
 import { getActionById } from '../../constants/Actions'
-import { setTriggerEnabled } from '../../uni_modules/uts-usage-stats/utssdk/app-android/index'
+import { setTriggerEnabled, setPollIntervalMs } from '../../uni_modules/uts-usage-stats/utssdk/app-android/index'
 
 function pad2(n: number): string {
   if (n < 10) return '0' + n
@@ -257,6 +352,11 @@ const triggerEnabled = ref<boolean>(getBool('trigger_enabled', true))
 const llmEnabled = ref<boolean>(getBool('llm_trigger_enabled', true))
 const askEachTime = ref<boolean>(getBool('llm_trigger_ask_each_time', true))
 const blacklistCount = ref<number>(0)
+const pollIntervalMin = ref<number>(getInt('trigger_poll_interval_min', 10))
+const cooldownMin = ref<number>(getInt('trigger_cooldown_min', 10))
+const pkgCooldownMin = ref<number>(getInt('trigger_pkg_cooldown_min', 20))
+const nextCheckCountdownText = ref<string>('--:--')
+const nextTriggerCountdownText = ref<string>('可触发')
 
 const dndStart = computed<string>(() : string => pad2(dndStartHour.value) + ':00')
 const dndEnd = computed<string>(() : string => pad2(dndEndHour.value) + ':00')
@@ -337,11 +437,17 @@ const showThresholdPicker = ref<boolean>(false)
 const showDndPicker = ref<boolean>(false)
 const showDurationPrefPicker = ref<boolean>(false)
 const showTargetCountPicker = ref<boolean>(false)
+const showPollIntervalPicker = ref<boolean>(false)
+const showCooldownPicker = ref<boolean>(false)
+const showPkgCooldownPicker = ref<boolean>(false)
 
 function openThresholdPicker(): void { showThresholdPicker.value = true }
 function openDndPicker(): void { showDndPicker.value = true }
 function openDurationPrefPicker(): void { showDurationPrefPicker.value = true }
 function openTargetCountPicker(): void { showTargetCountPicker.value = true }
+function openPollIntervalPicker(): void { showPollIntervalPicker.value = true }
+function openCooldownPicker(): void { showCooldownPicker.value = true }
+function openPkgCooldownPicker(): void { showPkgCooldownPicker.value = true }
 
 function onThresholdConfirm(v: number): void {
   durationThreshold.value = v
@@ -370,6 +476,30 @@ function onTargetCountConfirm(v: number): void {
   targetCount.value = v
   putInt('category_target_count', v)
   showTargetCountPicker.value = false
+  uni.showToast({ title: '已保存', icon: 'success' })
+}
+
+function onPollIntervalConfirm(v: number): void {
+  pollIntervalMin.value = v
+  putInt('trigger_poll_interval_min', v)
+  showPollIntervalPicker.value = false
+  try { setPollIntervalMs(v * 60 * 1000) } catch (_) {}
+  try { useAppStore().refreshTriggerCountdowns() } catch (_) {}
+  uni.showToast({ title: '已保存', icon: 'success' })
+}
+
+function onCooldownConfirm(v: number): void {
+  cooldownMin.value = v
+  putInt('trigger_cooldown_min', v)
+  showCooldownPicker.value = false
+  try { useAppStore().refreshTriggerCountdowns() } catch (_) {}
+  uni.showToast({ title: '已保存', icon: 'success' })
+}
+
+function onPkgCooldownConfirm(v: number): void {
+  pkgCooldownMin.value = v
+  putInt('trigger_pkg_cooldown_min', v)
+  showPkgCooldownPicker.value = false
   uni.showToast({ title: '已保存', icon: 'success' })
 }
 
@@ -553,6 +683,30 @@ function onAskEachTimeChange(e: any): void {
   }
 }
 
+let countdownTimer: number | null = null
+
+function startCountdownTimer(): void {
+  if (countdownTimer != null) return
+  const store = useAppStore()
+  store.refreshTriggerCountdowns()
+  countdownTimer = setInterval((): void => {
+    try {
+      const s = useAppStore()
+      s.refreshTriggerCountdowns()
+      nextCheckCountdownText.value = s.nextCheckCountdownText.value
+      nextTriggerCountdownText.value = s.nextTriggerCountdownText.value
+    } catch (_) {}
+  }, 1000)
+}
+
+function stopCountdownTimer(): void {
+  const tid = countdownTimer
+  if (tid != null) {
+    clearInterval(tid)
+    countdownTimer = null
+  }
+}
+
 onPageShow(() => {
   try { rules.value = getActiveRules() } catch (_) { rules.value = [] }
   durationThreshold.value = getInt('app_duration_threshold', 60)
@@ -564,6 +718,18 @@ onPageShow(() => {
   askEachTime.value = getBool('llm_trigger_ask_each_time', true)
   triggerEnabled.value = getBool('trigger_enabled', true)
   blacklistCount.value = readBlacklistCount()
+  pollIntervalMin.value = getInt('trigger_poll_interval_min', 10)
+  cooldownMin.value = getInt('trigger_cooldown_min', 10)
+  pkgCooldownMin.value = getInt('trigger_pkg_cooldown_min', 20)
+  startCountdownTimer()
+})
+
+onPageHide(() => {
+  stopCountdownTimer()
+})
+
+onUnload(() => {
+  stopCountdownTimer()
 })
 </script>
 
@@ -576,209 +742,132 @@ onPageShow(() => {
 }
 .page-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
 .page-bg-img { width: 100%; height: 100%; }
-.scroll-area {
-  flex: 1;
-  position: relative;
-  z-index: 1;
-}
-.bg-glow {
-  position: absolute;
-  border-radius: 999px;
-  z-index: 0;
-}
-.glow-purple {
-  width: 210px;
-  height: 210px;
-  left: -82px;
-  top: -54px;
-  background-color: #776B97;
-  opacity: 0.5;
-}
-.glow-blue {
-  width: 168px;
-  height: 168px;
-  right: -60px;
-  top: 104px;
-  background-color: #C2E0EE;
-  opacity: 0.24;
-}
-.glow-pink {
-  width: 178px;
-  height: 178px;
-  left: 42px;
-  bottom: 88px;
-  background-color: #C68DC0;
-  opacity: 0.18;
-}
-.sky-star {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 2px;
-  background-color: rgba(255, 255, 255, 0.74);
-  z-index: 0;
-}
-.star-a { left: 36px; top: 88px; }
-.star-b { left: 118px; top: 144px; width: 4px; height: 4px; border-radius: 2px; }
-.star-c { right: 52px; top: 116px; }
-.star-d { right: 26px; top: 310px; width: 5px; height: 5px; border-radius: 3px; }
-.star-e { left: 54px; top: 520px; }
-.star-f { right: 86px; top: 420px; width: 4px; height: 4px; border-radius: 2px; }
-.star-g { left: 138px; top: 610px; }
-.star-h { right: 36px; top: 720px; width: 4px; height: 4px; border-radius: 2px; }
-.star-i { left: 76px; top: 214px; width: 2px; height: 2px; border-radius: 1px; }
-.star-j { right: 148px; top: 276px; width: 3px; height: 3px; border-radius: 2px; }
-.star-k { left: 178px; top: 392px; width: 2px; height: 2px; border-radius: 1px; }
-.star-l { right: 64px; top: 560px; width: 3px; height: 3px; border-radius: 2px; }
+.scroll-area { flex: 1; position: relative; z-index: 1; }
 
-.dashboard-hero,
-.settings-hero,
-.planet-note,
-.section,
-.settings-section,
-.guard-box,
-.chart-container,
-.report-stats,
-.tag-card,
-.header-block,
-.filter-row,
-.empty-block {
+.bg-glow { position: absolute; border-radius: 999px; z-index: 0; }
+.glow-purple { width: 210px; height: 210px; left: -82px; top: -54px; background-color: #776B97; opacity: 0.5; }
+.glow-blue { width: 168px; height: 168px; right: -60px; top: 104px; background-color: #C2E0EE; opacity: 0.24; }
+.glow-pink { width: 178px; height: 178px; left: 42px; bottom: 88px; background-color: #C68DC0; opacity: 0.18; }
+
+/* ============================================================
+   页眉
+   ============================================================ */
+.settings-hero {
+  margin: 22px 14px 12px 14px;
+  padding: 22px 18px;
+  border-radius: 28px;
+  flex-direction: row;
+  align-items: center;
+  background-color: rgba(29, 25, 62, 0.82);
+  background-image: linear-gradient(160deg, rgba(48, 42, 94, 0.96) 0%, rgba(84, 65, 124, 0.78) 40%, rgba(198, 141, 192, 0.24) 100%);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.38);
+  border-style: solid;
+  box-shadow: 0 18px 42px rgba(5, 6, 20, 0.34);
+}
+.settings-hero-copy { flex: 1; flex-direction: column; padding-right: 12px; }
+.settings-kicker { color: #DBC8ED; font-size: 13px; font-weight: bold; margin-bottom: 8px; }
+.settings-title { color: #FFFFFF; font-size: 28px; font-weight: bold; line-height: 34px; }
+.settings-subtitle { color: rgba(255, 255, 255, 0.65); font-size: 13px; line-height: 20px; margin-top: 8px; }
+.settings-planet { position: relative; width: 86px; height: 86px; border-radius: 43px; background-color: rgba(219, 200, 237, 0.18); align-items: center; justify-content: center; }
+.settings-orbit { position: absolute; width: 96px; height: 34px; border-radius: 48px; border-width: 2px; border-color: rgba(219, 200, 237, 0.38); border-style: solid; transform: rotate(-20deg); }
+.settings-planet-text { color: #DBC8ED; font-size: 34px; }
+
+/* ============================================================
+   分区卡片（4 色体系）
+   ============================================================ */
+.section {
+  margin: 12px 14px;
+  border-radius: 24px;
+  overflow: hidden;
   background-color: rgba(29, 25, 62, 0.82);
   background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.92) 0%, rgba(84, 65, 124, 0.72) 56%, rgba(198, 141, 192, 0.18) 100%);
   border-width: 1px;
   border-color: rgba(219, 200, 237, 0.18);
   border-style: solid;
   box-shadow: 0 18px 42px rgba(5, 6, 20, 0.28);
+  padding: 16px 0 6px 0;
+  position: relative;
 }
-.dashboard-hero,
-.settings-hero { margin: 22px 14px 12px 14px; padding: 22px 18px; border-radius: 28px; flex-direction: row; align-items: center; }
-.dashboard-hero-copy,
-.settings-hero-copy { flex: 1; flex-direction: column; padding-right: 12px; }
-.dashboard-kicker,
-.settings-kicker,
-.section-toggle,
-.setting-value,
-.rule-priority,
-.rule-source,
-.detail-duration,
-.guard-value,
-.stat-val { color: #DBC8ED; }
-.dashboard-kicker,
-.settings-kicker { font-size: 13px; font-weight: bold; margin-bottom: 8px; }
-.dashboard-title,
-.settings-title,
-.section-title,
-.setting-label,
-.planet-note-title,
-.detail-name,
-.report-body,
-.report-title,
-.header-title,
-.tag-label { color: #FFFFFF; }
-.dashboard-title,
-.settings-title { font-size: 28px; font-weight: bold; line-height: 34px; }
-.dashboard-subtitle,
-.settings-subtitle,
-.planet-note-text,
-.setting-hint,
-.guard-label,
-.guard-sub,
-.chart-label,
-.legend-text,
-.empty-text,
-.loading-text,
-.detail-type,
-.detail-time,
-.stat-label,
-.rule-cond,
-.rule-time,
-.header-desc,
-.tag-pkg,
-.tag-uses,
-.empty-hint { color: rgba(255, 255, 255, 0.72); }
-.dashboard-subtitle,
-.settings-subtitle { font-size: 13px; line-height: 20px; margin-top: 8px; }
-.dashboard-planet,
-.settings-planet { position: relative; width: 86px; height: 86px; border-radius: 43px; background-color: rgba(219, 200, 237, 0.18); align-items: center; justify-content: center; }
-.dashboard-orbit,
-.settings-orbit { position: absolute; width: 96px; height: 34px; border-radius: 48px; border-width: 2px; border-color: rgba(219, 200, 237, 0.38); border-style: solid; transform: rotate(-20deg); }
-.dashboard-planet-text,
-.settings-planet-text { color: #DBC8ED; font-size: 34px; }
-.planet-note { margin: 0 14px 12px 14px; padding: 16px 18px; border-radius: 24px; }
-.planet-note-title { font-size: 16px; font-weight: bold; margin-bottom: 6px; }
-.planet-note-text { font-size: 12px; line-height: 19px; }
-.section,
-.settings-section { margin: 12px 14px; border-radius: 24px; overflow: hidden; }
-.section-header { flex-direction: row; justify-content: space-between; align-items: center; padding: 16px 18px 8px 18px; }
-.section-title { font-size: 18px; font-weight: bold; padding: 0; }
-.section-body { padding: 8px 0 14px 0; }
-.guard-box { margin: 8px 16px 12px 16px; padding: 18px; border-radius: 22px; align-items: center; }
-.guard-value { font-size: 28px; font-weight: bold; margin-top: 4px; }
-.chart-container { margin: 10px 16px 0 16px; padding: 14px 0 6px 0; border-radius: 22px; }
-.chart-label { padding-left: 14px; margin-bottom: 0; font-size: 13px; font-weight: bold; }
-.list-section { padding: 0 16px; }
-.detail-item { flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom-width: 1px; border-bottom-color: rgba(219, 200, 237, 0.16); border-bottom-style: solid; }
-.detail-left,
-.detail-right,
-.setting-left { flex-direction: column; }
-.detail-right { align-items: flex-end; }
-.detail-name { font-size: 14px; }
-.detail-type,
-.detail-time { font-size: 11px; margin-top: 2px; }
-.detail-duration { font-size: 14px; font-weight: bold; }
-.heatmap-legend,
-.empty-hint,
-.loading-box { align-items: center; padding: 20px; }
-.report-box { padding: 16px; }
-.report-body { font-size: 14px; line-height: 22px; white-space: pre-wrap; margin-top: 8px; }
-.report-stats { flex-direction: row; justify-content: space-around; margin: 10px 16px; padding: 12px; border-radius: 18px; }
-.stat-item { align-items: center; }
-.stat-val { font-size: 20px; font-weight: bold; }
-.refresh-btn { margin-top: 12px; padding: 10px 24px; background-color: #DBC8ED; border-radius: 18px; }
-.refresh-text { color: #161A33; font-size: 14px; font-weight: bold; }
-.setting-item { flex-direction: row; justify-content: space-between; align-items: center; padding: 15px 18px; border-bottom-width: 1px; border-bottom-color: rgba(219, 200, 237, 0.16); border-bottom-style: solid; }
-.setting-left { flex: 1; }
-.setting-label { font-size: 15px; font-weight: bold; }
-.setting-hint { font-size: 12px; line-height: 18px; margin-top: 4px; }
-.setting-value { font-size: 14px; font-weight: bold; }
+
+.section-purple { border-color: rgba(219, 200, 237, 0.28); }
+.section-blue { border-color: rgba(194, 224, 238, 0.24); }
+.section-green { border-color: rgba(143, 240, 195, 0.22); }
+.section-pink { border-color: rgba(241, 207, 237, 0.24); }
+.section-neutral { border-color: rgba(255, 255, 255, 0.14); }
+
+/* 左侧色条 */
+.section-bar {
+  position: absolute;
+  left: 0;
+  top: 16px;
+  width: 4px;
+  height: 24px;
+  border-radius: 2px;
+}
+.bar-purple { background-color: #DBC8ED; }
+.bar-blue { background-color: #C2E0EE; }
+.bar-green { background-color: #8FF0C3; }
+.bar-pink { background-color: #F1CFED; }
+.bar-neutral { background-color: rgba(255, 255, 255, 0.35); }
+
+.section-title { color: #FFFFFF; font-size: 18px; font-weight: bold; padding: 0 18px 8px 18px; }
+
+/* ============================================================
+   设置行
+   ============================================================ */
+.setting-item {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom-width: 1px;
+  border-bottom-color: rgba(219, 200, 237, 0.1);
+  border-bottom-style: solid;
+}
+.setting-left { flex: 1; flex-direction: column; }
+.setting-label { color: #FFFFFF; font-size: 15px; font-weight: bold; }
+.setting-hint { color: rgba(255, 255, 255, 0.55); font-size: 12px; line-height: 18px; margin-top: 4px; }
+.setting-value { color: rgba(255, 255, 255, 0.5); font-size: 14px; font-weight: bold; }
+.setting-value-purple { color: #DBC8ED; }
+.setting-value-blue { color: #C2E0EE; }
+.setting-value-pink { color: #F1CFED; }
+
+/* ============================================================
+   倒计时卡片
+   ============================================================ */
+.countdown-card {
+  margin: 6px 18px 12px 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background-image: linear-gradient(135deg, rgba(219, 200, 237, 0.12) 0%, rgba(194, 224, 238, 0.08) 100%);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.2);
+  border-style: solid;
+}
+.countdown-row { flex-direction: row; justify-content: space-between; align-items: center; padding: 5px 0; }
+.countdown-label { font-size: 13px; color: rgba(255, 255, 255, 0.65); }
+.countdown-value { font-size: 20px; font-weight: bold; color: #DBC8ED; }
+.countdown-active { color: #8FF0C3; }
+.countdown-divider { height: 1px; background-color: rgba(219, 200, 237, 0.14); margin: 6px 0; }
+
+/* ============================================================
+   触发规则
+   ============================================================ */
 .empty-rules { align-items: center; padding: 24px 16px 28px 16px; }
-.rule-card { padding: 14px 18px; border-bottom-width: 1px; border-bottom-color: rgba(219, 200, 237, 0.16); border-bottom-style: solid; }
-.rule-row1,
-.rule-row2 { flex-direction: row; align-items: center; margin-top: 4px; }
-.rule-type,
-.rule-trigger { font-size: 11px; border-radius: 12px; padding: 4px 8px; margin-right: 6px; }
-.rule-type { color: #FFFFFF; background-color: rgba(219, 200, 237, 0.18); font-weight: bold; }
-.rule-trigger { color: rgba(255, 255, 255, 0.72); background-color: rgba(194, 224, 238, 0.12); }
-.rule-priority { font-size: 11px; margin-left: auto; }
-.rule-source,
-.rule-cond { font-size: 11px; }
+.empty-text { color: rgba(255, 255, 255, 0.5); font-size: 14px; }
+.empty-hint { color: rgba(255, 255, 255, 0.35); font-size: 12px; margin-top: 6px; }
+.rule-card { padding: 14px 18px; border-bottom-width: 1px; border-bottom-color: rgba(219, 200, 237, 0.1); border-bottom-style: solid; }
+.rule-row1, .rule-row2 { flex-direction: row; align-items: center; margin-top: 4px; }
+.rule-type, .rule-trigger { font-size: 11px; border-radius: 12px; padding: 4px 8px; margin-right: 6px; }
+.rule-type { color: #FFFFFF; background-color: rgba(143, 240, 195, 0.18); font-weight: bold; }
+.rule-trigger { color: rgba(255, 255, 255, 0.65); background-color: rgba(194, 224, 238, 0.1); }
+.rule-priority { color: #DBC8ED; font-size: 11px; margin-left: auto; }
+.rule-source, .rule-cond { color: rgba(255, 255, 255, 0.55); font-size: 11px; }
 .rule-source { margin-right: 8px; }
 .rule-cond { flex: 1; }
 .rule-row3 { flex-direction: row; justify-content: space-between; margin-top: 4px; }
-.rule-time { font-size: 10px; }
-.header-block { margin: 22px 14px 12px 14px; padding: 20px 18px; border-radius: 28px; flex-direction: column; }
-.header-title { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
-.header-desc { font-size: 12px; line-height: 19px; }
-.filter-row { flex-direction: row; flex-wrap: wrap; margin: 0 14px 12px 14px; padding: 12px 12px 4px 12px; border-radius: 22px; }
-.filter-chip { padding: 6px 12px; background-color: rgba(255, 255, 255, 0.1); border-radius: 14px; margin-right: 6px; margin-bottom: 8px; }
-.filter-chip-active { background-color: #DBC8ED; }
-.filter-chip-text { font-size: 12px; color: #FFFFFF; }
-.empty-block { margin: 12px 14px; padding: 50px 20px; border-radius: 24px; align-items: center; }
-.tag-list { padding: 0 14px 18px 14px; }
-.tag-card { border-radius: 22px; padding: 14px; margin-bottom: 10px; flex-direction: row; }
-.tag-card-left { flex: 1; flex-direction: column; }
-.tag-card-right { flex-direction: column; align-items: flex-end; margin-left: 10px; }
-.tag-label { font-size: 14px; font-weight: bold; margin-bottom: 3px; }
-.tag-pkg { font-size: 11px; margin-bottom: 7px; }
-.tag-source-row { flex-direction: row; align-items: center; }
-.tag-source { font-size: 10px; padding: 3px 7px; border-radius: 8px; margin-right: 6px; }
-.tag-source-llm { background-color: rgba(194, 224, 238, 0.14); color: #C2E0EE; }
-.tag-source-user { background-color: rgba(143, 240, 195, 0.12); color: #8FF0C3; }
-.tag-source-pending { background-color: rgba(219, 200, 237, 0.14); color: #DBC8ED; }
-.cat-picker { flex-direction: row; align-items: center; background-color: rgba(255, 255, 255, 0.1); padding: 5px 10px; border-radius: 12px; margin-bottom: 6px; }
-.cat-picker-text { font-size: 12px; color: #FFFFFF; margin-right: 4px; }
-.cat-picker-arrow,
-.lock-text { color: rgba(255, 255, 255, 0.68); }
-.lock-text-on { color: #DBC8ED; font-weight: bold; }
+.rule-time { color: rgba(255, 255, 255, 0.35); font-size: 10px; }
+
 .bottom-spacer { height: 132px; }
 </style>

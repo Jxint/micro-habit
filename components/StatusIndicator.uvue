@@ -1,5 +1,5 @@
 <template>
-  <view class="status-card">
+  <view v-if="variant == 'bar'" class="status-card">
     <view class="status-header">
       <text class="status-title">{{ title }}</text>
       <text class="status-label" :style="{ color: textColor }">{{ statusText }}</text>
@@ -8,22 +8,69 @@
       <view class="progress-fill" :style="{ width: displayPercent + '%', backgroundColor: barColor }"></view>
     </view>
   </view>
+
+  <view v-else class="orb-card">
+    <view class="orb-outer">
+      <image v-if="bgImage.length > 0" class="orb-bg" :src="bgImage" mode="aspectFill" />
+      <view v-else class="orb-bg-emoji">
+        <text class="orb-bg-emoji-text">{{ orbEmoji }}</text>
+      </view>
+      <view class="orb-ring" :style="{ borderColor: ringColor }">
+        <view class="orb-ring-fill" :style="{ height: animActive ? displayPercent + '%' : '0%', backgroundColor: barColor }" />
+      </view>
+      <view v-if="animActive && displayPercent >= 50" class="orb-shine" />
+      <view class="orb-text">
+        <text class="orb-percent">{{ displayPercent }}</text>
+        <text class="orb-percent-sign">%</text>
+      </view>
+    </view>
+    <view class="orb-footer">
+      <text class="orb-title">{{ title }}</text>
+      <text class="orb-status" :style="{ color: textColor }">{{ statusText }}</text>
+    </view>
+  </view>
 </template>
 
 <script setup lang="uts">
+type IndicatorVariant = 'bar' | 'orb'
+
 const props = withDefaults(defineProps<{
   title: string
   percent: number
   status: string
-}>(), {})
+  variant?: IndicatorVariant
+  bgImage?: string
+}>(), {
+  variant: 'bar',
+  bgImage: ''
+})
 
-function getDisplayPercent(): number {
-  if (props.percent < 0) return 0
-  return Math.min(props.percent, 100)
+let animActive: boolean = false
+let orbEmoji: string = '·'
+let displayPercent: number = 0
+let ringColor: string = 'rgba(219, 200, 237, 0.34)'
+
+function clamp(): void {
+  if (props.percent < 0) {
+    displayPercent = 0
+    return
+  }
+  if (props.percent > 100) {
+    displayPercent = 100
+    return
+  }
+  displayPercent = Math.floor(props.percent)
 }
 
 function getBarColor(): string {
-  if (props.status === 'no_data') return 'rgba(255, 255, 255, 0.22)'
+  if (props.status === 'no_data') return 'rgba(255, 255, 255, 0.34)'
+  if (props.status === 'good') return '#7EF0C2'
+  if (props.status === 'normal') return '#DBC8ED'
+  return '#FF8FA6'
+}
+
+function getRingColor(): string {
+  if (props.status === 'no_data') return 'rgba(255, 255, 255, 0.18)'
   if (props.status === 'good') return '#7EF0C2'
   if (props.status === 'normal') return '#DBC8ED'
   return '#FF8FA6'
@@ -43,10 +90,43 @@ function getStatusText(): string {
   return '需关注'
 }
 
-const displayPercent = computed<number>(getDisplayPercent)
+function resolveEmoji(): void {
+  if (props.title == '护眼') {
+    orbEmoji = '◐'
+  } else if (props.title == '体态') {
+    orbEmoji = '◌'
+  } else if (props.title == '活力') {
+    orbEmoji = '⌁'
+  } else {
+    orbEmoji = '·'
+  }
+}
+
+function startAnim(): void {
+  setTimeout((): void => {
+    animActive = true
+  }, 60)
+}
+
 const barColor = computed<string>(getBarColor)
 const textColor = computed<string>(getTextColor)
 const statusText = computed<string>(getStatusText)
+
+onMounted((): void => {
+  clamp()
+  resolveEmoji()
+  ringColor = getRingColor()
+  if (props.variant == 'orb') startAnim()
+})
+
+watch((): number => props.percent, (_v: number): void => {
+  clamp()
+  ringColor = getRingColor()
+  if (props.variant == 'orb') {
+    animActive = false
+    startAnim()
+  }
+})
 </script>
 
 <style scoped>
@@ -56,4 +136,19 @@ const statusText = computed<string>(getStatusText)
 .status-label { font-size: 12px; font-weight: bold; }
 .progress-track { height: 8px; background-color: rgba(255, 255, 255, 0.12); border-radius: 4px; overflow: hidden; }
 .progress-fill { height: 8px; border-radius: 4px; }
+
+.orb-card { flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; }
+.orb-outer { width: 88px; height: 88px; border-radius: 44px; background-color: rgba(29, 25, 62, 0.6); border-width: 1px; border-color: rgba(219, 200, 237, 0.34); border-style: solid; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+.orb-bg { position: absolute; left: 0; top: 0; right: 0; bottom: 0; opacity: 0.45; }
+.orb-bg-emoji { position: absolute; left: 0; top: 0; right: 0; bottom: 0; align-items: center; justify-content: center; }
+.orb-bg-emoji-text { font-size: 30px; color: rgba(255, 255, 255, 0.32); }
+.orb-ring { position: absolute; left: 6px; top: 6px; right: 6px; bottom: 6px; border-radius: 38px; border-width: 4px; border-style: solid; overflow: hidden; align-items: flex-end; justify-content: center; }
+.orb-ring-fill { width: 100%; transition: height 0.9s cubic-bezier(0.4, 0, 0.2, 1); opacity: 0.78; }
+.orb-shine { position: absolute; width: 12px; height: 12px; border-radius: 6px; background-color: rgba(255, 255, 255, 0.4); right: 18px; top: 12px; }
+.orb-text { position: absolute; align-items: center; flex-direction: row; }
+.orb-percent { font-size: 18px; color: #FFFFFF; font-weight: bold; }
+.orb-percent-sign { font-size: 10px; color: rgba(255, 255, 255, 0.7); margin-left: 1px; margin-top: 4px; }
+.orb-footer { flex-direction: column; align-items: center; margin-top: 6px; }
+.orb-title { font-size: 12px; color: #FFFFFF; font-weight: bold; }
+.orb-status { font-size: 10px; margin-top: 2px; }
 </style>

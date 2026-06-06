@@ -1,0 +1,54 @@
+<template>
+  <view v-if="visible" class="sidebar-mask" :class="visible ? 'sidebar-mask-active' : ''" @tap="onMaskTap">
+    <view class="sidebar-card" :class="visible ? 'sidebar-card-active' : ''" @tap.stop="">
+      <view class="sidebar-header">
+        <text class="sidebar-title">{{ title }}</text>
+        <view class="sidebar-close" @tap="onCloseTap">
+          <text class="sidebar-close-text">×</text>
+        </view>
+      </view>
+      <scroll-view class="sidebar-body" scroll-y="true">
+        <slot />
+      </scroll-view>
+      <view v-if="$slots['footer']" class="sidebar-footer">
+        <slot name="footer" />
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = withDefaults(defineProps<{
+  visible: boolean
+  title: string
+  width?: string
+}>(), {
+  visible: false,
+  width: '86%'
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
+
+function onMaskTap(): void {
+  emit('close')
+}
+
+function onCloseTap(): void {
+  emit('close')
+}
+</script>
+
+<style scoped>
+.sidebar-mask { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(5, 6, 20, 0); z-index: 999; flex-direction: row; justify-content: flex-end; transition: background-color 0.32s cubic-bezier(0.4, 0, 0.2, 1); }
+.sidebar-mask-active { background-color: rgba(5, 6, 20, 0.62); }
+.sidebar-card { width: 86%; height: 100%; background-color: rgba(29, 25, 62, 0.98); background-image: linear-gradient(180deg, rgba(48, 42, 94, 0.96) 0%, rgba(84, 65, 124, 0.86) 50%, rgba(198, 141, 192, 0.34) 100%); border-left-width: 1px; border-left-color: rgba(219, 200, 237, 0.34); border-left-style: solid; flex-direction: column; transform: translateX(100%); transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1); }
+.sidebar-card-active { transform: translateX(0%); }
+.sidebar-header { flex-direction: row; justify-content: space-between; align-items: center; padding: 18px 20px 12px 20px; border-bottom-width: 1px; border-bottom-color: rgba(219, 200, 237, 0.18); border-bottom-style: solid; }
+.sidebar-title { font-size: 17px; font-weight: bold; color: #FFFFFF; }
+.sidebar-close { width: 32px; height: 32px; border-radius: 16px; background-color: rgba(255, 255, 255, 0.12); align-items: center; justify-content: center; }
+.sidebar-close-text { font-size: 22px; color: rgba(255, 255, 255, 0.78); font-weight: bold; }
+.sidebar-body { flex: 1; padding: 16px 20px; }
+.sidebar-footer { padding: 12px 20px 18px 20px; border-top-width: 1px; border-top-color: rgba(219, 200, 237, 0.18); border-top-style: solid; flex-direction: row; }
+</style>

@@ -56,7 +56,7 @@ open class GenComponentsLlmHistoryCard : VueComponent {
             return fun(): Any? {
                 return _cE("view", _uM("class" to "history-card"), _uA(
                     _cE("view", _uM("class" to "history-header", "onClick" to toggle), _uA(
-                        _cE("text", _uM("class" to "history-title"), "🤖 AI 历次判断"),
+                        _cE("text", _uM("class" to "history-title"), "AI 历次判断"),
                         _cE("text", _uM("class" to "history-count"), _tD(_ctx.entries.length) + " 条", 1),
                         _cE("text", _uM("class" to "history-arrow"), _tD(if (unref(expanded)) {
                             "▼"
@@ -84,7 +84,7 @@ open class GenComponentsLlmHistoryCard : VueComponent {
                                             } else {
                                                 "stage-post"
                                             }
-                                        ))), _tD(if (entry.stage === "pre") {
+                                        ))), " 💬 " + _tD(if (entry.stage === "pre") {
                                             "触发时"
                                         } else {
                                             "复评时"
@@ -92,12 +92,12 @@ open class GenComponentsLlmHistoryCard : VueComponent {
                                         _cE("text", _uM("class" to "history-time"), _tD(formatTime(entry.createdAt)), 1)
                                     )),
                                     if (isTrue(entry.adhocText != null && entry.adhocText!!.length > 0)) {
-                                        _cE("text", _uM("key" to 0, "class" to "history-adhoc"), " 💬 " + _tD(entry.adhocText), 1)
+                                        _cE("text", _uM("key" to 0, "class" to "history-adhoc"), " 🤔 " + _tD(entry.adhocText), 1)
                                     } else {
                                         _cC("v-if", true)
                                     },
                                     if (isTrue(entry.reasoning != null && entry.reasoning!!.length > 0)) {
-                                        _cE("text", _uM("key" to 1, "class" to "history-reasoning"), " 🤔 " + _tD(entry.reasoning), 1)
+                                        _cE("text", _uM("key" to 1, "class" to "history-reasoning"), _tD(entry.reasoning), 1)
                                     } else {
                                         _cC("v-if", true)
                                     },

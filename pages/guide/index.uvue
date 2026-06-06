@@ -19,187 +19,175 @@
     <view class="sky-star star-k"></view>
     <view class="sky-star star-l"></view>
     <scroll-view class="scroll-area" scroll-y="true">
-      <view class="hero-block">
+
+      <!-- ===== Hero 横幅 ===== -->
+      <view class="hero-section">
+        <view class="hero-planet-wrap">
+          <view class="hero-planet-glow"></view>
+          <image class="hero-mascot" src="/static/images/micro-planet-mascot.png" mode="aspectFit"></image>
+        </view>
         <view class="hero-copy">
           <text class="hero-brand">微憩星球</text>
           <text class="hero-title">轻轻守护，从 10 秒开始</text>
-          <text class="hero-subtitle">它会观察你的使用节奏，在合适的时候提醒你眨眨眼、松松肩、慢慢呼吸。</text>
+          <text class="hero-desc">它会观察你的使用节奏，在合适的时候提醒你眨眨眼、松松肩、慢慢呼吸。</text>
         </view>
-        <view class="hero-planet-card">
-          <image class="hero-mascot-img" src="/static/images/micro-planet-mascot.png" mode="aspectFit"></image>
-          <text class="hero-chip">不说教 · 不打扰</text>
+        <view class="hero-chip-row">
+          <view class="hero-chip"><text class="hero-chip-text">不说教</text></view>
+          <view class="hero-chip"><text class="hero-chip-text">不打扰</text></view>
+          <view class="hero-chip"><text class="hero-chip-text">10 秒见效</text></view>
         </view>
       </view>
 
-      <view class="value-block">
-        <text class="block-title">AI 健康大脑在做什么</text>
-        <text class="block-subtitle">不是催你打卡，而是把使用节奏、完成反馈和健康状态一起看懂。</text>
-        <view class="ai-core-card">
-          <view class="ai-core-icon">
-            <text class="ai-core-icon-text">AI</text>
-          </view>
+      <!-- ===== AI 大脑卡 ===== -->
+      <view class="card card-accent ai-section">
+        <text class="section-title">AI 健康大脑</text>
+        <text class="section-subtitle">不是催你打卡，而是把使用节奏、完成反馈和健康状态一起看懂。</text>
+        <view class="ai-core-row">
+          <image class="ai-icon-img" src="/static/images/elements/ai-brain_001.jpg" mode="aspectFit"></image>
           <view class="ai-core-copy">
             <text class="ai-core-title">先判断，再轻轻提醒</text>
-            <text class="ai-core-text">本地规则引擎实时看连续使用时长，推荐算法选择当下更适合的护眼、体态或呼吸动作。</text>
+            <text class="ai-core-desc">本地规则引擎实时看连续使用时长，推荐算法选择当下更适合的护眼、体态或呼吸动作。</text>
           </view>
         </view>
+      </view>
+
+      <!-- ===== 4 个价值点 ===== -->
+      <view class="card value-section">
+        <text class="section-title">它为你做什么</text>
         <view class="value-grid">
           <view class="value-card">
-            <text class="value-icon value-icon-blue">◌</text>
-            <text class="value-title">解决忘休息</text>
-            <text class="value-text">刷久了才提醒，不靠你自己想起来</text>
-          </view>
-          <view class="value-card value-card-even">
-            <text class="value-icon value-icon-purple">✦</text>
-            <text class="value-title">推荐做什么</text>
-            <text class="value-text">按时间段和历史完成情况选微动作</text>
+            <image class="value-icon-img" src="/static/images/elements/icon-rest_001.jpg" mode="aspectFit"></image>
+            <text class="value-label">解决忘休息</text>
+            <text class="value-desc">刷久了才提醒，不靠你自己想起来</text>
           </view>
           <view class="value-card">
-            <text class="value-icon value-icon-pink">⌁</text>
-            <text class="value-title">AI 小结报告</text>
-            <text class="value-text">每日一句话、每周建议和下周小目标</text>
+            <image class="value-icon-img" src="/static/images/elements/icon-compass_001.jpg" mode="aspectFit"></image>
+            <text class="value-label">推荐做什么</text>
+            <text class="value-desc">按时间段和历史完成情况选微动作</text>
           </view>
-          <view class="value-card value-card-even">
-            <text class="value-icon value-icon-blue">◐</text>
-            <text class="value-title">越用越懂你</text>
-            <text class="value-text">完成、跳过、忙一下，都会帮助调节频率</text>
+          <view class="value-card">
+            <image class="value-icon-img" src="/static/images/elements/icon-book_001.jpg" mode="aspectFit"></image>
+            <text class="value-label">AI 小结报告</text>
+            <text class="value-desc">每日一句话、每周建议和下周小目标</text>
+          </view>
+          <view class="value-card">
+            <image class="value-icon-img" src="/static/images/elements/icon-heart-brain_001.jpg" mode="aspectFit"></image>
+            <text class="value-label">越用越懂你</text>
+            <text class="value-desc">完成、跳过、忙一下，都会帮助调节频率</text>
           </view>
         </view>
-        <text class="value-privacy">只识别你正在使用哪个 App 和连续用了多久，不读取聊天内容、密码或屏幕文字。</text>
+        <view class="privacy-bar">
+          <text class="privacy-text">只识别你正在使用哪个 App 和连续用了多久，不读取聊天内容、密码或屏幕文字。</text>
+        </view>
       </view>
 
-      <view class="focus-block">
-        <text class="block-title">选择守护重点</text>
-        <text class="block-subtitle">之后可以随时修改，现在先选一个你最想照顾的方向。</text>
+      <!-- ===== 选择守护重点 ===== -->
+      <view class="card card-accent focus-section">
+        <text class="section-title">选择守护重点</text>
+        <text class="section-subtitle">之后可以随时修改，现在先选一个你最想照顾的方向。</text>
         <view class="focus-grid">
           <view class="focus-card" :class="selectedFocus === 'eye' ? 'focus-active' : ''" @tap="selectFocus('eye')">
-            <text class="focus-icon">◐</text>
-            <text class="focus-title">护眼优先</text>
+            <view class="focus-icon-wrap focus-icon-blue"><text class="focus-icon-text">目</text></view>
+            <text class="focus-label">护眼优先</text>
           </view>
           <view class="focus-card" :class="selectedFocus === 'posture' ? 'focus-active' : ''" @tap="selectFocus('posture')">
-            <text class="focus-icon">◌</text>
-            <text class="focus-title">肩颈优先</text>
+            <view class="focus-icon-wrap focus-icon-purple"><text class="focus-icon-text">颈</text></view>
+            <text class="focus-label">肩颈优先</text>
           </view>
           <view class="focus-card" :class="selectedFocus === 'breath' ? 'focus-active' : ''" @tap="selectFocus('breath')">
-            <text class="focus-icon">⌁</text>
-            <text class="focus-title">减压呼吸</text>
+            <view class="focus-icon-wrap focus-icon-pink"><text class="focus-icon-text">息</text></view>
+            <text class="focus-label">减压呼吸</text>
           </view>
           <view class="focus-card" :class="selectedFocus === 'balance' ? 'focus-active' : ''" @tap="selectFocus('balance')">
-            <text class="focus-icon">✧</text>
-            <text class="focus-title">均衡发展</text>
+            <view class="focus-icon-wrap focus-icon-green"><text class="focus-icon-text">衡</text></view>
+            <text class="focus-label">均衡发展</text>
           </view>
         </view>
       </view>
 
-      <view class="steps-block">
-        <text class="block-title">开启轻轻守护</text>
-        <text class="block-subtitle">权限只用于识别 App 和连续使用时长，不读取聊天内容、密码或屏幕文字。</text>
-        <view class="step-card">
-          <view class="step-num-wrap step-num-1">
-            <text class="step-num">1</text>
-          </view>
-          <view class="step-content">
-            <text class="step-title">开启使用情况权限</text>
-            <text class="step-desc">用来检测你正在使用哪个 App，以及连续使用了多久</text>
-            <view class="step-status-row">
-              <text class="step-status" :class="usageEnabled ? 'step-status-on' : 'step-status-off'">
-                {{ usageEnabled ? '✅ 已开启' : '⚪ 未开启' }}
-              </text>
-              <view v-if="!usageEnabled" class="step-action-btn" @tap="openUsageAccess">
-                <text class="step-action-btn-text">立即开启</text>
-              </view>
+      <!-- ===== 3 步开启 ===== -->
+      <view class="card steps-section">
+        <text class="section-title">开启轻轻守护</text>
+        <text class="section-subtitle">权限只用于识别 App 和连续使用时长，不读取聊天内容、密码或屏幕文字。</text>
+
+        <view class="step-row">
+          <view class="step-badge badge-blue"><text class="step-badge-text">1</text></view>
+          <view class="step-body">
+            <text class="step-name">开启使用情况权限</text>
+            <text class="step-hint">用来检测你正在使用哪个 App，以及连续使用了多久</text>
+            <view class="step-actions">
+              <text class="step-status" :class="usageEnabled ? 'status-on' : 'status-off'">{{ usageEnabled ? '已开启' : '未开启' }}</text>
+              <view v-if="!usageEnabled" class="step-btn" @tap="openUsageAccess"><text class="step-btn-text">立即开启</text></view>
             </view>
           </view>
         </view>
 
-        <view class="step-card">
-          <view class="step-num-wrap step-num-2">
-            <text class="step-num">2</text>
-          </view>
-          <view class="step-content">
-            <text class="step-title">开启悬浮窗权限</text>
-            <text class="step-desc">用来在其他 App 上方显示微动作提醒</text>
-            <view class="step-status-row">
-              <text class="step-status" :class="overlayEnabled ? 'step-status-on' : 'step-status-off'">
-                {{ overlayEnabled ? '✅ 已开启' : '⚪ 未开启' }}
-              </text>
-              <view v-if="!overlayEnabled" class="step-action-btn" @tap="openOverlay">
-                <text class="step-action-btn-text">立即开启</text>
-              </view>
+        <view class="step-row">
+          <view class="step-badge badge-purple"><text class="step-badge-text">2</text></view>
+          <view class="step-body">
+            <text class="step-name">开启悬浮窗权限</text>
+            <text class="step-hint">用来在其他 App 上方显示微动作提醒</text>
+            <view class="step-actions">
+              <text class="step-status" :class="overlayEnabled ? 'status-on' : 'status-off'">{{ overlayEnabled ? '已开启' : '未开启' }}</text>
+              <view v-if="!overlayEnabled" class="step-btn" @tap="openOverlay"><text class="step-btn-text">立即开启</text></view>
             </view>
           </view>
         </view>
 
-        <view class="step-card step-card-info">
-          <view class="step-num-wrap step-num-3">
-            <text class="step-num">3</text>
-          </view>
-          <view class="step-content">
-            <text class="step-title">后台守护</text>
-            <text class="step-desc">用来保持提醒服务稳定运行，不打扰你的正常使用</text>
+        <view class="step-row">
+          <view class="step-badge badge-pink"><text class="step-badge-text">3</text></view>
+          <view class="step-body">
+            <text class="step-name">后台守护</text>
+            <text class="step-hint">用来保持提醒服务稳定运行，不打扰你的正常使用</text>
           </view>
         </view>
       </view>
 
-      <view class="demo-block">
-        <text class="block-title">演示一次</text>
-        <text class="block-subtitle">假设你刷屏久了一点，小星球会这样提醒你。</text>
+      <!-- ===== 演示一次 ===== -->
+      <view class="card card-accent demo-section">
+        <text class="section-title">演示一次</text>
+        <text class="section-subtitle">假设你刷屏久了一点，小星球会这样提醒你。</text>
         <view class="demo-card">
-          <view class="demo-planet">
-            <text class="demo-planet-text">◐</text>
+          <view class="demo-planet-circle">
+            <image class="demo-mascot" src="/static/images/micro-planet-mascot.png" mode="aspectFit"></image>
           </view>
           <view class="demo-copy">
-            <text class="demo-title">星球信号提醒</text>
-            <text class="demo-text">检测到眼睛电量有点低，要不要眨眼 10 秒？</text>
+            <text class="demo-copy-title">星球信号提醒</text>
+            <text class="demo-copy-text">检测到眼睛电量有点低，要不要眨眼 10 秒？</text>
           </view>
-          <view class="demo-action" @tap="startDemo">
-            <text class="demo-action-text">{{ demoStarted ? '演示中' : '好啊' }}</text>
-          </view>
+          <view class="demo-btn" @tap="startDemo"><text class="demo-btn-text">{{ demoStarted ? '演示中' : '好啊' }}</text></view>
         </view>
         <view v-if="demoStarted" class="demo-flow">
-          <view class="demo-stage">
-            <view class="demo-stage-planet">
-              <view class="demo-stage-orbit"></view>
-              <text class="demo-stage-icon">◐</text>
-            </view>
-            <view class="demo-stage-copy">
-              <text class="demo-stage-title">进入 10 秒微动作</text>
-              <text class="demo-stage-text">真实使用时会进入动作页，显示引导文案、倒计时和跳过按钮。</text>
-            </view>
-          </view>
-          <view class="demo-progress">
+          <view class="demo-progress-bar">
             <view class="demo-progress-fill"></view>
           </view>
-          <view class="demo-steps">
-            <view class="demo-step">
-              <text class="demo-step-num">1</text>
-              <text class="demo-step-text">收到提醒</text>
+          <view class="demo-steps-flow">
+            <view class="demo-flow-step">
+              <view class="demo-flow-dot dot-done"></view>
+              <text class="demo-flow-label">收到提醒</text>
             </view>
-            <view class="demo-step">
-              <text class="demo-step-num">2</text>
-              <text class="demo-step-text">点“好啊”</text>
+            <view class="demo-flow-line"></view>
+            <view class="demo-flow-step">
+              <view class="demo-flow-dot dot-done"></view>
+              <text class="demo-flow-label">点"好啊"</text>
             </view>
-            <view class="demo-step">
-              <text class="demo-step-num">3</text>
-              <text class="demo-step-text">跟着倒计时做完</text>
+            <view class="demo-flow-line"></view>
+            <view class="demo-flow-step">
+              <view class="demo-flow-dot dot-active"></view>
+              <text class="demo-flow-label">跟着做</text>
             </view>
           </view>
-          <text class="demo-result">完成后，小星球会点亮一次，并把这次照顾记录进健康轨迹。</text>
+          <text class="demo-result-text">完成后，小星球会点亮一次，并把这次照顾记录进健康轨迹。</text>
         </view>
       </view>
 
-      <view class="cta-block">
-        <view class="cta-btn-primary" @tap="startApp">
-          <text class="cta-btn-primary-text">开始我的小星球</text>
-        </view>
-        <view class="cta-btn-secondary" @tap="skipGuide">
-          <text class="cta-btn-secondary-text">先逛逛</text>
-        </view>
+      <!-- ===== CTA ===== -->
+      <view class="cta-section">
+        <view class="cta-primary" @tap="startApp"><text class="cta-primary-text">开始我的小星球</text></view>
+        <view class="cta-secondary" @tap="skipGuide"><text class="cta-secondary-text">先逛逛</text></view>
       </view>
 
-      <view class="footer-block">
-        <text class="footer-text">v1.0.0 · 守护你的每一次温柔停顿</text>
-      </view>
+      <view class="footer"><text class="footer-text">v1.0.0 · 守护你的每一次温柔停顿</text></view>
     </scroll-view>
   </view>
 </template>
@@ -228,23 +216,27 @@ function refreshPermissionStates(): void {
 }
 
 function openUsageAccess(): void {
-  openUsageAccessSettings()
-  setTimeout(() : void => {
-    refreshPermissionStates()
-  }, 800)
+  console.log('[guide] openUsageAccess 被点击')
+  try {
+    openUsageAccessSettings()
+  } catch (e) {
+    console.warn('[guide] openUsageAccessSettings 异常: ' + JSON.stringify(e))
+  }
+  setTimeout(refreshPermissionStates, 800)
 }
 
 function openOverlay(): void {
-  requestOverlayPermission()
-  setTimeout(() : void => {
-    refreshPermissionStates()
-  }, 800)
+  console.log('[guide] openOverlay 被点击')
+  try {
+    requestOverlayPermission()
+  } catch (e) {
+    console.warn('[guide] requestOverlayPermission 异常: ' + JSON.stringify(e))
+  }
+  setTimeout(refreshPermissionStates, 800)
 }
 
 function completeGuide(): void {
   putInt('guide_completed', 1)
-  const now = Math.floor(Date.now() / 1000)
-  putInt('newbie_start_date', now)
   uni.reLaunch({
     url: '/pages/home/index'
   })
@@ -287,48 +279,14 @@ onShow((): void => {
 }
 .page-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 0; }
 .page-bg-img { width: 100%; height: 100%; }
-.scroll-area {
-  flex: 1;
-  position: relative;
-  z-index: 1;
-}
-.bg-glow {
-  position: absolute;
-  border-radius: 999px;
-  z-index: 0;
-}
-.glow-purple {
-  width: 210px;
-  height: 210px;
-  left: -82px;
-  top: -54px;
-  background-color: #776B97;
-  opacity: 0.5;
-}
-.glow-blue {
-  width: 168px;
-  height: 168px;
-  right: -60px;
-  top: 104px;
-  background-color: #C2E0EE;
-  opacity: 0.24;
-}
-.glow-pink {
-  width: 178px;
-  height: 178px;
-  left: 42px;
-  bottom: 88px;
-  background-color: #C68DC0;
-  opacity: 0.18;
-}
-.sky-star {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 2px;
-  background-color: rgba(255, 255, 255, 0.74);
-  z-index: 0;
-}
+.scroll-area { flex: 1; position: relative; z-index: 1; }
+
+.bg-glow { position: absolute; border-radius: 999px; z-index: 0; }
+.glow-purple { width: 210px; height: 210px; left: -82px; top: -54px; background-color: #776B97; opacity: 0.5; }
+.glow-blue { width: 168px; height: 168px; right: -60px; top: 104px; background-color: #C2E0EE; opacity: 0.24; }
+.glow-pink { width: 178px; height: 178px; left: 42px; bottom: 88px; background-color: #C68DC0; opacity: 0.18; }
+
+.sky-star { position: absolute; width: 3px; height: 3px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.74); z-index: 0; }
 .star-a { left: 36px; top: 88px; }
 .star-b { left: 118px; top: 144px; width: 4px; height: 4px; border-radius: 2px; }
 .star-c { right: 52px; top: 116px; }
@@ -342,11 +300,13 @@ onShow((): void => {
 .star-k { left: 178px; top: 392px; width: 2px; height: 2px; border-radius: 1px; }
 .star-l { right: 64px; top: 560px; width: 3px; height: 3px; border-radius: 2px; }
 
-.hero-block,
-.value-block,
-.focus-block,
-.demo-block,
-.step-card {
+/* ============================================================
+   通用卡片
+   ============================================================ */
+.card {
+  margin: 14px 16px;
+  padding: 20px;
+  border-radius: 28px;
   background-color: rgba(29, 25, 62, 0.82);
   background-image: linear-gradient(135deg, rgba(48, 42, 94, 0.92) 0%, rgba(84, 65, 124, 0.72) 56%, rgba(198, 141, 192, 0.18) 100%);
   border-width: 1px;
@@ -354,119 +314,278 @@ onShow((): void => {
   border-style: solid;
   box-shadow: 0 18px 42px rgba(5, 6, 20, 0.34);
 }
-.hero-block {
-  margin: 22px 14px 0 14px;
-  padding: 24px 18px;
-  border-radius: 28px;
-  flex-direction: row;
+.card-accent {
+  border-color: rgba(219, 200, 237, 0.38);
+  box-shadow: 0 18px 42px rgba(5, 6, 20, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.section-title { color: #FFFFFF; font-size: 20px; font-weight: bold; line-height: 26px; }
+.section-subtitle { color: rgba(255, 255, 255, 0.68); font-size: 13px; line-height: 20px; margin-top: 6px; }
+
+/* ============================================================
+   Hero 横幅
+   ============================================================ */
+.hero-section {
+  margin: 22px 16px 0 16px;
+  padding: 28px 20px 20px 20px;
+  border-radius: 32px;
+  background-color: rgba(29, 25, 62, 0.82);
+  background-image: linear-gradient(160deg, rgba(48, 42, 94, 0.96) 0%, rgba(84, 65, 124, 0.78) 40%, rgba(198, 141, 192, 0.24) 100%);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.38);
+  border-style: solid;
+  box-shadow: 0 18px 42px rgba(5, 6, 20, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   align-items: center;
 }
-.hero-copy { flex: 1; flex-direction: column; padding-right: 12px; }
-.hero-brand,
-.ai-core-icon-text,
-.cta-btn-primary-text,
-.step-action-btn-text,
-.step-num,
-.demo-action-text { color: #FFFFFF; }
-.hero-brand { font-size: 13px; font-weight: bold; margin-bottom: 8px; }
-.hero-title { color: #FFFFFF; font-size: 25px; font-weight: bold; line-height: 31px; margin-bottom: 8px; }
-.hero-subtitle,
-.block-subtitle,
-.ai-core-text,
-.value-text,
-.value-privacy,
-.step-desc,
-.demo-text,
-.demo-stage-text,
-.demo-step-text,
-.cta-btn-secondary-text,
-.footer-text { color: rgba(255, 255, 255, 0.72); }
-.hero-subtitle { font-size: 13px; line-height: 21px; text-align: left; padding: 0; }
-.hero-planet-card { position: relative; width: 124px; height: 142px; border-radius: 28px; background-color: rgba(255, 255, 255, 0.14); border-width: 1px; border-color: rgba(219, 200, 237, 0.18); border-style: solid; align-items: center; justify-content: center; overflow: visible; }
-.hero-mascot-img { width: 118px; height: 96px; margin-bottom: 8px; }
-.hero-orbit,
-.demo-stage-orbit { position: absolute; border-width: 2px; border-color: rgba(219, 200, 237, 0.38); border-style: solid; transform: rotate(-20deg); }
-.hero-orbit { width: 86px; height: 34px; border-radius: 43px; }
-.hero-icon-wrap { width: 68px; height: 68px; border-radius: 34px; background-color: rgba(219, 200, 237, 0.18); align-items: center; justify-content: center; margin-bottom: 12px; }
-.hero-icon { color: #DBC8ED; font-size: 34px; }
-.hero-chip { color: #FFFFFF; background-color: rgba(255, 255, 255, 0.12); border-radius: 13px; padding: 5px 9px; font-size: 11px; }
-.value-block,
-.focus-block,
-.demo-block { margin: 14px 16px; padding: 18px; border-radius: 26px; }
-.block-title { color: #FFFFFF; font-size: 19px; font-weight: bold; }
-.block-subtitle { font-size: 12px; line-height: 19px; margin-top: 6px; }
-.ai-core-card,
-.demo-flow { margin-top: 14px; padding: 14px; border-radius: 22px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; }
-.ai-core-card { flex-direction: row; align-items: center; }
-.ai-core-icon { width: 50px; height: 50px; border-radius: 25px; background-color: rgba(18, 19, 52, 0.92); align-items: center; justify-content: center; margin-right: 12px; }
+.hero-planet-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.hero-planet-glow {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 80px;
+  background-color: rgba(219, 200, 237, 0.14);
+  box-shadow: 0 0 40px rgba(219, 200, 237, 0.18);
+}
+.hero-mascot { width: 120px; height: 100px; }
+.hero-copy { align-items: center; margin-bottom: 16px; }
+.hero-brand { color: #DBC8ED; font-size: 12px; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px; }
+.hero-title { color: #FFFFFF; font-size: 26px; font-weight: bold; line-height: 32px; text-align: center; margin-bottom: 10px; }
+.hero-desc { color: rgba(255, 255, 255, 0.72); font-size: 14px; line-height: 22px; text-align: center; }
+.hero-chip-row { flex-direction: row; justify-content: center; }
+.hero-chip {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 5px 12px;
+  margin: 0 4px;
+}
+.hero-chip-text { color: rgba(255, 255, 255, 0.88); font-size: 12px; }
+
+/* ============================================================
+   AI 大脑
+   ============================================================ */
+.ai-section { margin-top: 14px; }
+.ai-core-row {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.14);
+  border-style: solid;
+}
+.ai-icon-img { width: 56px; height: 56px; border-radius: 28px; margin-right: 14px; }
 .ai-core-copy { flex: 1; flex-direction: column; }
-.ai-core-title,
-.value-title,
-.focus-title,
-.step-title,
-.demo-title,
-.demo-stage-title { color: #FFFFFF; font-weight: bold; }
-.ai-core-title { font-size: 15px; margin-bottom: 5px; }
-.value-grid,
-.focus-grid { flex-direction: row; flex-wrap: wrap; margin-top: 14px; }
-.value-card,
-.focus-card { width: 48%; margin-right: 2%; margin-bottom: 10px; padding: 13px 11px; border-radius: 20px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; }
-.value-card { min-height: 120px; }
-.value-card-even { margin-right: 0; }
-.value-icon { width: 36px; height: 36px; border-radius: 18px; text-align: center; line-height: 36px; font-size: 18px; margin-bottom: 8px; }
-.value-icon-blue { color: #C2E0EE; background-color: rgba(194, 224, 238, 0.14); }
-.value-icon-purple { color: #DBC8ED; background-color: rgba(219, 200, 237, 0.14); }
-.value-icon-pink { color: #F1CFED; background-color: rgba(198, 141, 192, 0.14); }
-.value-title { font-size: 13px; margin-bottom: 5px; }
-.value-text,
-.value-privacy { font-size: 11px; line-height: 17px; }
-.focus-card { align-items: center; }
-.focus-active { background-color: rgba(219, 200, 237, 0.2); border-color: rgba(219, 200, 237, 0.42); }
-.focus-icon { color: #DBC8ED; font-size: 24px; }
-.focus-title { font-size: 13px; margin-top: 6px; }
-.steps-block { padding: 0 16px; }
-.step-card { flex-direction: row; align-items: flex-start; margin-bottom: 12px; padding: 17px; border-radius: 24px; }
-.step-num-wrap { width: 36px; height: 36px; border-radius: 18px; align-items: center; justify-content: center; margin-right: 12px; margin-top: 2px; }
-.step-num-1 { background-color: rgba(194, 224, 238, 0.28); }
-.step-num-2 { background-color: rgba(219, 200, 237, 0.28); }
-.step-num-3 { background-color: #DBC8ED; }
-.step-content { flex: 1; flex-direction: column; }
-.step-title { font-size: 16px; margin-bottom: 5px; }
-.step-desc { font-size: 12px; line-height: 18px; margin-bottom: 10px; }
-.step-status-row { flex-direction: row; align-items: center; }
-.step-status { font-size: 12px; font-weight: bold; padding: 5px 10px; border-radius: 12px; }
-.step-status-on { color: #8FF0C3; background-color: rgba(143, 240, 195, 0.12); }
-.step-status-off { color: rgba(255, 255, 255, 0.6); background-color: rgba(255, 255, 255, 0.08); }
-.step-action-btn { margin-left: 10px; padding: 6px 13px; background-color: rgba(18, 19, 52, 0.92); border-radius: 16px; }
-.demo-card,
-.demo-stage { flex-direction: row; align-items: center; }
-.demo-card { margin-top: 14px; padding: 14px; border-radius: 22px; background-color: rgba(255, 255, 255, 0.1); border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; }
-.demo-planet,
-.demo-stage-planet { background-color: rgba(219, 200, 237, 0.18); align-items: center; justify-content: center; }
-.demo-planet { width: 48px; height: 48px; border-radius: 24px; margin-right: 12px; }
-.demo-planet-text,
-.demo-stage-icon,
-.demo-result { color: #DBC8ED; }
-.demo-planet-text { font-size: 22px; }
-.demo-copy,
-.demo-stage-copy { flex: 1; flex-direction: column; }
-.demo-title { font-size: 14px; }
-.demo-text { font-size: 12px; line-height: 18px; margin-top: 3px; }
-.demo-action { background-color: #DBC8ED; border-radius: 18px; padding: 8px 12px; margin-left: 8px; align-items: center; justify-content: center; }
-.demo-action-text { color: #161A33; font-size: 12px; font-weight: bold; }
-.demo-stage-planet { position: relative; width: 68px; height: 68px; border-radius: 34px; margin-right: 12px; }
-.demo-stage-orbit { width: 78px; height: 28px; border-radius: 39px; }
-.demo-stage-icon { font-size: 29px; }
-.demo-stage-title { font-size: 15px; margin-bottom: 5px; }
-.demo-progress { height: 9px; border-radius: 5px; background-color: rgba(255, 255, 255, 0.1); margin-top: 14px; overflow: hidden; }
-.demo-progress-fill { width: 64%; height: 9px; border-radius: 5px; background-color: #DBC8ED; }
-.demo-steps { flex-direction: row; margin-top: 12px; }
-.demo-step { flex: 1; flex-direction: row; align-items: center; margin-right: 6px; }
-.demo-step-num { width: 20px; height: 20px; border-radius: 10px; background-color: #DBC8ED; color: #161A33; font-size: 11px; line-height: 20px; text-align: center; margin-right: 5px; }
-.demo-result { font-size: 12px; line-height: 18px; margin-top: 12px; }
-.cta-block { padding: 20px 24px 0 24px; align-items: center; }
-.cta-btn-primary { width: 100%; padding: 14px; background-color: #DBC8ED; border-radius: 26px; align-items: center; justify-content: center; margin-bottom: 10px; }
-.cta-btn-primary-text { color: #161A33; font-size: 16px; font-weight: bold; }
-.cta-btn-secondary { padding: 9px 18px; background-color: rgba(255, 255, 255, 0.1); border-radius: 20px; border-width: 1px; border-color: rgba(219, 200, 237, 0.16); border-style: solid; }
-.footer-block { align-items: center; padding: 24px 0 32px 0; }
+.ai-core-title { color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 5px; }
+.ai-core-desc { color: rgba(255, 255, 255, 0.68); font-size: 12px; line-height: 19px; }
+
+/* ============================================================
+   4 价值点
+   ============================================================ */
+.value-section { margin-top: 14px; }
+.value-grid { flex-direction: row; flex-wrap: wrap; margin-top: 16px; }
+.value-card {
+  width: 48%;
+  margin-right: 2%;
+  margin-bottom: 10px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.14);
+  border-style: solid;
+  align-items: center;
+}
+.value-icon-img { width: 52px; height: 52px; border-radius: 26px; margin-bottom: 10px; }
+.value-label { color: #FFFFFF; font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+.value-desc { color: rgba(255, 255, 255, 0.65); font-size: 12px; line-height: 18px; text-align: center; }
+.privacy-bar {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background-color: rgba(143, 240, 195, 0.08);
+  border-width: 1px;
+  border-color: rgba(143, 240, 195, 0.18);
+  border-style: solid;
+}
+.privacy-text { color: rgba(143, 240, 195, 0.82); font-size: 11px; line-height: 17px; }
+
+/* ============================================================
+   守护重点
+   ============================================================ */
+.focus-section { margin-top: 14px; }
+.focus-grid { flex-direction: row; flex-wrap: wrap; margin-top: 16px; }
+.focus-card {
+  width: 48%;
+  margin-right: 2%;
+  margin-bottom: 10px;
+  padding: 16px 12px;
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.14);
+  border-style: solid;
+  align-items: center;
+}
+.focus-active {
+  background-color: rgba(219, 200, 237, 0.18);
+  border-color: rgba(219, 200, 237, 0.62);
+  box-shadow: 0 0 16px rgba(219, 200, 237, 0.28);
+}
+.focus-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.focus-icon-blue { background-color: rgba(194, 224, 238, 0.22); }
+.focus-icon-purple { background-color: rgba(219, 200, 237, 0.22); }
+.focus-icon-pink { background-color: rgba(241, 207, 237, 0.22); }
+.focus-icon-green { background-color: rgba(143, 240, 195, 0.22); }
+.focus-icon-text { color: #FFFFFF; font-size: 18px; font-weight: bold; }
+.focus-label { color: #FFFFFF; font-size: 13px; font-weight: bold; }
+
+/* ============================================================
+   3 步开启
+   ============================================================ */
+.steps-section { margin-top: 14px; }
+.step-row {
+  flex-direction: row;
+  align-items: flex-start;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.12);
+  border-style: solid;
+}
+.step-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14px;
+  margin-top: 2px;
+}
+.badge-blue { background-color: rgba(194, 224, 238, 0.28); }
+.badge-purple { background-color: rgba(219, 200, 237, 0.28); }
+.badge-pink { background-color: rgba(241, 207, 237, 0.28); }
+.step-badge-text { color: #FFFFFF; font-size: 15px; font-weight: bold; }
+.step-body { flex: 1; flex-direction: column; }
+.step-name { color: #FFFFFF; font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+.step-hint { color: rgba(255, 255, 255, 0.6); font-size: 12px; line-height: 18px; margin-bottom: 10px; }
+.step-actions { flex-direction: row; align-items: center; }
+.step-status { font-size: 12px; font-weight: bold; padding: 5px 12px; border-radius: 12px; }
+.status-on { color: #8FF0C3; background-color: rgba(143, 240, 195, 0.12); }
+.status-off { color: rgba(255, 255, 255, 0.55); background-color: rgba(255, 255, 255, 0.08); }
+.step-btn {
+  margin-left: 10px;
+  padding: 6px 14px;
+  background-color: rgba(18, 19, 52, 0.92);
+  border-radius: 16px;
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.24);
+  border-style: solid;
+}
+.step-btn-text { color: #FFFFFF; font-size: 12px; font-weight: bold; }
+
+/* ============================================================
+   演示
+   ============================================================ */
+.demo-section { margin-top: 14px; }
+.demo-card {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.14);
+  border-style: solid;
+}
+.demo-planet-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background-color: rgba(219, 200, 237, 0.18);
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  overflow: hidden;
+}
+.demo-mascot { width: 44px; height: 44px; }
+.demo-copy { flex: 1; flex-direction: column; }
+.demo-copy-title { color: #FFFFFF; font-size: 14px; font-weight: bold; }
+.demo-copy-text { color: rgba(255, 255, 255, 0.65); font-size: 12px; line-height: 18px; margin-top: 3px; }
+.demo-btn {
+  background-color: #DBC8ED;
+  border-radius: 18px;
+  padding: 8px 14px;
+  margin-left: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.demo-btn-text { color: #161A33; font-size: 12px; font-weight: bold; }
+
+.demo-flow {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.12);
+  border-style: solid;
+}
+.demo-progress-bar { height: 8px; border-radius: 4px; background-color: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.demo-progress-fill { width: 64%; height: 8px; border-radius: 4px; background-image: linear-gradient(90deg, #C2E0EE, #DBC8ED); }
+
+.demo-steps-flow { flex-direction: row; align-items: center; justify-content: center; margin-top: 14px; }
+.demo-flow-step { align-items: center; }
+.demo-flow-dot { width: 24px; height: 24px; border-radius: 12px; margin-bottom: 4px; }
+.dot-done { background-color: rgba(219, 200, 237, 0.5); }
+.dot-active { background-color: #DBC8ED; box-shadow: 0 0 10px rgba(219, 200, 237, 0.4); }
+.demo-flow-label { color: rgba(255, 255, 255, 0.7); font-size: 11px; }
+.demo-flow-line { width: 32px; height: 2px; background-color: rgba(219, 200, 237, 0.3); margin: 0 4px; margin-bottom: 18px; }
+.demo-result-text { color: rgba(219, 200, 237, 0.82); font-size: 12px; line-height: 18px; margin-top: 14px; }
+
+/* ============================================================
+   CTA
+   ============================================================ */
+.cta-section { padding: 22px 24px 0 24px; align-items: center; }
+.cta-primary {
+  width: 100%;
+  height: 52px;
+  border-radius: 26px;
+  background-color: #DBC8ED;
+  box-shadow: 0 8px 24px rgba(219, 200, 237, 0.28);
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.cta-primary-text { color: #161A33; font-size: 16px; font-weight: bold; }
+.cta-secondary {
+  padding: 9px 20px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  border-width: 1px;
+  border-color: rgba(219, 200, 237, 0.18);
+  border-style: solid;
+}
+.cta-secondary-text { color: rgba(255, 255, 255, 0.65); font-size: 14px; }
+
+.footer { align-items: center; padding: 28px 0 36px 0; }
+.footer-text { color: rgba(255, 255, 255, 0.35); font-size: 11px; }
 </style>

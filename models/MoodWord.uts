@@ -1,0 +1,4 @@
+export type MoodWord = {
+  word: string
+  weight: number
+}

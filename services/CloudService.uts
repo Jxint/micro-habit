@@ -172,65 +172,35 @@ export function downloadTtsAudio(
     onFail('downloadTtsAudio cacheKey 为空')
     return
   }
+  // 直接用 uni.downloadFile 下载 MiniMax 返回的音频 URL
+  // 不指定 filePath，让系统下载到临时目录，避免 _doc/ 写入权限问题
   try {
-    uni.request({
+    uni.downloadFile({
       url: url,
-      method: 'GET',
-      responseType: 'arraybuffer',
       timeout: 60000,
-      success(res) {
+      success: (dlRes): void => {
         try {
-          const ab = res.data as ArrayBuffer
-          if (ab == null) {
-            onFail('下载响应无 ArrayBuffer')
+          if (dlRes.statusCode != 200) {
+            onFail('TTS 下载 HTTP 状态: ' + dlRes.statusCode)
             return
           }
-          const filePath: string = '_doc/' + cacheKey + '.mp3'
-          const abRef: ArrayBuffer = ab
-          // ArrayBuffer → base64 字符串，writeFile 在 App-Android 上只支持 base64/utf-8
-          let base64: string = ''
-          try {
-            base64 = uni.arrayBufferToBase64(abRef)
-          } catch (e) {
-            const msg = e != null ? ('' + e) : 'null'
-            onFail('TTS ArrayBuffer→base64 失败: ' + msg)
+          const tempPath: string = dlRes.tempFilePath
+          if (tempPath == null || tempPath.length < 1) {
+            onFail('TTS 下载无 tempFilePath')
             return
           }
-          try {
-            uni.getFileSystemManager().writeFile({
-              filePath: filePath,
-              data: base64,
-              encoding: 'base64',
-              success: (): void => {
-                try {
-                  const fileSize: number = abRef.byteLength
-                  saveTtsCache(cacheKey, cacheKey, filePath, fileSize, 'minimax')
-                  console.log('[CloudService] downloadTtsAudio OK, cacheKey=' + cacheKey + ' size=' + fileSize)
-                  onOK(filePath)
-                } catch (e) {
-                  const msg = e != null ? ('' + e) : 'null'
-                  onFail('TTS 缓存写库失败: ' + msg)
-                }
-              },
-              fail: (err): void => {
-                const msg = err != null ? ('' + err) : 'null'
-                console.warn('[CloudService] writeFile fail: ' + msg)
-                onFail('TTS 文件写失败: ' + msg)
-              }
-            })
-          } catch (e) {
-            const msg = e != null ? ('' + e) : 'null'
-            onFail('TTS 写文件构造失败: ' + msg)
-          }
+          // 不写缓存（避免 _doc 写权限问题），下次触发会重新下载
+          console.log('[CloudService] downloadTtsAudio OK, cacheKey=' + cacheKey + ' tempPath=' + tempPath)
+          onOK(tempPath)
         } catch (e) {
           const msg = e != null ? ('' + e) : 'null'
           onFail('TTS 下载处理异常: ' + msg)
         }
       },
-      fail(_err) {
-        const msg = _err != null ? ('' + _err) : 'null'
-        console.warn('[CloudService] downloadTtsAudio network fail: ' + msg)
-        onFail('TTS 下载网络失败: ' + msg)
+      fail: (err): void => {
+        const msg = err != null ? ('' + err) : 'null'
+        console.warn('[CloudService] downloadFile fail: ' + msg)
+        onFail('TTS 文件下载失败: ' + msg)
       }
     })
   } catch (e) {
@@ -417,6 +387,7 @@ function extractFinishReason(data: UTSJSONObject): string {
 }
 
 function parseJsonThreeLevels(raw: string): UTSJSONObject | null {
+  // 1) 整体直接 parse
   try {
     const first = JSON.parse(raw)
     if (first != null) {
@@ -429,16 +400,52 @@ function parseJsonThreeLevels(raw: string): UTSJSONObject | null {
         return first as UTSJSONObject
       }
     }
-  } catch (_) {}
+    return null
+  } catch (e1) {
+    console.warn('[CloudService] parseJsonThreeLevels 整体 parse 失败: ' + (e1 != null ? ('' + e1) : 'null'))
+  }
+  // 2) 去掉 markdown ```json ... ``` 包裹后 parse
   try {
-    const match = raw.match(/\{[\s\S]*\}/)
-    if (match != null) {
-      const m = match[0]
-      if (m != null && m.length > 0) {
-        const second = JSON.parse(m)
-        if (second != null && typeof second === 'object') return second as UTSJSONObject
+    const stripped: string = raw
+      .replace(/```json\s*/gi, '')
+      .replace(/```/g, '')
+      .trim()
+    const direct = JSON.parse(stripped)
+    if (direct != null && typeof direct === 'object') return direct as UTSJSONObject
+    if (typeof direct === 'string') {
+      const second = JSON.parse(direct)
+      if (second != null && typeof second === 'object') return second as UTSJSONObject
+    }
+    return null
+  } catch (e2) {
+    console.warn('[CloudService] parseJsonThreeLevels 去 markdown 后失败: ' + (e2 != null ? ('' + e2) : 'null'))
+  }
+  // 3) 兜底：贪婪匹配首个 { 到末尾，取平衡 JSON
+  try {
+    const startIdx: number = raw.indexOf('{')
+    if (startIdx < 0) return null
+    let depth: number = 0
+    let inStr: boolean = false
+    let esc: boolean = false
+    for (let i = startIdx; i < raw.length; i++) {
+      const c = raw.charAt(i) as string
+      if (esc) { esc = false; continue }
+      if (c == '\\') { esc = true; continue }
+      if (c == '"') { inStr = !inStr; continue }
+      if (inStr) continue
+      if (c == '{') depth++
+      else if (c == '}') {
+        depth--
+        if (depth == 0) {
+          const sub: string = raw.substring(startIdx, i + 1)
+          const obj = JSON.parse(sub)
+          if (obj != null && typeof obj === 'object') return obj as UTSJSONObject
+          return null
+        }
       }
     }
-  } catch (_) {}
+  } catch (e3) {
+    console.warn('[CloudService] parseJsonThreeLevels 平衡匹配失败: ' + (e3 != null ? ('' + e3) : 'null'))
+  }
   return null
 }

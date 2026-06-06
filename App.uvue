@@ -17,6 +17,7 @@ import {
   stopUsageMonitor,
   isUsagePermissionGranted,
   setTriggerEnabled as setUsageTriggerEnabled,
+  setPollIntervalMs,
   queryUsageStatsOnce,
   AppForegroundInfo,
   UsageMonitorCallbacks
@@ -52,11 +53,16 @@ let pendingAdhocText = ''
 let pendingActionId = ''
 // 幂等守卫：$on 重复注册导致同一 actionId 被处理多次
 let pendingActionIds: Map<string, boolean> = new Map<string, boolean>()
-// per-package 触发防抖：5min tick 命中同一包时按 (pkg, time) 二次去重，避免连续弹窗打架
-const TRIGGER_COOL_DOWN_MS_PER_PKG: number = 30 * 60 * 1000
+// per-package 触发防抖：tick 命中同一包时按 (pkg, time) 二次去重，避免连续弹窗打架
+// 间隔从 settings 的 trigger_pkg_cooldown_min 实时读取，便于用户在设置页调整
+const DEFAULT_PKG_COOLDOWN_MIN: number = 20
+function getPkgCooldownMs(): number {
+  const min = getInt('trigger_pkg_cooldown_min', DEFAULT_PKG_COOLDOWN_MIN)
+  if (min < 1) return DEFAULT_PKG_COOLDOWN_MIN * 60 * 1000
+  return min * 60 * 1000
+}
 let lastTriggerPerPkg: Map<string, number> = new Map<string, number>()
 let pendingActionName = ''
-let pendingActionCategory = ''
 
 function safeNowHour(): number {
   try { return currentHour() } catch (_) { return 12 }
@@ -213,7 +219,6 @@ function onActionResolvedLLM(actionId: string, actionName: string, actionCategor
   }
   pendingActionId = actionId
   pendingActionName = actionName
-  pendingActionCategory = actionCategory
   const postCtx = buildPostContext(actionName, actionCategory, durationMs, appPackage)
   setPostContext(postCtx)
   // 实际的 LLM 评估由 4 个 callback 各自触发（onSelfReported/onBusyRemindLater/onSkipDuringExec/onCountdownFinish）
@@ -648,10 +653,11 @@ onLaunch(() => {
     const callbacks: UsageMonitorCallbacks = {
       onAppDurationTrigger: (info: AppForegroundInfo): void => {
         try {
-          // per-package 触发防抖：5min tick 命中同一包时按 (pkg, time) 二次去重
+          // per-package 触发防抖：tick 命中同一包时按 (pkg, time) 二次去重，间隔走设置
           const nowTs = Date.now()
           const lastTs = lastTriggerPerPkg.get(info.packageName) ?? 0
-          if (nowTs - lastTs < TRIGGER_COOL_DOWN_MS_PER_PKG) {
+          const pkgCd = getPkgCooldownMs()
+          if (nowTs - lastTs < pkgCd) {
             console.log('[App.uvue] 跳过同包重复触发: ' + info.packageName)
             return
           }
@@ -730,9 +736,10 @@ onLaunch(() => {
     if (isUsagePermissionGranted()) {
       const thresholdMs = getInt('app_duration_threshold', 60) * 60000
       const triggerEnabled = getBool('trigger_enabled', true)
-      // 5 分钟轮询：聚合数据查今日累计前台时长（INTERVAL_DAILY 一定有数据）
+      // 轮询间隔走设置 trigger_poll_interval_min（默认 10 分钟）
+      const pollMs = getInt('trigger_poll_interval_min', 10) * 60 * 1000
       try {
-        startUsageMonitor(callbacks, thresholdMs, 5 * 60 * 1000, triggerEnabled)
+        startUsageMonitor(callbacks, thresholdMs, pollMs, triggerEnabled)
       } catch (e) {
         console.error('[App.uvue] startUsageMonitor 失败: ' + JSON.stringify(e))
       }
@@ -757,6 +764,12 @@ onAppShow(() => {
   try {
     const triggerOn = getBool('trigger_enabled', true)
     setUsageTriggerEnabled(triggerOn)
+  } catch (_) {}
+  // 同步轮询间隔：用户在设置页改了 trigger_poll_interval_min 后，
+  // 从后台回到前台时把新值推到 Service，让下一次 tick 按新间隔排
+  try {
+    const pollMs = getInt('trigger_poll_interval_min', 10) * 60 * 1000
+    setPollIntervalMs(pollMs)
   } catch (_) {}
   console.log('App Show')
 })

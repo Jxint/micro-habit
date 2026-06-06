@@ -1,29 +1,34 @@
-import { getInt, putInt } from '../database/SettingsDao'
+// ============================================================
+// 已废弃（Deprecated）
+// ============================================================
+// 新手保护模式于 2025-XX 移除。
+// 行为不再区分新老用户——所有用户统一使用 settings 中的
+//   trigger_poll_interval_min / trigger_cooldown_min
+// 进行触发频率控制。
+//
+// 保留本文件 + 导出符号仅为兼容已编译的旧调用方与历史逻辑，
+// 行为已全部退化为"非新手"等价路径（isNewbie=false、间隔=0）。
+// 后续清理时请直接删除本文件，并在以下引用方同步清理：
+//   - services/TriggerEngine.uts
+//   - services/UserProfileService.uts
+//   - pages/guide/index.uvue
+// ============================================================
+
+import { getInt } from '../database/SettingsDao'
 
 const NORMAL_INTERVAL_MS = 60 * 60 * 1000
-const NEWBIE_INTERVAL_MS = 120 * 60 * 1000
 
 export function isNewbie(): boolean {
-  const newbieMode = getInt('newbie_mode', 1)
-  if (newbieMode < 1) return false
-  const startDate = getInt('newbie_start_date', 0)
-  if (startDate < 1) return false
-  const daysSince = Math.floor((Date.now() - startDate) / (24 * 3600 * 1000))
-  return daysSince < 3
+  return false
 }
 
 export function getMinTriggerIntervalMs(): number {
-  return isNewbie() ? NEWBIE_INTERVAL_MS : NORMAL_INTERVAL_MS
+  return 0
 }
 
 export function getNewbieTriggerLevel(originalLevel: string): string {
-  return 'gentle'
+  return originalLevel
 }
 
 export function checkGraduation(): void {
-  const startDate = getInt('newbie_start_date', 0)
-  const daysSince = Math.floor((Date.now() - startDate) / (24 * 3600 * 1000))
-  if (daysSince >= 3 && getInt('newbie_mode', 1) == 1) {
-    putInt('newbie_mode', 0)
-  }
 }

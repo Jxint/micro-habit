@@ -34,16 +34,6 @@
             <text class="guard-sub">习惯渗透度 {{ penetrationText }}</text>
           </view>
 
-          <view class="chart-container">
-            <text class="chart-label">今天哪些时刻点亮了星球</text>
-            <BarChart
-              :labels="hourlyLabels"
-              :values="hourlyValues"
-              :height="220"
-              barColor="#CBB8FF"
-            />
-          </view>
-
           <view class="list-section" v-if="detailCount > 0">
             <text class="chart-label">今日完成记录</text>
             <view class="detail-item" v-for="(item, idx) in todayDetails" :key="idx">
@@ -100,19 +90,28 @@
 
       <view class="section">
         <view class="section-header">
-          <text class="section-title">三颗星球趋势</text>
+          <text class="section-title">心情状态词云</text>
+          <text class="section-toggle" @tap="onRefreshMoodCloud">{{ moodCloudLoading ? '生成中…' : '提取状态' }}</text>
         </view>
         <view class="section-body">
-          <view class="chart-container">
-            <LineChart
-              :series-values="weekTrendValues"
-              :series-names="weekTrendNames"
-              :series-colors="weekTrendColors"
-              :point-labels="weekTrendLabels"
-              :height="360"
-              title="本周完成次数趋势（左右可拖动）"
-            />
+          <text class="mood-cloud-hint">基于历次 AI 提醒与状态记录汇总，已去除情绪化用词与表情符号</text>
+          <WordCloud
+            v-if="moodCloudWords.length > 0"
+            :words="moodCloudWords"
+          />
+          <view v-else class="mood-cloud-empty">
+            <text class="empty-text">{{ moodCloudHintText }}</text>
           </view>
+        </view>
+      </view>
+
+      <view class="section">
+        <view class="section-header">
+          <text class="section-title">AI 历次判断</text>
+          <text class="section-toggle">{{ llmHistoryEntries.length }} 条</text>
+        </view>
+        <view class="section-body">
+          <LlmHistoryCard :entries="llmHistoryEntries" />
         </view>
       </view>
 
@@ -144,11 +143,15 @@ import StatusIndicator from '../../components/StatusIndicator.uvue'
 import BarChart from '../../components/BarChart.uvue'
 import LineChart from '../../components/LineChart.uvue'
 import HeatmapCalendar from '../../components/HeatmapCalendar.uvue'
+import LlmHistoryCard from '../../components/LlmHistoryCard.uvue'
+import WordCloud from '../../components/WordCloud.uvue'
 import { useAppStore } from '../../stores/appStore'
 import { getHourlyData, getWeeklyTrend, getTodayDetail, ActionDetail, LineSeries } from '../../services/ScoreCalculator'
 import { today } from '../../utils/TimeUtils'
 import { BarItem } from '../../database/ActionLogDao'
 import { DailyCount } from '../../models/DailyCount'
+import { LlmHistoryEntry } from '../../models/LlmHistoryEntry'
+import { generateMoodCloud, getMoodCloudSampleCount, type MoodWord } from '../../services/MoodCloudService'
 
 const store = useAppStore()
 
@@ -176,6 +179,17 @@ const weekTrendLabels = ref<string[]>([])
 
 const heatmapDates = ref<string[]>([])
 const heatmapCounts = ref<number[]>([])
+
+const llmHistoryEntries = ref<LlmHistoryEntry[]>([])
+
+const moodCloudWords = ref<MoodWord[]>([])
+const moodCloudLoading = ref<boolean>(false)
+const moodCloudSampleCount = ref<number>(0)
+const moodCloudHintText = computed<string>((): string => {
+  if (moodCloudSampleCount.value < 1) return '尚未记录任何状态，多用一段时间后再来'
+  if (moodCloudLoading.value) return '正在从历次记录中提取关键词'
+  return '点击"提取状态"按钮让 AI 汇总近期心情/状态'
+})
 
 const weeklyShow = ref<boolean>(false)
 const weeklyToggleText = computed<string>(() : string => weeklyShow.value ? '▼' : '▶')
@@ -220,43 +234,6 @@ function formatDetailType(t: string): string {
 
 function loadData(): void {
   const date = today()
-  const hourly = getHourlyData(date)
-  const hLabels: string[] = []
-  const hValues: number[] = []
-  for (let i = 0; i < hourly.length; i++) {
-    hLabels.push(hourly[i].label)
-    hValues.push(hourly[i].value)
-  }
-  hourlyLabels.value = hLabels
-  hourlyValues.value = hValues
-
-  const trend = getWeeklyTrend()
-  if (trend.length > 0) {
-    const first = trend[0]
-    if (first != null) {
-      weekTrendNames.value = [first.name]
-      weekTrendColors.value = [first.color]
-      const v: number[] = []
-      const labels: string[] = []
-      for (let i = 0; i < first.points.length; i++) {
-        labels.push(first.points[i].label)
-        v.push(first.points[i].value)
-      }
-      weekTrendLabels.value = labels
-      weekTrendValues.value = [v]
-    } else {
-      weekTrendNames.value = []
-      weekTrendColors.value = []
-      weekTrendLabels.value = []
-      weekTrendValues.value = []
-    }
-  } else {
-    weekTrendNames.value = []
-    weekTrendColors.value = []
-    weekTrendLabels.value = []
-    weekTrendValues.value = []
-  }
-
   const heatmap = store.heatmapData.value
   const dArr: string[] = []
   const cArr: number[] = []
@@ -268,6 +245,9 @@ function loadData(): void {
   heatmapCounts.value = cArr
 
   todayDetails.value = getTodayDetail()
+
+  try { llmHistoryEntries.value = store.llmHistory.value } catch (_) { llmHistoryEntries.value = [] }
+  try { moodCloudSampleCount.value = getMoodCloudSampleCount() } catch (_) { moodCloudSampleCount.value = 0 }
 }
 
 function toggleWeekly(): void {
@@ -277,6 +257,26 @@ function toggleWeekly(): void {
 function refreshWeek(): void {
   weeklyShow.value = true
   store.refreshWeeklyReport()
+}
+
+function onRefreshMoodCloud(): void {
+  if (moodCloudLoading.value) return
+  moodCloudLoading.value = true
+  try {
+    generateMoodCloud(
+      (words: MoodWord[]): void => {
+        moodCloudWords.value = words
+        moodCloudLoading.value = false
+      },
+      (err: string): void => {
+        console.warn('[dashboard] onRefreshMoodCloud 失败: ' + err)
+        moodCloudLoading.value = false
+      }
+    )
+  } catch (e) {
+    console.warn('[dashboard] onRefreshMoodCloud 异常: ' + JSON.stringify(e))
+    moodCloudLoading.value = false
+  }
 }
 
 onPageShow(() => {
@@ -412,8 +412,7 @@ onPageShow(() => {
 .rule-time,
 .header-desc,
 .tag-pkg,
-.tag-uses,
-.empty-hint { color: rgba(255, 255, 255, 0.72); }
+.tag-uses { color: rgba(255, 255, 255, 0.72); }
 .dashboard-subtitle,
 .settings-subtitle { font-size: 13px; line-height: 20px; margin-top: 8px; }
 .dashboard-planet,
@@ -435,6 +434,8 @@ onPageShow(() => {
 .chart-container { margin: 10px 16px 0 16px; padding: 14px 0 6px 0; border-radius: 22px; }
 .chart-label { padding-left: 14px; margin-bottom: 0; font-size: 13px; font-weight: bold; }
 .list-section { padding: 0 16px; }
+.mood-cloud-hint { font-size: 12px; color: rgba(255, 255, 255, 0.62); padding: 0 16px 8px 16px; }
+.mood-cloud-empty { padding: 24px 16px; align-items: center; }
 .detail-item { flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom-width: 1px; border-bottom-color: rgba(219, 200, 237, 0.16); border-bottom-style: solid; }
 .detail-left,
 .detail-right,

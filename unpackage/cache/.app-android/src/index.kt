@@ -50,8 +50,8 @@ import kotlin.properties.Delegates
 import io.dcloud.uniapp.extapi.`$emit` as uni__emit
 import io.dcloud.uniapp.extapi.`$on` as uni__on
 import android.view.WindowManager.LayoutParams as WindowManagerLayoutParams
-import io.dcloud.uniapp.extapi.arrayBufferToBase64 as uni_arrayBufferToBase64
 import io.dcloud.uniapp.extapi.connectSocket as uni_connectSocket
+import io.dcloud.uniapp.extapi.downloadFile as uni_downloadFile
 import io.dcloud.uniapp.extapi.exit as uni_exit
 import io.dcloud.uniapp.extapi.getFileSystemManager as uni_getFileSystemManager
 import io.dcloud.uniapp.extapi.navigateTo as uni_navigateTo
@@ -141,15 +141,9 @@ fun tryConnectSocket(host: String, port: String, id: String): UTSPromise<SocketT
     )
 }
 fun initRuntimeSocketService(): UTSPromise<Boolean> {
-<<<<<<< HEAD
     val hosts: String = "172.24.90.1,127.0.0.1"
     val port: String = "8090"
-    val id: String = "app-android_L5D_tz"
-=======
-    val hosts: String = "127.0.0.1,172.21.18.17,172.16.253.1,192.168.238.1"
-    val port: String = "8090"
-    val id: String = "app-android_6DhOvg"
->>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
+    val id: String = "app-android_jPpzlT"
     if (hosts == "" || port == "" || id == "") {
         return UTSPromise.resolve(false)
     }
@@ -1562,13 +1556,15 @@ val DEFAULT_SETTINGS = _uA(
     DefaultSetting(key = "daily_summary_time", value = "21:00"),
     DefaultSetting(key = "weekly_report_enabled", value = "1"),
     DefaultSetting(key = "dark_mode", value = "system"),
-    DefaultSetting(key = "newbie_mode", value = "1"),
     DefaultSetting(key = "guide_completed", value = "0"),
     DefaultSetting(key = "health_preference", value = "balanced"),
     DefaultSetting(key = "body_limit", value = "none"),
     DefaultSetting(key = "llm_trigger_enabled", value = "1"),
     DefaultSetting(key = "llm_trigger_ask_each_time", value = "1"),
-    DefaultSetting(key = "trigger_enabled", value = "1")
+    DefaultSetting(key = "trigger_enabled", value = "1"),
+    DefaultSetting(key = "trigger_poll_interval_min", value = "10"),
+    DefaultSetting(key = "trigger_cooldown_min", value = "10"),
+    DefaultSetting(key = "trigger_pkg_cooldown_min", value = "20")
 ) as UTSArray<DefaultSetting>
 val DB_VERSION: Number = 9
 fun getDbVersion(): Number {
@@ -2057,45 +2053,6 @@ fun getRecentLogs(count: Number): UTSArray<ActionLog> {
     }
     return result
 }
-open class BarItem (
-    @JsonNotNull
-    open var label: String,
-    @JsonNotNull
-    open var value: Number,
-) : UTSObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("BarItem", "database/ActionLogDao.uts", 100, 13)
-    }
-}
-fun getHourlyCompletionData(date: String): UTSArray<BarItem> {
-    val result: UTSArray<BarItem> = _uA()
-    run {
-        var h: Number = 0
-        while(h < 24){
-            val label = (if (h < 10) {
-                "0"
-            } else {
-                ""
-            }
-            ) + h + ":00"
-            result.push(BarItem(label = label, value = 0))
-            h++
-        }
-    }
-    val rows = dbManager.query("SELECT * FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
-        getTimestampFromDate(date),
-        getTimestampFromDate(date) + 86400,
-        "completed",
-        "self_reported"
-    ))
-    for(row in resolveUTSValueIterator(rows)){
-        val created = getNum(row, "created_at")
-        val d = Date(created)
-        val hour = d.getHours()
-        result[hour].value = result[hour].value + 1
-    }
-    return result
-}
 fun mapRow(row: Map<String, Any>): ActionLog {
     return ActionLog(id = getNum(row, "id"), action_id = getStr(row, "action_id"), action_type = getStr(row, "action_type"), result = getStr(row, "result") as ActionResult, skip_reason = getStrOrNull(row, "skip_reason"), trigger_type = getStr(row, "trigger_type"), trigger_level = getStr(row, "trigger_level"), duration_ms = getNum(row, "duration_ms"), target_ms = getNum(row, "target_ms"), triggered_at = getNum(row, "triggered_at"), completed_at = getNum(row, "completed_at"), created_at = getNum(row, "created_at"))
 }
@@ -2455,6 +2412,18 @@ fun getTodayAppBreakdown(): UTSArray<AppUsageItem> {
     }
     return result
 }
+fun getTop5Apps(): UTSArray<AppUsageItem> {
+    val all = getTodayAppBreakdown()
+    val r: UTSArray<AppUsageItem> = _uA()
+    run {
+        var i: Number = 0
+        while(i < all.length && i < 5){
+            r.push(all[i])
+            i++
+        }
+    }
+    return r
+}
 open class DailyCount (
     @JsonNotNull
     open var date: String,
@@ -2585,19 +2554,6 @@ fun getRecent28Days(): UTSArray<DailyCount> {
     }
     return result
 }
-fun getSummaryByDate(date: String): DailySummary? {
-    val row = dbManager.queryOne("SELECT * FROM daily_summaries WHERE date = ?", _uA(
-        date
-    ))
-    return if (row != null) {
-        mapRow__2(row)
-    } else {
-        null
-    }
-}
-fun mapRow__2(row: Map<String, Any>): DailySummary {
-    return DailySummary(id = getNum(row, "id"), date = getStr(row, "date"), total_completed = getNum(row, "total_completed"), total_skipped = getNum(row, "total_skipped"), total_duration_sec = getNum(row, "total_duration_sec"), eye_score = getNum(row, "eye_score"), posture_score = getNum(row, "posture_score"), vitality_score = getNum(row, "vitality_score"), penetration = getNum(row, "penetration"), phone_usage_min = getNum(row, "phone_usage_min"), guard_minutes = getNum(row, "guard_minutes"), guard_count = getNum(row, "guard_count"), created_at = getNum(row, "created_at"))
-}
 fun getSetting(key: String, defaultValue: String = ""): String {
     val row = dbManager.queryOne("SELECT value FROM user_settings WHERE key = ?", _uA(
         key
@@ -2701,30 +2657,6 @@ fun getActionById(id: String): MicroAction? {
     }
     return null
 }
-fun getTimestampFromDate__1(date: String): Number {
-    val parts = date.split("-")
-    return Math.floor(Date(parseInt(parts[0] as String), parseInt(parts[1] as String) - 1, parseInt(parts[2] as String)).getTime() / 1000)
-}
-fun countCompletedForDate(date: String): Number {
-    val start = getTimestampFromDate__1(date)
-    val end = start + 86400
-    val row = dbManager.queryOne("SELECT COUNT(*) as cnt FROM action_logs WHERE created_at >= ? AND created_at < ? AND result IN (?,?)", _uA(
-        start,
-        end,
-        "completed",
-        "self_reported"
-    ))
-    val rawCnt = if (row != null) {
-        row.get("cnt")
-    } else {
-        null
-    }
-    return if (rawCnt != null) {
-        parseFloat("" + rawCnt)
-    } else {
-        0
-    }
-}
 fun calculateThreeStatus(date: String): ThreeStatus {
     val target = getTargetCount()
     val eyeScore = calcCategoryScore(date, EYE_ACTION_IDS, target)
@@ -2813,71 +2745,6 @@ fun getHomepageData(date: String): HomepageData {
     val heatmapData = getRecent28Days()
     val targetCount = getTargetCount()
     return HomepageData(eyeScore = threeStatus.eyeScore, eyeLevel = threeStatus.eyeLevel, postureScore = threeStatus.postureScore, postureLevel = threeStatus.postureLevel, vitalityScore = threeStatus.vitalityScore, vitalityLevel = threeStatus.vitalityLevel, guardCount = guardCount, penetration = penetration, todayCompletedCount = todayCompletedCount, heatmapData = heatmapData, targetCount = targetCount)
-}
-fun getHourlyData(date: String): UTSArray<BarItem> {
-    return getHourlyCompletionData(date)
-}
-open class WeekCountRow (
-    @JsonNotNull
-    open var date: String,
-    @JsonNotNull
-    open var count: Number,
-) : UTSObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("WeekCountRow", "services/ScoreCalculator.uts", 112, 6)
-    }
-}
-fun getWeeklyCounts(): UTSArray<WeekCountRow> {
-    val result: UTSArray<WeekCountRow> = _uA()
-    run {
-        var i: Number = 6
-        while(i >= 0){
-            val d = daysAgo(i)
-            val summary = getSummaryByDate(d)
-            val cnt = if (summary != null) {
-                summary.total_completed
-            } else {
-                countCompletedForDate(d)
-            }
-            result.push(WeekCountRow(date = d, count = cnt))
-            i--
-        }
-    }
-    return result
-}
-open class LinePoint (
-    @JsonNotNull
-    open var label: String,
-    @JsonNotNull
-    open var value: Number,
-) : UTSObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LinePoint", "services/ScoreCalculator.uts", 126, 13)
-    }
-}
-open class LineSeries (
-    @JsonNotNull
-    open var name: String,
-    @JsonNotNull
-    open var color: String,
-    @JsonNotNull
-    open var points: UTSArray<LinePoint>,
-) : UTSObject(), IUTSSourceMap {
-    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LineSeries", "services/ScoreCalculator.uts", 130, 13)
-    }
-}
-fun getWeeklyTrend(): UTSArray<LineSeries> {
-    val rows = getWeeklyCounts()
-    val points: UTSArray<LinePoint> = _uA()
-    for(r in resolveUTSValueIterator(rows)){
-        val parts = r.date.split("-")
-        val label = parts[1] + "/" + parts[2]
-        points.push(LinePoint(label = label, value = r.count))
-    }
-    return _uA(
-        LineSeries(name = "完成次数", color = "#2ECC71", points = points)
-    )
 }
 open class ActionDetail (
     @JsonNotNull
@@ -3215,7 +3082,7 @@ class PersistedEffectiveRuleReactiveObject : PersistedEffectiveRule, IUTSReactiv
             _tRS(__v_raw, "updatedAt", oldValue, value)
         }
 }
-fun mapRow__3(row: Map<String, Any>): PersistedEffectiveRule {
+fun mapRow__2(row: Map<String, Any>): PersistedEffectiveRule {
     val pkgJson = getStr(row, "app_packages_json")
     var appPackages: UTSArray<String> = _uA()
     if (pkgJson.length > 0) {
@@ -3381,7 +3248,7 @@ fun getActiveRules(): UTSArray<PersistedEffectiveRule> {
                 i++
                 continue
             }
-            result.push(mapRow__3(r))
+            result.push(mapRow__2(r))
             i++
         }
     }
@@ -3605,30 +3472,6 @@ fun getOrCreateState(actionType: String): FrequencyState {
     }
     return frequencyReducer.get(actionType)!!
 }
-val NORMAL_INTERVAL_MS: Number = 3600000
-val NEWBIE_INTERVAL_MS: Number = 7200000
-fun isNewbie(): Boolean {
-    val newbieMode = getInt("newbie_mode", 1)
-    if (newbieMode < 1) {
-        return false
-    }
-    val startDate = getInt("newbie_start_date", 0)
-    if (startDate < 1) {
-        return false
-    }
-    val daysSince = Math.floor((Date.now() - startDate) / 86400000)
-    return daysSince < 3
-}
-fun getMinTriggerIntervalMs(): Number {
-    return if (isNewbie()) {
-        NEWBIE_INTERVAL_MS
-    } else {
-        NORMAL_INTERVAL_MS
-    }
-}
-fun getNewbieTriggerLevel(originalLevel: String): String {
-    return "gentle"
-}
 enum class TriggerState__1(override val value: Int) : UTSEnumInt {
     IDLE(0),
     SHOWING(1),
@@ -3659,7 +3502,7 @@ open class TriggerContext (
     open var triggerType: String,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("TriggerContext", "services/TriggerEngine.uts", 20, 13)
+        return UTSSourceMapPosition("TriggerContext", "services/TriggerEngine.uts", 19, 13)
     }
 }
 open class TriggerDecision (
@@ -3681,12 +3524,31 @@ open class TriggerDecision (
     open var matchedRuleSource: String,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("TriggerDecision", "services/TriggerEngine.uts", 27, 13)
+        return UTSSourceMapPosition("TriggerDecision", "services/TriggerEngine.uts", 26, 13)
     }
 }
 var currentState: TriggerState__1 = TriggerState__1.IDLE
 var lastTriggerTime: Number = 0
-val COOL_DOWN_MS: Number = 300000
+val DEFAULT_COOLDOWN_MIN: Number = 10
+fun getCooldownMs(): Number {
+    val min = getInt("trigger_cooldown_min", DEFAULT_COOLDOWN_MIN)
+    if (min < 1) {
+        return DEFAULT_COOLDOWN_MIN * 60000
+    }
+    return min * 60000
+}
+fun getRemainingCooldownMs(): Number {
+    if (lastTriggerTime < 1) {
+        return 0
+    }
+    val cd = getCooldownMs()
+    val remain = cd - (Date.now() - lastTriggerTime)
+    return if (remain > 0) {
+        remain
+    } else {
+        0
+    }
+}
 fun evaluate(ctx: TriggerContext): EffectiveRuleMatch? {
     if (isSystemPackage(ctx.appPackage)) {
         return null
@@ -3776,12 +3638,13 @@ fun evaluate(ctx: TriggerContext): EffectiveRuleMatch? {
 }
 fun shouldTrigger(context: TriggerContext): TriggerDecision? {
     if (currentState !== TriggerState__1.IDLE) {
-        console.log("[TriggerEngine] skip: state=" + currentState, " at services/TriggerEngine.uts:47")
+        console.log("[TriggerEngine] skip: state=" + currentState, " at services/TriggerEngine.uts:62")
         return null
     }
     val nowMs = Date.now()
-    if (nowMs - lastTriggerTime < COOL_DOWN_MS) {
-        console.log("[TriggerEngine] skip: cooldown remaining=" + (COOL_DOWN_MS - (nowMs - lastTriggerTime)), " at services/TriggerEngine.uts:53")
+    val cooldownMs = getCooldownMs()
+    if (nowMs - lastTriggerTime < cooldownMs) {
+        console.log("[TriggerEngine] skip: cooldown remaining=" + (cooldownMs - (nowMs - lastTriggerTime)), " at services/TriggerEngine.uts:69")
         return null
     }
     var dndOk = false
@@ -3789,7 +3652,7 @@ fun shouldTrigger(context: TriggerContext): TriggerDecision? {
         dndOk = isInDndPeriod()
     }
      catch (e: Throwable) {
-        console.warn("[TriggerEngine] isInDndPeriod: " + e, " at services/TriggerEngine.uts:58")
+        console.warn("[TriggerEngine] isInDndPeriod: " + e, " at services/TriggerEngine.uts:74")
     }
     if (dndOk) {
         return null
@@ -3802,16 +3665,10 @@ fun shouldTrigger(context: TriggerContext): TriggerDecision? {
         blacklisted = isBlacklisted(context.appPackage)
     }
      catch (e: Throwable) {
-        console.warn("[TriggerEngine] isBlacklisted: " + e, " at services/TriggerEngine.uts:65")
+        console.warn("[TriggerEngine] isBlacklisted: " + e, " at services/TriggerEngine.uts:81")
     }
     if (blacklisted) {
         return null
-    }
-    if (isNewbie()) {
-        val minInterval = getMinTriggerIntervalMs()
-        if (nowMs - lastTriggerTime < minInterval) {
-            return null
-        }
     }
     if (isFrequencyReduced(context.triggerType)) {
         return null
@@ -3821,7 +3678,7 @@ fun shouldTrigger(context: TriggerContext): TriggerDecision? {
         match = evaluate(context)
     }
      catch (e: Throwable) {
-        console.warn("[TriggerEngine] evaluateRule: " + e, " at services/TriggerEngine.uts:76")
+        console.warn("[TriggerEngine] evaluateRule: " + e, " at services/TriggerEngine.uts:87")
     }
     var action: MicroAction? = null
     var ruleSource: String = "system"
@@ -3832,7 +3689,7 @@ fun shouldTrigger(context: TriggerContext): TriggerDecision? {
             try {
                 fallbackId = selectAction(context.triggerType)
             } catch (e: Throwable) {
-                console.warn("[TriggerEngine] selectAction: " + e, " at services/TriggerEngine.uts:83")
+                console.warn("[TriggerEngine] selectAction: " + e, " at services/TriggerEngine.uts:94")
             }
             if (fallbackId == null) {
                 return null
@@ -3847,7 +3704,7 @@ fun shouldTrigger(context: TriggerContext): TriggerDecision? {
             fallbackId = selectAction(context.triggerType)
         }
          catch (e: Throwable) {
-            console.warn("[TriggerEngine] selectAction fallback: " + e, " at services/TriggerEngine.uts:91")
+            console.warn("[TriggerEngine] selectAction fallback: " + e, " at services/TriggerEngine.uts:102")
         }
         if (fallbackId == null) {
             return null
@@ -3861,11 +3718,8 @@ fun shouldTrigger(context: TriggerContext): TriggerDecision? {
         return null
     }
     var triggerLevel = decideTriggerLevel(context)
-    if (isNewbie()) {
-        triggerLevel = getNewbieTriggerLevel(triggerLevel)
-    }
     if (match == null) {
-        triggerLevel = "gentle"
+        "gentle"
     }
     currentState = TriggerState__1.SHOWING
     lastTriggerTime = nowMs
@@ -3905,12 +3759,13 @@ fun forceIdle(): Unit {
     lastTriggerTime = 0
 }
 fun scheduleCooldownEnd(): Unit {
+    val cd = getCooldownMs()
     scheduleTimer(fun(): Unit {
         if (currentState === TriggerState__1.COOLING_DOWN) {
             currentState = TriggerState__1.IDLE
         }
     }
-    , COOL_DOWN_MS)
+    , cd)
 }
 fun isInDndPeriod(): Boolean {
     val enabled = getBool("dnd_enabled", true)
@@ -3924,7 +3779,7 @@ fun isInDndPeriod(): Boolean {
 fun isBlacklisted(packageName: String): Boolean {
     val listStr = getSetting("app_blacklist", "[]")
     try {
-        val list = UTSAndroid.consoleDebugError(JSON.parse(listStr), " at services/TriggerEngine.uts:182") as UTSArray<String>
+        val list = UTSAndroid.consoleDebugError(JSON.parse(listStr), " at services/TriggerEngine.uts:190") as UTSArray<String>
         return list.indexOf(packageName) >= 0
     }
      catch (_: Throwable) {
@@ -4006,6 +3861,12 @@ var player: NativeAudioPlayer? = null
 fun play(filePath: String, callbacks: AudioPlayerCallbacks): Unit {
     ensurePlayer()
     player!!!!.playFile(filePath, callbacks)
+}
+fun stop(): Unit {
+    if (player != null) {
+        player!!!!.stop()
+        player = null
+    }
 }
 fun ensurePlayer(): Unit {
     if (player == null) {
@@ -4202,27 +4063,9 @@ fun getByHash(hash: String): TtsCache? {
     if (row == null) {
         return null
     }
-    return mapRow__4(row)
+    return mapRow__3(row)
 }
-fun save(textHash: String, textContent: String, filePath: String, fileSize: Number, source: String): Unit {
-    val row = SqlRow(columns = _uA(
-        "text_hash",
-        "text_content",
-        "file_path",
-        "file_size",
-        "source",
-        "created_at"
-    ), values = _uA(
-        textHash,
-        textContent,
-        filePath,
-        fileSize,
-        source,
-        Math.floor(Date.now() / 1000)
-    ))
-    dbManager.insert("tts_cache", row)
-}
-fun mapRow__4(row: Map<String, Any>): TtsCache {
+fun mapRow__3(row: Map<String, Any>): TtsCache {
     return TtsCache(text_hash = getStr(row, "text_hash"), text_content = getStr(row, "text_content"), file_path = getStr(row, "file_path"), file_size = getNum(row, "file_size"), source = getStr(row, "source"), created_at = getNum(row, "created_at"))
 }
 open class LlmCache (
@@ -4250,9 +4093,9 @@ fun getByKey(key: String): LlmCache? {
     if (row == null) {
         return null
     }
-    return mapRow__5(row)
+    return mapRow__4(row)
 }
-fun save__1(key: String, type: String, response: String, expiresAt: Number): Unit {
+fun save(key: String, type: String, response: String, expiresAt: Number): Unit {
     dbManager.execSql("INSERT OR REPLACE INTO llm_cache (cache_key, cache_type, response, expires_at, created_at) VALUES (?,?,?,?,?)", _uA(
         key,
         type,
@@ -4261,7 +4104,7 @@ fun save__1(key: String, type: String, response: String, expiresAt: Number): Uni
         Math.floor(Date.now() / 1000)
     ))
 }
-fun mapRow__5(row: Map<String, Any>): LlmCache {
+fun mapRow__4(row: Map<String, Any>): LlmCache {
     return LlmCache(cache_key = getStr(row, "cache_key"), cache_type = getStr(row, "cache_type"), response = getStr(row, "response"), model = getStr(row, "model"), created_at = getNum(row, "created_at"), expires_at = getNum(row, "expires_at"))
 }
 val MINIMAX_BASE_URL = "https://api.minimax.chat/v1"
@@ -4416,64 +4259,19 @@ fun downloadTtsAudio(url: String, cacheKey: String, onOK: (localPath: String) ->
         return
     }
     try {
-        uni_request<Any>(RequestOptions(url = url, method = "GET", responseType = "arraybuffer", timeout = 60000, success = fun(res) {
+        uni_downloadFile(DownloadFileOptions(url = url, timeout = 60000, success = fun(dlRes): Unit {
             try {
-                val ab = res.data as ArrayBuffer
-                if (ab == null) {
-                    onFail("下载响应无 ArrayBuffer")
+                if (dlRes.statusCode != 200) {
+                    onFail("TTS 下载 HTTP 状态: " + dlRes.statusCode)
                     return
                 }
-                val filePath: String = "_doc/" + cacheKey + ".mp3"
-                val abRef: ArrayBuffer = ab
-                var base64: String = ""
-                try {
-                    base64 = uni_arrayBufferToBase64(abRef)
-                }
-                 catch (e: Throwable) {
-                    val msg = if (e != null) {
-                        ("" + e)
-                    } else {
-                        "null"
-                    }
-                    onFail("TTS ArrayBuffer→base64 失败: " + msg)
+                val tempPath: String = dlRes.tempFilePath
+                if (tempPath == null || tempPath.length < 1) {
+                    onFail("TTS 下载无 tempFilePath")
                     return
                 }
-                try {
-                    uni_getFileSystemManager().writeFile(WriteFileOptions(filePath = filePath, data = base64, encoding = "base64", success = fun(_res): Unit {
-                        try {
-                            val fileSize: Number = abRef.byteLength
-                            save(cacheKey, cacheKey, filePath, fileSize, "minimax")
-                            console.log("[CloudService] downloadTtsAudio OK, cacheKey=" + cacheKey + " size=" + fileSize, " at services/CloudService.uts:208")
-                            onOK(filePath)
-                        }
-                         catch (e: Throwable) {
-                            val msg = if (e != null) {
-                                ("" + e)
-                            } else {
-                                "null"
-                            }
-                            onFail("TTS 缓存写库失败: " + msg)
-                        }
-                    }
-                    , fail = fun(err): Unit {
-                        val msg = if (err != null) {
-                            ("" + err)
-                        } else {
-                            "null"
-                        }
-                        console.warn("[CloudService] writeFile fail: " + msg, " at services/CloudService.uts:217")
-                        onFail("TTS 文件写失败: " + msg)
-                    }
-                    ))
-                }
-                 catch (e: Throwable) {
-                    val msg = if (e != null) {
-                        ("" + e)
-                    } else {
-                        "null"
-                    }
-                    onFail("TTS 写文件构造失败: " + msg)
-                }
+                console.log("[CloudService] downloadTtsAudio OK, cacheKey=" + cacheKey + " tempPath=" + tempPath, " at services/CloudService.uts:193")
+                onOK(tempPath)
             }
              catch (e: Throwable) {
                 val msg = if (e != null) {
@@ -4484,14 +4282,14 @@ fun downloadTtsAudio(url: String, cacheKey: String, onOK: (localPath: String) ->
                 onFail("TTS 下载处理异常: " + msg)
             }
         }
-        , fail = fun(_err) {
-            val msg = if (_err != null) {
-                ("" + _err)
+        , fail = fun(err): Unit {
+            val msg = if (err != null) {
+                ("" + err)
             } else {
                 "null"
             }
-            console.warn("[CloudService] downloadTtsAudio network fail: " + msg, " at services/CloudService.uts:232")
-            onFail("TTS 下载网络失败: " + msg)
+            console.warn("[CloudService] downloadFile fail: " + msg, " at services/CloudService.uts:202")
+            onFail("TTS 文件下载失败: " + msg)
         }
         ))
     }
@@ -4505,37 +4303,37 @@ fun downloadTtsAudio(url: String, cacheKey: String, onOK: (localPath: String) ->
     }
 }
 fun callDaily(date: String, data: DailyData, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
-    console.log("[CloudService] callDaily start, date=" + date, " at services/CloudService.uts:243")
+    console.log("[CloudService] callDaily start, date=" + date, " at services/CloudService.uts:213")
     val userPrompt = buildDailySummaryPrompt(data)
     callMinimaxChat(SYSTEM_PROMPT_DAILY, userPrompt, 1500, fun(raw: String): Unit {
         if (raw.length > 0) {
-            console.log("[CloudService] callDaily OK, raw.length=" + raw.length, " at services/CloudService.uts:247")
+            console.log("[CloudService] callDaily OK, raw.length=" + raw.length, " at services/CloudService.uts:217")
             onOK(raw)
             return
         }
-        console.warn("[CloudService] callDaily empty raw", " at services/CloudService.uts:251")
+        console.warn("[CloudService] callDaily empty raw", " at services/CloudService.uts:221")
         onFail()
     }
     , fun(){
-        console.warn("[CloudService] callDaily failed, fallback to local", " at services/CloudService.uts:254")
+        console.warn("[CloudService] callDaily failed, fallback to local", " at services/CloudService.uts:224")
         onFail()
     }
     )
 }
 fun callWeekly(data: WeeklyReportStats, onOK: (raw: String) -> Unit, onFail: () -> Unit): Unit {
-    console.log("[CloudService] callWeekly start, totalCompleted=" + data.totalCompleted, " at services/CloudService.uts:260")
+    console.log("[CloudService] callWeekly start, totalCompleted=" + data.totalCompleted, " at services/CloudService.uts:230")
     val userPrompt = buildWeeklyReportPrompt(data)
     callMinimaxChat(SYSTEM_PROMPT_WEEKLY, userPrompt, 2000, fun(raw: String): Unit {
         if (raw.length > 0) {
-            console.log("[CloudService] callWeekly OK, raw.length=" + raw.length, " at services/CloudService.uts:264")
+            console.log("[CloudService] callWeekly OK, raw.length=" + raw.length, " at services/CloudService.uts:234")
             onOK(raw)
             return
         }
-        console.warn("[CloudService] callWeekly empty raw", " at services/CloudService.uts:268")
+        console.warn("[CloudService] callWeekly empty raw", " at services/CloudService.uts:238")
         onFail()
     }
     , fun(){
-        console.warn("[CloudService] callWeekly failed, fallback to local", " at services/CloudService.uts:271")
+        console.warn("[CloudService] callWeekly failed, fallback to local", " at services/CloudService.uts:241")
         onFail()
     }
     )
@@ -4553,7 +4351,7 @@ fun callLlmEvaluate(stage: String, ctx: UTSUnionTypeObject, onOK: (raw: String) 
             if (cached != null && cached.response.length > 0) {
                 val nowSec = Math.floor(Date.now() / 1000)
                 if (cached.expires_at <= 0 || cached.expires_at > nowSec) {
-                    console.log("[CloudService] callLlmEvaluate " + stage + " cache HIT key=" + cacheKey, " at services/CloudService.uts:299")
+                    console.log("[CloudService] callLlmEvaluate " + stage + " cache HIT key=" + cacheKey, " at services/CloudService.uts:269")
                     onOK(cached.response)
                     return
                 }
@@ -4565,7 +4363,7 @@ fun callLlmEvaluate(stage: String, ctx: UTSUnionTypeObject, onOK: (raw: String) 
             } else {
                 "null"
             }
-            ), " at services/CloudService.uts:305")
+            ), " at services/CloudService.uts:275")
         }
     }
     var userPrompt = ""
@@ -4573,11 +4371,11 @@ fun callLlmEvaluate(stage: String, ctx: UTSUnionTypeObject, onOK: (raw: String) 
         if (stage === "pre") {
             val pCtx = ctx as PreTriggerContext
             userPrompt = buildPreTriggerPrompt(pCtx)
-            console.log("[CloudService] callLlmEvaluate pre userPrompt len=" + userPrompt.length, " at services/CloudService.uts:313")
+            console.log("[CloudService] callLlmEvaluate pre userPrompt len=" + userPrompt.length, " at services/CloudService.uts:283")
         } else {
             val pCtx = ctx as PostActionContext
             userPrompt = buildPostActionPrompt(pCtx)
-            console.log("[CloudService] callLlmEvaluate post userPrompt len=" + userPrompt.length, " at services/CloudService.uts:317")
+            console.log("[CloudService] callLlmEvaluate post userPrompt len=" + userPrompt.length, " at services/CloudService.uts:287")
         }
     }
      catch (e: Throwable) {
@@ -4586,17 +4384,17 @@ fun callLlmEvaluate(stage: String, ctx: UTSUnionTypeObject, onOK: (raw: String) 
         } else {
             "null"
         }
-        console.warn("[CloudService] callLlmEvaluate prompt 构造失败: " + msg, " at services/CloudService.uts:321")
+        console.warn("[CloudService] callLlmEvaluate prompt 构造失败: " + msg, " at services/CloudService.uts:291")
         onFail()
         return
     }
     callMinimaxChat(SYSTEM_PROMPT_EVALUATE, userPrompt, 1500, fun(raw: String): Unit {
-        console.log("[CloudService] callLlmEvaluate " + stage + " OK, rawLen=" + raw.length + " preview=" + raw.substring(0, 80), " at services/CloudService.uts:327")
+        console.log("[CloudService] callLlmEvaluate " + stage + " OK, rawLen=" + raw.length + " preview=" + raw.substring(0, 80), " at services/CloudService.uts:297")
         if (cacheKey.length > 0 && raw.length > 0) {
             try {
                 val ttlSec: Number = 86400
                 val expiresAt = Math.floor(Date.now() / 1000) + ttlSec
-                save__1(cacheKey, stage, raw, expiresAt)
+                save(cacheKey, stage, raw, expiresAt)
             }
              catch (e: Throwable) {
                 console.warn("[CloudService] callLlmEvaluate 写缓存异常: " + (if (e != null) {
@@ -4604,13 +4402,13 @@ fun callLlmEvaluate(stage: String, ctx: UTSUnionTypeObject, onOK: (raw: String) 
                 } else {
                     "null"
                 }
-                ), " at services/CloudService.uts:334")
+                ), " at services/CloudService.uts:304")
             }
         }
         onOK(raw)
     }
     , fun(): Unit {
-        console.warn("[CloudService] callLlmEvaluate " + stage + " FAIL", " at services/CloudService.uts:339")
+        console.warn("[CloudService] callLlmEvaluate " + stage + " FAIL", " at services/CloudService.uts:309")
         onFail()
     }
     )
@@ -4622,7 +4420,7 @@ open class LlmCacheContext (
     open var continuousMinutes: Number,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("LlmCacheContext", "services/CloudService.uts", 330, 6)
+        return UTSSourceMapPosition("LlmCacheContext", "services/CloudService.uts", 297, 6)
     }
 }
 fun buildLlmCacheKey(stage: String, ctx: LlmCacheContext?): String {
@@ -4661,7 +4459,7 @@ fun extractChatContent(data: Any): String {
                 } else {
                     ""
                 }
-                ), " at services/CloudService.uts:374")
+                ), " at services/CloudService.uts:344")
                 return ""
             }
         }
@@ -4698,7 +4496,7 @@ fun extractChatContent(data: Any): String {
         }
     }
      catch (e: Throwable) {
-        console.warn("[CloudService] extractChatContent exception: " + JSON.stringify(e), " at services/CloudService.uts:398")
+        console.warn("[CloudService] extractChatContent exception: " + JSON.stringify(e), " at services/CloudService.uts:368")
     }
     return ""
 }
@@ -4739,6 +4537,7 @@ fun textHash(text: String): String {
     }
     return (hash ushr 0).toString(16).padStart(8, "0")
 }
+val TTS_MODE: String = "system"
 fun speakAdhoc(text: String): Unit {
     if (isSystemMuted()) {
         return
@@ -4746,40 +4545,11 @@ fun speakAdhoc(text: String): Unit {
     if (text.length < 1) {
         return
     }
-    val hash: String = textHash(text)
-    try {
-        val cached = getByHash(hash)
-        if (cached != null && cached.file_path.length > 0) {
-            val fp: String = cached.file_path
-            playLocalAudio(fp, fun(): Unit {})
-            return
-        }
+    if (TTS_MODE == "api") {
+        speakAdhocViaApi(text)
+        return
     }
-     catch (e: Throwable) {
-        val msg = if (e != null) {
-            ("" + e)
-        } else {
-            "null"
-        }
-        console.warn("[TtsService] speakAdhoc 查缓存失败: " + msg, " at services/TtsService.uts:36")
-    }
-    val textCopy: String = text
-    val hashCopy: String = hash
-    callMinimaxTts(text, fun(url: String): Unit {
-        downloadTtsAudio(url, hashCopy, fun(localPath: String): Unit {
-            playLocalAudio(localPath, fun(): Unit {})
-        }
-        , fun(errMsg: String): Unit {
-            console.warn("[TtsService] speakAdhoc download 失败: " + errMsg, " at services/TtsService.uts:47")
-            fallbackSystemTts(textCopy)
-        }
-        )
-    }
-    , fun(errMsg: String): Unit {
-        console.warn("[TtsService] speakAdhoc tts 失败: " + errMsg, " at services/TtsService.uts:53")
-        fallbackSystemTts(textCopy)
-    }
-    )
+    speakAdhocSystem(text)
 }
 fun speakFixedGuide(text: String): Unit {
     if (isSystemMuted()) {
@@ -4790,10 +4560,14 @@ fun speakFixedGuide(text: String): Unit {
         speakSystemTts(text, vol)
     }
      catch (e: Throwable) {
-        console.warn("[TtsService] speakFixedGuide plugin 调用失败: " + JSON.stringify(e), " at services/TtsService.uts:63")
+        console.warn("[TtsService] speakFixedGuide plugin 调用失败: " + JSON.stringify(e), " at services/TtsService.uts:47")
     }
 }
 fun preGenerateAll(): Unit {
+    if (TTS_MODE == "system") {
+        console.log("[TtsService] preGenerateAll 已搁置（系统 TTS 无需预生成）", " at services/TtsService.uts:56")
+        return
+    }
     try {
         val texts: UTSArray<String> = _uA()
         run {
@@ -4849,13 +4623,13 @@ fun preGenerateAll(): Unit {
                     downloadTtsAudio(url, tHash, fun(_local: String): Unit {
                         running--
                         doneCount++
-                        console.log("[TtsService] preGenerateAll 进度 " + doneCount + "/" + total, " at services/TtsService.uts:114")
+                        console.log("[TtsService] preGenerateAll 进度 " + doneCount + "/" + total, " at services/TtsService.uts:104")
                         tryStart()
                     }
                     , fun(errMsg: String): Unit {
                         running--
                         doneCount++
-                        console.warn("[TtsService] preGenerateAll download 失败: " + errMsg, " at services/TtsService.uts:120")
+                        console.warn("[TtsService] preGenerateAll download 失败: " + errMsg, " at services/TtsService.uts:110")
                         tryStart()
                     }
                     )
@@ -4863,7 +4637,7 @@ fun preGenerateAll(): Unit {
                 , fun(errMsg: String): Unit {
                     running--
                     doneCount++
-                    console.warn("[TtsService] preGenerateAll tts 失败: " + errMsg, " at services/TtsService.uts:128")
+                    console.warn("[TtsService] preGenerateAll tts 失败: " + errMsg, " at services/TtsService.uts:118")
                     tryStart()
                 }
                 )
@@ -4877,7 +4651,7 @@ fun preGenerateAll(): Unit {
         } else {
             "null"
         }
-        console.warn("[TtsService] preGenerateAll 整体异常: " + msg, " at services/TtsService.uts:137")
+        console.warn("[TtsService] preGenerateAll 整体异常: " + msg, " at services/TtsService.uts:127")
     }
 }
 fun prewarmSystemTts(): Unit {
@@ -4890,8 +4664,68 @@ fun prewarmSystemTts(): Unit {
         } else {
             "null"
         }
-        console.warn("[TtsService] prewarmSystemTts 失败: " + msg, " at services/TtsService.uts:145")
+        console.warn("[TtsService] prewarmSystemTts 失败: " + msg, " at services/TtsService.uts:135")
     }
+}
+fun stopSpeech(): Unit {
+    try {
+        stop()
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[TtsService] stopSpeech 失败: " + msg, " at services/TtsService.uts:144")
+    }
+}
+fun speakAdhocSystem(text: String): Unit {
+    try {
+        speakSystemTts(text, getAdjustedVolume())
+    }
+     catch (e: Throwable) {
+        console.warn("[TtsService] speakAdhocSystem 失败: " + JSON.stringify(e), " at services/TtsService.uts:150")
+    }
+}
+fun speakAdhocViaApi(text: String): Unit {
+    if (text.length < 1) {
+        return
+    }
+    val hash: String = textHash(text)
+    try {
+        val cached = getByHash(hash)
+        if (cached != null && cached.file_path.length > 0) {
+            val fp: String = cached.file_path
+            playLocalAudio(fp, fun(): Unit {})
+            return
+        }
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[TtsService] speakAdhocViaApi 查缓存失败: " + msg, " at services/TtsService.uts:173")
+    }
+    val textCopy: String = text
+    val hashCopy: String = hash
+    callMinimaxTts(text, fun(url: String): Unit {
+        downloadTtsAudio(url, hashCopy, fun(localPath: String): Unit {
+            playLocalAudio(localPath, fun(): Unit {})
+        }
+        , fun(errMsg: String): Unit {
+            console.warn("[TtsService] speakAdhocViaApi download 失败: " + errMsg, " at services/TtsService.uts:184")
+            speakAdhocSystem(textCopy)
+        }
+        )
+    }
+    , fun(errMsg: String): Unit {
+        console.warn("[TtsService] speakAdhocViaApi tts 失败: " + errMsg, " at services/TtsService.uts:190")
+        speakAdhocSystem(textCopy)
+    }
+    )
 }
 fun playLocalAudio(filePath: String, onEnd: () -> Unit): Unit {
     try {
@@ -4904,7 +4738,7 @@ fun playLocalAudio(filePath: String, onEnd: () -> Unit): Unit {
             } else {
                 "null"
             }
-            console.warn("[TtsService] playLocalAudio onError: " + msg, " at services/TtsService.uts:155")
+            console.warn("[TtsService] playLocalAudio onError: " + msg, " at services/TtsService.uts:202")
         }
         , onProgress = fun(_cur, _total): Unit {})
         play(filePath, cbs)
@@ -4915,20 +4749,7 @@ fun playLocalAudio(filePath: String, onEnd: () -> Unit): Unit {
         } else {
             "null"
         }
-        console.warn("[TtsService] playLocalAudio 失败: " + msg, " at services/TtsService.uts:162")
-    }
-}
-fun fallbackSystemTts(text: String): Unit {
-    try {
-        speakSystemTts(text, getAdjustedVolume())
-    }
-     catch (e: Throwable) {
-        val msg = if (e != null) {
-            ("" + e)
-        } else {
-            "null"
-        }
-        console.warn("[TtsService] fallbackSystemTts 失败: " + msg, " at services/TtsService.uts:169")
+        console.warn("[TtsService] playLocalAudio 失败: " + msg, " at services/TtsService.uts:209")
     }
 }
 fun getAdjustedVolume(): Number {
@@ -4996,11 +4817,15 @@ val CHANNEL_ID: String = "micro_habit_usage_stats"
 val FOREGROUND_TYPE_SPECIAL_USE: Int = 108
 val WAKE_LOCK_TAG: String = "MicroHabit:UsageStats"
 val SERVICE_CLASS_NAME: String = "uts.sdk.modules.utsUsageStats.UsageStatsForegroundService"
+val DEFAULT_POLL_INTERVAL_MS: Long = 600000
 var cachedCbs: UsageMonitorCallbacks? = null
 var thresholdMs: Number = 3600000
-var pollIntervalMs: Number = 300000
+@JvmField
+var pollIntervalMs: Number = 600000
 var serviceInstance: UsageStatsForegroundService? = null
 var lastReconcileTime: Long = 0
+@JvmField
+var lastTickTimeMs: Long = 0
 @JvmField
 var triggerEnabled: Boolean = false
 fun getSelfPackageNameInternal(): String {
@@ -5055,6 +4880,7 @@ fun makeServiceIntent(ctx: Context): Intent {
 val PREFS_NAME: String = "micro_habit_prefs"
 val KEY_TRIGGER_ENABLED: String = "trigger_enabled"
 val KEY_POLL_THRESHOLD_MS: String = "poll_threshold_ms"
+val KEY_POLL_INTERVAL_MS: String = "poll_interval_ms"
 fun getPrefs(): SharedPreferences? {
     try {
         val ctx = UTSAndroid.getAppContext()
@@ -5076,10 +4902,11 @@ fun loadPrefsFromDisk(): Unit {
         triggerEnabled = prefs.getBoolean(KEY_TRIGGER_ENABLED, false)
         val defaultThresholdMs: Number = 3600000
         thresholdMs = prefs.getLong(KEY_POLL_THRESHOLD_MS, defaultThresholdMs.toLong()) as Number
+        pollIntervalMs = prefs.getLong(KEY_POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS) as Number
     }
      catch (_: Throwable) {}
 }
-fun savePrefsToDisk(triggerEnabledIn: Boolean, thresholdMsIn: Number): Unit {
+fun savePrefsToDisk(triggerEnabledIn: Boolean, thresholdMsIn: Number, pollIntervalMsIn: Number): Unit {
     try {
         val prefs = getPrefs()
         if (prefs == null) {
@@ -5088,13 +4915,14 @@ fun savePrefsToDisk(triggerEnabledIn: Boolean, thresholdMsIn: Number): Unit {
         val editor = prefs.edit()
         editor.putBoolean(KEY_TRIGGER_ENABLED, triggerEnabledIn)
         editor.putLong(KEY_POLL_THRESHOLD_MS, thresholdMsIn.toLong())
+        editor.putLong(KEY_POLL_INTERVAL_MS, pollIntervalMsIn.toLong())
         editor.apply()
     }
      catch (_: Throwable) {}
 }
 open class UsageStatsForegroundService : Service, IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("UsageStatsForegroundService", "uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts", 131, 14)
+        return UTSSourceMapPosition("UsageStatsForegroundService", "uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts", 138, 14)
     }
     private var handler: Handler? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -5119,7 +4947,7 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             this.startPolling()
         }
          catch (e: Throwable) {
-            console.error("[UsageStats] onCreate THREW: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:168")
+            console.error("[UsageStats] onCreate THREW: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:175")
         }
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -5137,7 +4965,7 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             insertHeartbeat("stopped")
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] heartbeat onDestroy write failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:186")
+            console.warn("[UsageStats] heartbeat onDestroy write failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:193")
         }
         this.stopPolling()
         this.releaseWakeLock()
@@ -5163,8 +4991,17 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             this.doPoll()
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] immediate poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:214")
+            console.warn("[UsageStats] immediate poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:221")
         }
+    }
+    public open fun rescheduleTick(): Unit {
+        if (!this.started) {
+            return
+        }
+        if (this.handler != null) {
+            this.handler!!!!.removeCallbacksAndMessages(null)
+        }
+        this.scheduleNextTick()
     }
     private fun createChannel(): Unit {
         if (Build.VERSION.SDK_INT < 26) {
@@ -5227,6 +5064,7 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
         }
         this.handler = Handler(Looper.getMainLooper())
         this.lastTickTime = System.currentTimeMillis()
+        lastTickTimeMs = this.lastTickTime
         this.started = true
         true
         this.doPoll()
@@ -5250,14 +5088,16 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             insertHeartbeat("alive")
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] heartbeat tick write failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:292")
+            console.warn("[UsageStats] heartbeat tick write failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:309")
         }
         try {
             this.doPoll()
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:297")
+            console.warn("[UsageStats] poll error: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:314")
         }
+        this.lastTickTime = System.currentTimeMillis()
+        lastTickTimeMs = this.lastTickTime
         this.acquireWakeLock()
         this.scheduleNextTick()
     }
@@ -5329,7 +5169,7 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             }
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] queryUsageStats 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:357")
+            console.warn("[UsageStats] queryUsageStats 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:376")
         }
         this.checkTimePeriod(nowMs)
         val rolled: Boolean = this.checkDayRollover()
@@ -5355,10 +5195,10 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
             val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, todayStart, now)
             val sz: Int = stats.size
             if (sz < 1) {
-                console.log("[UsageStats] reconcile: no system stats", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:382")
+                console.log("[UsageStats] reconcile: no system stats", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:401")
                 return
             }
-            console.log("[UsageStats] reconcile: system has " + sz + " apps, top 3:", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:385")
+            console.log("[UsageStats] reconcile: system has " + sz + " apps, top 3:", " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:404")
             var n: Int = 0
             run {
                 var i: Int = 0
@@ -5374,14 +5214,14 @@ open class UsageStatsForegroundService : Service, IUTSSourceMap {
                         continue
                     }
                     val totalMs: Long = s.getTotalTimeInForeground() as Number as Long
-                    console.log("[UsageStats]   " + pkg + " totalMs=" + totalMs, " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:393")
+                    console.log("[UsageStats]   " + pkg + " totalMs=" + totalMs, " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:412")
                     n++
                     i++
                 }
             }
         }
          catch (e: Throwable) {
-            console.warn("[UsageStats] reconcile failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:397")
+            console.warn("[UsageStats] reconcile failed: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:416")
         }
     }
     private fun tryRefreshUsm(): Unit {
@@ -5446,7 +5286,7 @@ fun startUsageMonitor(cbs: UsageMonitorCallbacks, thresholdMsIn: Number, pollInt
         pollIntervalMs = pollIntervalMsIn
     }
     triggerEnabled = triggerEnabledIn
-    savePrefsToDisk(triggerEnabled, thresholdMs)
+    savePrefsToDisk(triggerEnabled, thresholdMs, pollIntervalMs)
     true
     try {
         val ctx = UTSAndroid.getAppContext()
@@ -5456,7 +5296,7 @@ fun startUsageMonitor(cbs: UsageMonitorCallbacks, thresholdMsIn: Number, pollInt
         ctx.startForegroundService(makeServiceIntent(ctx))
     }
      catch (e: Throwable) {
-        console.warn("[UsageStats] startForegroundService 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:471")
+        console.warn("[UsageStats] startForegroundService 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:490")
     }
 }
 fun setTriggerEnabled(enabled: Boolean): Unit {
@@ -5470,6 +5310,26 @@ fun setTriggerEnabled(enabled: Boolean): Unit {
              catch (_: Throwable) {}
         }
     }
+}
+fun setPollIntervalMs(msIn: Number): Unit {
+    if (msIn < 1) {
+        return
+    }
+    pollIntervalMs = msIn
+    savePrefsToDisk(triggerEnabled, thresholdMs, pollIntervalMs)
+    val svc = serviceInstance
+    if (svc != null) {
+        try {
+            svc.rescheduleTick()
+        }
+         catch (_: Throwable) {}
+    }
+}
+fun getCurrentPollIntervalMs(): Number {
+    return pollIntervalMs
+}
+fun getLastTickTimeMs(): Number {
+    return lastTickTimeMs as Number
 }
 fun stopUsageMonitor(): Unit {
     false
@@ -5544,7 +5404,7 @@ fun queryUsageStatsOnce(beginMs: Number, endMs: Number): UTSArray<UsageStatEntry
         }
     }
      catch (e: Throwable) {
-        console.warn("[UsageStats] queryUsageStatsOnce 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:551")
+        console.warn("[UsageStats] queryUsageStatsOnce 失败: " + JSON.stringify(e), " at uni_modules/uts-usage-stats/utssdk/app-android/UsageStatsForegroundService.uts:593")
     }
     return result
 }
@@ -6297,7 +6157,7 @@ open class LlmAcceptanceRate (
         return UTSSourceMapPosition("LlmAcceptanceRate", "database/LlmHistoryDao.uts", 5, 13)
     }
 }
-fun mapRow__6(row: Map<String, Any>): LlmHistoryEntry {
+fun mapRow__5(row: Map<String, Any>): LlmHistoryEntry {
     val parsedJson = getStr(row, "parsed_result_json")
     var parsed = ParsedLlmResult()
     if (parsedJson != null && parsedJson.length > 0) {
@@ -6349,7 +6209,7 @@ fun mapRows(rows: UTSArray<Map<String, Any>>): UTSArray<LlmHistoryEntry> {
                 continue
             }
             try {
-                result.push(mapRow__6(r))
+                result.push(mapRow__5(r))
             }
              catch (e: Throwable) {
                 console.warn("[LlmHistoryDao] mapRow skip dirty row, err: " + JSON.stringify(e), " at database/LlmHistoryDao.uts:63")
@@ -6410,6 +6270,12 @@ fun updateUserAccepted(historyId: Number, accepted: Number): Unit {
 }
 fun getAllHistory(limit: Number): UTSArray<LlmHistoryEntry> {
     val rows = dbManager.query("SELECT * FROM llm_history ORDER BY created_at DESC LIMIT ?", _uA(
+        limit
+    ))
+    return mapRows(rows)
+}
+fun getAllStateAndAdhocTexts(limit: Number): UTSArray<LlmHistoryEntry> {
+    val rows = dbManager.query("SELECT * FROM llm_history WHERE stage = 'pre' ORDER BY created_at DESC LIMIT ?", _uA(
         limit
     ))
     return mapRows(rows)
@@ -7095,7 +6961,6 @@ fun safeBodyLimit(v: String): String {
 fun getUserProfile(): UserProfile {
     val focus = safeHealthFocus(getSetting("health_preference", "balanced"))
     val limit = safeBodyLimit(getSetting("body_limit", "none"))
-    val newbie = getBool("newbie_mode", true)
     val preferred: UTSArray<Number> = _uA()
     try {
         val rows = dbManager.query("SELECT strftime('%H', created_at, 'unixepoch') as hr, COUNT(*) as cnt FROM action_logs WHERE result IN ('completed','self_reported') GROUP BY hr ORDER BY cnt DESC LIMIT 3")
@@ -7138,7 +7003,7 @@ fun getUserProfile(): UserProfile {
             }
         }
     }
-    return UserProfile(healthFocus = focus, bodyLimit = limit, newbieMode = newbie, preferredHours = preferred, totalActiveDays = totalDays, avgDailyCompletes = Math.round(avg * 10) / 10, daysSinceFirstUse = daysSinceFirst)
+    return UserProfile(healthFocus = focus, bodyLimit = limit, newbieMode = false, preferredHours = preferred, totalActiveDays = totalDays, avgDailyCompletes = Math.round(avg * 10) / 10, daysSinceFirstUse = daysSinceFirst)
 }
 fun getActiveRuleList(): UTSArray<PersistedEffectiveRule> {
     return getActiveRules()
@@ -7309,7 +7174,7 @@ class AppTagReactiveObject : AppTag, IUTSReactive<AppTag> {
             _tRS(__v_raw, "updatedAt", oldValue, value)
         }
 }
-fun mapRow__7(row: Map<String, Any>): AppTag {
+fun mapRow__6(row: Map<String, Any>): AppTag {
     val total = getNum(row, "total_uses")
     return AppTag(packageName = getStr(row, "package_name"), appLabel = getStr(row, "app_label"), category = getStr(row, "category") as AppCategory, tagSource = getStr(row, "tag_source") as TagSource, isUserLocked = getNum(row, "is_user_locked") == 1, isInRule = getNum(row, "is_in_rule") == 1, totalUses = total, lastSeenAt = getNum(row, "last_seen_at"), createdAt = getNum(row, "created_at"), updatedAt = getNum(row, "updated_at"))
 }
@@ -7320,7 +7185,7 @@ fun getByPackage(pkg: String): AppTag? {
     if (row == null) {
         return null
     }
-    return mapRow__7(row)
+    return mapRow__6(row)
 }
 fun listAll(): UTSArray<AppTag> {
     val rows = dbManager.query("SELECT * FROM app_tags ORDER BY last_seen_at DESC")
@@ -7333,7 +7198,7 @@ fun listAll(): UTSArray<AppTag> {
                 i++
                 continue
             }
-            result.push(mapRow__7(r))
+            result.push(mapRow__6(r))
             i++
         }
     }
@@ -7350,7 +7215,7 @@ fun listPendingForLlm(): UTSArray<AppTag> {
                 i++
                 continue
             }
-            result.push(mapRow__7(r))
+            result.push(mapRow__6(r))
             i++
         }
     }
@@ -7994,7 +7859,7 @@ open class UserAchievementRow (
         return UTSSourceMapPosition("UserAchievementRow", "database/AchievementDao.uts", 3, 13)
     }
 }
-fun mapRow__8(row: Map<String, Any>): UserAchievementRow {
+fun mapRow__7(row: Map<String, Any>): UserAchievementRow {
     return UserAchievementRow(id = getNum(row, "id"), achievementId = getStr(row, "achievement_id"), unlockedAt = getNum(row, "unlocked_at"), currentProgress = getNum(row, "current_progress"), createdAt = getNum(row, "created_at"))
 }
 fun getAllUnlocked(): UTSArray<UserAchievementRow> {
@@ -8010,7 +7875,7 @@ fun getAllUnlocked(): UTSArray<UserAchievementRow> {
                     continue
                 }
                 try {
-                    result.push(mapRow__8(r))
+                    result.push(mapRow__7(r))
                 }
                  catch (e: Throwable) {
                     console.warn("[AchievementDao] mapRow skip dirty row: " + JSON.stringify(e), " at database/AchievementDao.uts:32")
@@ -8317,7 +8182,15 @@ open class GenApp : BaseApp {
             var pendingAdhocText = ""
             var pendingActionId = ""
             var pendingActionIds: Map<String, Boolean> = Map<String, Boolean>()
-            val TRIGGER_COOL_DOWN_MS_PER_PKG: Number = 1800000
+            val DEFAULT_PKG_COOLDOWN_MIN: Number = 20
+            fun gen_getPkgCooldownMs_fn(): Number {
+                val min = getInt("trigger_pkg_cooldown_min", DEFAULT_PKG_COOLDOWN_MIN)
+                if (min < 1) {
+                    return DEFAULT_PKG_COOLDOWN_MIN * 60000
+                }
+                return min * 60000
+            }
+            val getPkgCooldownMs = ::gen_getPkgCooldownMs_fn
             var lastTriggerPerPkg: Map<String, Number> = Map<String, Number>()
             fun gen_safeNowHour_fn(): Number {
                 try {
@@ -8430,7 +8303,7 @@ open class GenApp : BaseApp {
                             } else {
                                 "null"
                             }
-                            ), " at App.uvue:182")
+                            ), " at App.uvue:188")
                         }
                     }
                 }
@@ -8440,7 +8313,7 @@ open class GenApp : BaseApp {
                     } else {
                         "null"
                     }
-                    ), " at App.uvue:186")
+                    ), " at App.uvue:192")
                 }
             }
             val checkAchievementsAndNotify = ::gen_checkAchievementsAndNotify_fn
@@ -8449,13 +8322,13 @@ open class GenApp : BaseApp {
                     uni__emit("showTriggerRuleDialog", payload)
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] emitShowRuleDialog 失败: " + JSON.stringify(e), " at App.uvue:194")
+                    console.warn("[App.uvue] emitShowRuleDialog 失败: " + JSON.stringify(e), " at App.uvue:200")
                 }
             }
             val emitShowRuleDialog = ::gen_emitShowRuleDialog_fn
             fun gen_onActionResolvedLLM_fn(actionId: String, actionName: String, actionCategory: String, durationMs: Number, appPackage: String): Unit {
                 if (pendingActionIds.has(actionId)) {
-                    console.log("[App.uvue] onActionResolvedLLM skip duplicate: " + actionId, " at App.uvue:201")
+                    console.log("[App.uvue] onActionResolvedLLM skip duplicate: " + actionId, " at App.uvue:207")
                     return
                 }
                 pendingActionIds.set(actionId, true)
@@ -8471,7 +8344,6 @@ open class GenApp : BaseApp {
                 }
                 pendingActionId = actionId
                 actionName
-                actionCategory
                 val postCtx = buildPostContext(actionName, actionCategory, durationMs, appPackage)
                 setPostContext(postCtx)
             }
@@ -8484,7 +8356,7 @@ open class GenApp : BaseApp {
                     val askEach = getBool("llm_trigger_ask_each_time", true)
                     if (askEach) {
                         val rule = postResult.suggestedRule!!
-                        val payload: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("payload", "App.uvue", 230, 13), "rule" to rule, "reasoning" to postResult.reasoning, "confidence" to postResult.confidence, "historyId" to postResult.historyId, "decision" to postResult.decision, "targetRuleId" to postResult.historyId)
+                        val payload: UTSJSONObject = _uO("__\$originalPosition" to UTSSourceMapPosition("payload", "App.uvue", 235, 13), "rule" to rule, "reasoning" to postResult.reasoning, "confidence" to postResult.confidence, "historyId" to postResult.historyId, "decision" to postResult.decision, "targetRuleId" to postResult.historyId)
                         emitShowRuleDialog(payload)
                     } else {
                         try {
@@ -8500,12 +8372,12 @@ open class GenApp : BaseApp {
                             }
                         }
                          catch (e2: Throwable) {
-                            console.warn("[App.uvue] 静默保存 suggestedRule 失败: " + JSON.stringify(e2), " at App.uvue:267")
+                            console.warn("[App.uvue] 静默保存 suggestedRule 失败: " + JSON.stringify(e2), " at App.uvue:272")
                         }
                     }
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] tryShowLlmRuleDialog 异常: " + JSON.stringify(e), " at App.uvue:271")
+                    console.warn("[App.uvue] tryShowLlmRuleDialog 异常: " + JSON.stringify(e), " at App.uvue:276")
                 }
             }
             val tryShowLlmRuleDialog = ::gen_tryShowLlmRuleDialog_fn
@@ -8585,16 +8457,16 @@ open class GenApp : BaseApp {
                                     tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
                                 }
                                  catch (e: Throwable) {
-                                    console.warn("[App.uvue] onSelfReported post-result 异常: " + JSON.stringify(e), " at App.uvue:337")
+                                    console.warn("[App.uvue] onSelfReported post-result 异常: " + JSON.stringify(e), " at App.uvue:342")
                                 }
                             }
                             , fun(): Unit {
-                                console.warn("[App.uvue] onSelfReported evaluatePost fail", " at App.uvue:341")
+                                console.warn("[App.uvue] onSelfReported evaluatePost fail", " at App.uvue:346")
                             }
                             )
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onSelfReported evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:345")
+                            console.warn("[App.uvue] onSelfReported evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:350")
                         }
                     }
                     dismissOverlay()
@@ -8633,16 +8505,16 @@ open class GenApp : BaseApp {
                                     tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
                                 }
                                  catch (e: Throwable) {
-                                    console.warn("[App.uvue] onBusyRemindLater post-result 异常: " + JSON.stringify(e), " at App.uvue:380")
+                                    console.warn("[App.uvue] onBusyRemindLater post-result 异常: " + JSON.stringify(e), " at App.uvue:385")
                                 }
                             }
                             , fun(): Unit {
-                                console.warn("[App.uvue] onBusyRemindLater evaluatePost fail", " at App.uvue:384")
+                                console.warn("[App.uvue] onBusyRemindLater evaluatePost fail", " at App.uvue:389")
                             }
                             )
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onBusyRemindLater evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:388")
+                            console.warn("[App.uvue] onBusyRemindLater evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:393")
                         }
                     }
                     dismissOverlay()
@@ -8657,16 +8529,16 @@ open class GenApp : BaseApp {
                                     tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
                                 }
                                  catch (e: Throwable) {
-                                    console.warn("[App.uvue] onSkipDuringExec post-result 异常: " + JSON.stringify(e), " at App.uvue:406")
+                                    console.warn("[App.uvue] onSkipDuringExec post-result 异常: " + JSON.stringify(e), " at App.uvue:411")
                                 }
                             }
                             , fun(): Unit {
-                                console.warn("[App.uvue] onSkipDuringExec evaluatePost fail", " at App.uvue:410")
+                                console.warn("[App.uvue] onSkipDuringExec evaluatePost fail", " at App.uvue:415")
                             }
                             )
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onSkipDuringExec evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:414")
+                            console.warn("[App.uvue] onSkipDuringExec evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:419")
                         }
                     }
                     dismissOverlay()
@@ -8722,16 +8594,16 @@ open class GenApp : BaseApp {
                                     tryShowLlmRuleDialog(postResult, pendingDecisionActionId)
                                 }
                                  catch (e: Throwable) {
-                                    console.warn("[App.uvue] onCountdownFinish post-result 异常: " + JSON.stringify(e), " at App.uvue:454")
+                                    console.warn("[App.uvue] onCountdownFinish post-result 异常: " + JSON.stringify(e), " at App.uvue:459")
                                 }
                             }
                             , fun(): Unit {
-                                console.warn("[App.uvue] onCountdownFinish evaluatePost fail", " at App.uvue:458")
+                                console.warn("[App.uvue] onCountdownFinish evaluatePost fail", " at App.uvue:463")
                             }
                             )
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onCountdownFinish evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:462")
+                            console.warn("[App.uvue] onCountdownFinish evaluatePost 异常: " + JSON.stringify(e), " at App.uvue:467")
                         }
                     }
                 }
@@ -8740,7 +8612,7 @@ open class GenApp : BaseApp {
                     showOverlay(cfg, cbs)
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] showOverlay 失败: " + JSON.stringify(e), " at App.uvue:471")
+                    console.warn("[App.uvue] showOverlay 失败: " + JSON.stringify(e), " at App.uvue:476")
                 }
                 try {
                     if (getBool("tts_enabled", true)) {
@@ -8757,7 +8629,7 @@ open class GenApp : BaseApp {
                     }
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] 播 TTS 开场白失败: " + JSON.stringify(e), " at App.uvue:482")
+                    console.warn("[App.uvue] 播 TTS 开场白失败: " + JSON.stringify(e), " at App.uvue:487")
                 }
             }
             val showOverlayWithAdhoc = ::gen_showOverlayWithAdhoc_fn
@@ -8787,31 +8659,31 @@ open class GenApp : BaseApp {
                             onActionResolvedLLM(actionId, actionName, actionCategory, durationMs, appPackage)
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] llmActionCompleted 处理异常: " + JSON.stringify(e), " at App.uvue:501")
+                            console.warn("[App.uvue] llmActionCompleted 处理异常: " + JSON.stringify(e), " at App.uvue:506")
                         }
                     }
                     )
                     uni__on("manualTriggerCheck", fun(_data: Any): Unit {
                         try {
-                            console.log("[manualTrigger] 开始检查", " at App.uvue:506")
+                            console.log("[manualTrigger] 开始检查", " at App.uvue:511")
                             val triggerVal = getBool("trigger_enabled", true)
-                            console.log("[manualTrigger] trigger_enabled=" + triggerVal, " at App.uvue:508")
+                            console.log("[manualTrigger] trigger_enabled=" + triggerVal, " at App.uvue:513")
                             if (!triggerVal) {
-                                console.log("[manualTrigger] 触发已关闭", " at App.uvue:510")
+                                console.log("[manualTrigger] 触发已关闭", " at App.uvue:515")
                                 uni_showToast(ShowToastOptions(title = "触发已关闭", icon = "none", position = "bottom"))
                                 return
                             }
                             if (!isUsagePermissionGranted()) {
-                                console.log("[manualTrigger] 缺少使用情况权限", " at App.uvue:515")
+                                console.log("[manualTrigger] 缺少使用情况权限", " at App.uvue:520")
                                 uni_showToast(ShowToastOptions(title = "缺少使用情况权限", icon = "none", position = "bottom"))
                                 return
                             }
                             val thresholdMs = getInt("app_duration_threshold", 60) * 60000
-                            console.log("[manualTrigger] 阈值(ms): " + thresholdMs, " at App.uvue:520")
+                            console.log("[manualTrigger] 阈值(ms): " + thresholdMs, " at App.uvue:525")
                             val nowMs = Date.now()
                             val startMs = nowMs - 86400000
                             val stats = queryUsageStatsOnce(startMs, nowMs)
-                            console.log("[manualTrigger] queryUsageStatsOnce 返回 " + stats.length + " 条", " at App.uvue:524")
+                            console.log("[manualTrigger] queryUsageStatsOnce 返回 " + stats.length + " 条", " at App.uvue:529")
                             var triggered = false
                             run {
                                 var i: Number = 0
@@ -8826,10 +8698,10 @@ open class GenApp : BaseApp {
                                         i++
                                         continue
                                     }
-                                    console.log("[manualTrigger] 超阈值 App: " + s.packageName + " totalMs=" + totalMs, " at App.uvue:531")
+                                    console.log("[manualTrigger] 超阈值 App: " + s.packageName + " totalMs=" + totalMs, " at App.uvue:536")
                                     val ctx = TriggerContext(appPackage = s.packageName, appLabel = s.packageName, continuousMinutes = Math.floor(totalMs / 60000), triggerType = "app_duration")
                                     forceIdle()
-                                    console.log("[manualTrigger] forceIdle done, calling shouldTrigger", " at App.uvue:539")
+                                    console.log("[manualTrigger] forceIdle done, calling shouldTrigger", " at App.uvue:544")
                                     var decision: TriggerDecision? = null
                                     try {
                                         decision = shouldTrigger(ctx)
@@ -8840,34 +8712,34 @@ open class GenApp : BaseApp {
                                         } else {
                                             "null"
                                         }
-                                        console.warn("[manualTrigger] shouldTrigger THREW: " + errMsg, " at App.uvue:545")
+                                        console.warn("[manualTrigger] shouldTrigger THREW: " + errMsg, " at App.uvue:550")
                                         i++
                                         continue
                                     }
                                     if (decision == null) {
-                                        console.log("[manualTrigger] shouldTrigger 返回 null, 跳过: " + s.packageName, " at App.uvue:549")
+                                        console.log("[manualTrigger] shouldTrigger 返回 null, 跳过: " + s.packageName, " at App.uvue:554")
                                         i++
                                         continue
                                     }
-                                    console.log("[manualTrigger] shouldTrigger 命中 actionId=" + decision.actionId + " level=" + decision.triggerLevel, " at App.uvue:552")
+                                    console.log("[manualTrigger] shouldTrigger 命中 actionId=" + decision.actionId + " level=" + decision.triggerLevel, " at App.uvue:557")
                                     val info = AppForegroundInfo(packageName = s.packageName, startTime = nowMs, continuousMs = totalMs)
                                     val llmEnabled = getBool("llm_trigger_enabled", true)
                                     if (!llmEnabled) {
-                                        console.log("[manualTrigger] LLM 关闭，跳转健康卡片页", " at App.uvue:560")
+                                        console.log("[manualTrigger] LLM 关闭，跳转健康卡片页", " at App.uvue:565")
                                         setActionIdForNextPage(decision.actionId)
                                         setAdhocForNextPage(decision.ttsText)
                                         uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
                                     } else {
-                                        console.log("[manualTrigger] LLM 开启，走 evaluatePre + 跳转健康卡片页", " at App.uvue:565")
+                                        console.log("[manualTrigger] LLM 开启，走 evaluatePre + 跳转健康卡片页", " at App.uvue:570")
                                         var preCtx: PreTriggerContext? = null
                                         try {
                                             preCtx = buildPreContext(info, decision)
                                         }
                                          catch (e3: Throwable) {
-                                            console.warn("[manualTrigger] buildPreContext 异常: " + ("" + e3), " at App.uvue:568")
+                                            console.warn("[manualTrigger] buildPreContext 异常: " + ("" + e3), " at App.uvue:573")
                                         }
                                         if (preCtx == null) {
-                                            console.warn("[manualTrigger] buildPreContext 返回 null，降级跳转", " at App.uvue:571")
+                                            console.warn("[manualTrigger] buildPreContext 返回 null，降级跳转", " at App.uvue:576")
                                             setActionIdForNextPage(decision.actionId)
                                             setAdhocForNextPage(getFallbackAdhoc())
                                             uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
@@ -8878,18 +8750,18 @@ open class GenApp : BaseApp {
                                             setPreContext(preCtx)
                                         }
                                          catch (e4: Throwable) {
-                                            console.warn("[manualTrigger] setPreContext 异常: " + ("" + e4), " at App.uvue:579")
+                                            console.warn("[manualTrigger] setPreContext 异常: " + ("" + e4), " at App.uvue:584")
                                         }
                                         try {
                                             evaluatePre(fun(preResult: PreTriggerResult): Unit {
-                                                console.log("[manualTrigger] evaluatePre 成功 adhocText=" + preResult.adhocText, " at App.uvue:584")
+                                                console.log("[manualTrigger] evaluatePre 成功 adhocText=" + preResult.adhocText, " at App.uvue:589")
                                                 setActionIdForNextPage(decision.actionId)
                                                 setAdhocForNextPage(preResult.adhocText)
                                                 uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
                                                 clearPreContext()
                                             }
                                             , fun(): Unit {
-                                                console.log("[manualTrigger] evaluatePre 失败，降级跳转", " at App.uvue:591")
+                                                console.log("[manualTrigger] evaluatePre 失败，降级跳转", " at App.uvue:596")
                                                 setActionIdForNextPage(decision.actionId)
                                                 setAdhocForNextPage(getFallbackAdhoc())
                                                 uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
@@ -8898,7 +8770,7 @@ open class GenApp : BaseApp {
                                             )
                                         }
                                          catch (e: Throwable) {
-                                            console.warn("[manualTrigger] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:599")
+                                            console.warn("[manualTrigger] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:604")
                                             setActionIdForNextPage(decision.actionId)
                                             setAdhocForNextPage(getFallbackAdhoc())
                                             uni_navigateTo(NavigateToOptions(url = "/pages/action/execute?actionId=" + decision.actionId))
@@ -8911,7 +8783,7 @@ open class GenApp : BaseApp {
                                 }
                             }
                             if (!triggered) {
-                                console.log("[manualTrigger] 无 App 超过阈值", " at App.uvue:610")
+                                console.log("[manualTrigger] 无 App 超过阈值", " at App.uvue:615")
                                 uni_showToast(ShowToastOptions(title = "当前无 App 超过阈值，无需触发", icon = "none", position = "bottom"))
                             }
                         }
@@ -8921,14 +8793,14 @@ open class GenApp : BaseApp {
                             } else {
                                 "null"
                             }
-                            console.warn("[manualTrigger] 异常: " + errMsg, " at App.uvue:615")
+                            console.warn("[manualTrigger] 异常: " + errMsg, " at App.uvue:620")
                             uni_showToast(ShowToastOptions(title = "检查失败", icon = "none", position = "bottom"))
                         }
                     }
                     )
                 }
                  catch (e: Throwable) {
-                    console.warn("[App.uvue] \$on 异常: " + JSON.stringify(e), " at App.uvue:620")
+                    console.warn("[App.uvue] \$on 异常: " + JSON.stringify(e), " at App.uvue:625")
                 }
                 try {
                     try {
@@ -8940,13 +8812,13 @@ open class GenApp : BaseApp {
                                 onUpgrade(oldV, newV)
                             }
                              catch (e: Throwable) {
-                                console.warn("[App.uvue] onUpgrade 异常: " + JSON.stringify(e), " at App.uvue:625")
+                                console.warn("[App.uvue] onUpgrade 异常: " + JSON.stringify(e), " at App.uvue:630")
                             }
                         }
                         )
                     }
                      catch (e: Throwable) {
-                        console.error("[App.uvue] sqliteStore.openDatabase 失败: " + JSON.stringify(e), " at App.uvue:628")
+                        console.error("[App.uvue] sqliteStore.openDatabase 失败: " + JSON.stringify(e), " at App.uvue:633")
                     }
                     try {
                         setTimeout(fun(): Unit {
@@ -8959,7 +8831,7 @@ open class GenApp : BaseApp {
                                 } else {
                                     "null"
                                 }
-                                console.warn("[App.uvue] preGenerateAll 启动失败: " + msg, " at App.uvue:637")
+                                console.warn("[App.uvue] preGenerateAll 启动失败: " + msg, " at App.uvue:642")
                             }
                         }
                         , 3000)
@@ -8970,7 +8842,7 @@ open class GenApp : BaseApp {
                         } else {
                             "null"
                         }
-                        console.warn("[App.uvue] preGenerateAll setTimeout 失败: " + msg, " at App.uvue:642")
+                        console.warn("[App.uvue] preGenerateAll setTimeout 失败: " + msg, " at App.uvue:647")
                     }
                     try {
                         prewarmSystemTts()
@@ -8981,14 +8853,15 @@ open class GenApp : BaseApp {
                         } else {
                             "null"
                         }
-                        console.warn("[App.uvue] prewarmSystemTts 失败: " + msg, " at App.uvue:646")
+                        console.warn("[App.uvue] prewarmSystemTts 失败: " + msg, " at App.uvue:651")
                     }
                     val callbacks = UsageMonitorCallbacks(onAppDurationTrigger = fun(info: AppForegroundInfo): Unit {
                         try {
                             val nowTs = Date.now()
                             val lastTs = lastTriggerPerPkg.get(info.packageName) ?: 0
-                            if (nowTs - lastTs < TRIGGER_COOL_DOWN_MS_PER_PKG) {
-                                console.log("[App.uvue] 跳过同包重复触发: " + info.packageName, " at App.uvue:655")
+                            val pkgCd = getPkgCooldownMs()
+                            if (nowTs - lastTs < pkgCd) {
+                                console.log("[App.uvue] 跳过同包重复触发: " + info.packageName, " at App.uvue:661")
                                 return
                             }
                             lastTriggerPerPkg.set(info.packageName, nowTs)
@@ -9002,7 +8875,7 @@ open class GenApp : BaseApp {
                                 decision = shouldTrigger(ctx)
                             }
                              catch (e: Throwable) {
-                                console.warn("[App.uvue] shouldTrigger 失败: " + JSON.stringify(e), " at App.uvue:672")
+                                console.warn("[App.uvue] shouldTrigger 失败: " + JSON.stringify(e), " at App.uvue:678")
                             }
                             if (decision == null) {
                                 return
@@ -9020,7 +8893,7 @@ open class GenApp : BaseApp {
                                         showOverlayWithAdhoc(decision, preResult.adhocText, preResult.fallback)
                                     }
                                      catch (e: Throwable) {
-                                        console.warn("[App.uvue] onReady 处理失败: " + JSON.stringify(e), " at App.uvue:690")
+                                        console.warn("[App.uvue] onReady 处理失败: " + JSON.stringify(e), " at App.uvue:696")
                                     }
                                 }
                                 , fun(): Unit {
@@ -9028,20 +8901,20 @@ open class GenApp : BaseApp {
                                         showOverlayWithAdhoc(decision, getFallbackAdhoc(), true)
                                     }
                                      catch (e: Throwable) {
-                                        console.warn("[App.uvue] onFail 降级失败: " + JSON.stringify(e), " at App.uvue:697")
+                                        console.warn("[App.uvue] onFail 降级失败: " + JSON.stringify(e), " at App.uvue:703")
                                     }
                                     clearPreContext()
                                 }
                                 )
                             }
                              catch (e: Throwable) {
-                                console.warn("[App.uvue] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:703")
+                                console.warn("[App.uvue] evaluatePre 异常: " + JSON.stringify(e), " at App.uvue:709")
                                 showOverlayWithAdhoc(decision, getFallbackAdhoc(), true)
                                 clearPreContext()
                             }
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onAppDurationTrigger 异常: " + JSON.stringify(e), " at App.uvue:708")
+                            console.warn("[App.uvue] onAppDurationTrigger 异常: " + JSON.stringify(e), " at App.uvue:714")
                         }
                     }
                     , onAppSwitch = fun(from: String, to: String): Unit {
@@ -9055,7 +8928,7 @@ open class GenApp : BaseApp {
                             setSnapshotTotal(pkg, pkg, sec)
                         }
                          catch (e: Throwable) {
-                            console.warn("[App.uvue] onUsageTick 写快照失败: " + JSON.stringify(e), " at App.uvue:719")
+                            console.warn("[App.uvue] onUsageTick 写快照失败: " + JSON.stringify(e), " at App.uvue:725")
                         }
                     }
                     , onTimePeriodTrigger = fun(_name: String): Unit {}, onDayRollover = fun(_old: String, _new: String): Unit {
@@ -9065,25 +8938,26 @@ open class GenApp : BaseApp {
                          catch (_: Throwable) {}
                     }
                     , onPermissionMissing = fun(): Unit {
-                        console.warn("[App.uvue] PACKAGE_USAGE_STATS 权限缺失或被关闭", " at App.uvue:727")
+                        console.warn("[App.uvue] PACKAGE_USAGE_STATS 权限缺失或被关闭", " at App.uvue:733")
                     }
                     )
                     if (isUsagePermissionGranted()) {
                         val thresholdMs = getInt("app_duration_threshold", 60) * 60000
                         val triggerEnabled = getBool("trigger_enabled", true)
+                        val pollMs = getInt("trigger_poll_interval_min", 10) * 60000
                         try {
-                            startUsageMonitor(callbacks, thresholdMs, 300000, triggerEnabled)
+                            startUsageMonitor(callbacks, thresholdMs, pollMs, triggerEnabled)
                         } catch (e: Throwable) {
-                            console.error("[App.uvue] startUsageMonitor 失败: " + JSON.stringify(e), " at App.uvue:737")
+                            console.error("[App.uvue] startUsageMonitor 失败: " + JSON.stringify(e), " at App.uvue:744")
                         }
                     } else {
-                        console.warn("[App.uvue] 启动时未授予使用情况权限，需在引导页授权", " at App.uvue:740")
+                        console.warn("[App.uvue] 启动时未授予使用情况权限，需在引导页授权", " at App.uvue:747")
                     }
                 }
                  catch (e: Throwable) {
-                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:743")
+                    console.error("App init error: " + JSON.stringify(e), " at App.uvue:750")
                 }
-                console.log("App Launch", " at App.uvue:745")
+                console.log("App Launch", " at App.uvue:752")
             }
             )
             onAppShow(fun(_options){
@@ -9107,11 +8981,16 @@ open class GenApp : BaseApp {
                     setTriggerEnabled(triggerOn)
                 }
                  catch (_: Throwable) {}
-                console.log("App Show", " at App.uvue:761")
+                try {
+                    val pollMs = getInt("trigger_poll_interval_min", 10) * 60000
+                    setPollIntervalMs(pollMs)
+                }
+                 catch (_: Throwable) {}
+                console.log("App Show", " at App.uvue:774")
             }
             )
             onAppHide(fun(){
-                console.log("App Hide", " at App.uvue:765")
+                console.log("App Hide", " at App.uvue:778")
             }
             )
             onLastPageBackPress(fun(){
@@ -9136,7 +9015,7 @@ open class GenApp : BaseApp {
                     sqliteStore.close()
                 }
                  catch (_: Throwable) {}
-                console.log("App Exit", " at App.uvue:784")
+                console.log("App Exit", " at App.uvue:797")
             }
             )
             return fun(): Any? {
@@ -9194,6 +9073,83 @@ val GenComponentsActionCardClass = CreateVueComponent(GenComponentsActionCard::c
     return GenComponentsActionCard(instance)
 }
 )
+open class TopAppEntry (
+    @JsonNotNull
+    open var packageName: String,
+    @JsonNotNull
+    open var appLabel: String,
+    @JsonNotNull
+    open var totalSeconds: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("TopAppEntry", "constants/PhoneUsagePrompts.uts", 2, 13)
+    }
+}
+open class PhoneUsageEvalInput (
+    @JsonNotNull
+    open var totalMinutes: Number,
+    @JsonNotNull
+    open var totalSeconds: Number,
+    @JsonNotNull
+    open var hourText: String,
+    @JsonNotNull
+    open var minuteText: String,
+    @JsonNotNull
+    open var appCount: Number,
+    @JsonNotNull
+    open var topApps: UTSArray<TopAppEntry>,
+    @JsonNotNull
+    open var isNight: Boolean = false,
+    @JsonNotNull
+    open var isWorkHour: Boolean = false,
+    @JsonNotNull
+    open var guardCount: Number,
+) : UTSObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("PhoneUsageEvalInput", "constants/PhoneUsagePrompts.uts", 7, 13)
+    }
+}
+val SYSTEM_PROMPT_PHONE_USAGE: String = "你是微憩星球里的\"小星球\"，温柔、不评判、不会医学恐吓。用中文，2-3 段，每段不超过 40 字，语气像朋友给一个温柔建议。禁止使用表情符号（如 😀😄💕 等 emoji），仅用纯文字。禁止出现\"建议\"\"应当\"\"需要\"等命令式词汇，改用\"也许\"\"或许\"\"可以试试\"。禁止读取任何用户隐私。"
+fun buildPhoneUsageEvalPrompt(input: PhoneUsageEvalInput): String {
+    val topLines: UTSArray<String> = _uA()
+    run {
+        var i: Number = 0
+        while(i < input.topApps.length){
+            val a = input.topApps[i]
+            if (a == null) {
+                i++
+                continue
+            }
+            val mins = Math.floor(a.totalSeconds / 60)
+            topLines.push("  " + a.appLabel + "：" + mins + " 分钟")
+            i++
+        }
+    }
+    val period: String = if (input.isNight) {
+        "深夜时段"
+    } else {
+        if (input.isWorkHour) {
+            "工作/学习时段"
+        } else {
+            "休息时段"
+        }
+    }
+    val topBlock: String = if (topLines.length > 0) {
+        topLines.join("\n")
+    } else {
+        "  （无具体应用数据）"
+    }
+    return "请根据以下今日手机使用情况写一段温柔的评价：\n- 累计使用：" + input.hourText + " " + input.minuteText + "\n" + "- 涉及应用：" + input.appCount + " 个\n" + "- 使用时段：" + period + "\n" + "- 微动作完成：" + input.guardCount + " 次\n" + "- 使用最久的应用：\n" + topBlock + "\n" + "\n" + "要求：\n" + "1. 先用一句话温柔概括今天的使用节奏（不要评判，承认现实）。\n" + "2. 如果夜间使用多，温柔提醒；如果是工作时段，肯定专注。\n" + "3. 给出 1 个不强迫的微动作建议（如\"下次刷完 B 站，也许可以眨眨眼睛\"）。\n" + "4. 末尾加一句\"——微憩星球 🌙\"（注意：末尾的 🌙 是允许的，作为品牌签名）。\n" + "5. **全文不允许出现除末尾 🌙 之外的其他 emoji 字符**。"
+}
+val FALLBACK_PHONE_USAGE_EVAL_TEXTS = _uA(
+    "今天用得有点久，别忘了眨眨眼睛、站起来走两步。\n休息是给自己的礼物。\n——微憩星球",
+    "屏幕看久了，眼睛会想你的。\n也许下次可以试试每 20 分钟看向 6 米外 20 秒。\n——微憩星球",
+    "手机是我们的工具，也是我们的牵绊。\n今天已经努力了一整天，现在可以放一放啦。\n——微憩星球"
+) as UTSArray<String>
+fun getFallbackPhoneUsageEval(): String {
+    val idx = Math.floor(Math.random() * FALLBACK_PHONE_USAGE_EVAL_TEXTS.length)
+    return FALLBACK_PHONE_USAGE_EVAL_TEXTS[idx] as String
+}
 open class PhoneUsageSummary (
     @JsonNotNull
     open var totalMinutes: Number,
@@ -9207,7 +9163,7 @@ open class PhoneUsageSummary (
     open var appCount: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("PhoneUsageSummary", "services/PhoneUsageService.uts", 4, 13)
+        return UTSSourceMapPosition("PhoneUsageSummary", "services/PhoneUsageService.uts", 7, 13)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return PhoneUsageSummaryReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -9305,7 +9261,7 @@ open class PieSegment (
     open var endAngle: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("PieSegment", "services/PhoneUsageService.uts", 11, 13)
+        return UTSSourceMapPosition("PieSegment", "services/PhoneUsageService.uts", 14, 13)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return PieSegmentReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -9487,9 +9443,125 @@ fun getTodayPieSegments(): UTSArray<PieSegment> {
     }
     return segments
 }
-val LLM_RESERVED_NOTE = "LLM 接口待配置"
 fun aiEvaluateTodayUsage(onComplete: (text: String) -> Unit): Unit {
-    onComplete(LLM_RESERVED_NOTE)
+    var summary: PhoneUsageSummary
+    try {
+        summary = getTodayPhoneUsageSummary()
+    }
+     catch (_: Throwable) {
+        summary = PhoneUsageSummary(totalMinutes = 0, totalSeconds = 0, hourText = "0 小时", minuteText = "0 分钟", appCount = 0)
+    }
+    if (summary.totalSeconds < 1) {
+        try {
+            val sys = getPhoneUsageFromSystem()
+            if (sys != null && sys.summary.totalSeconds > 0) {
+                summary = sys.summary
+            }
+        }
+         catch (_: Throwable) {}
+    }
+    var topApps: UTSArray<AppUsageItem> = _uA()
+    try {
+        topApps = getTop5Apps()
+    }
+     catch (_: Throwable) {
+        topApps = _uA()
+    }
+    val topDtos: UTSArray<TopAppEntry> = _uA()
+    run {
+        var i: Number = 0
+        while(i < topApps.length){
+            val a = topApps[i]
+            if (a == null) {
+                i++
+                continue
+            }
+            topDtos.push(TopAppEntry(packageName = a.packageName, appLabel = if (a.appLabel.length > 0) {
+                a.appLabel
+            } else {
+                a.packageName
+            }
+            , totalSeconds = a.foregroundSec))
+            i++
+        }
+    }
+    var guardCount: Number = 0
+    try {
+        guardCount = countCompletedToday()
+    }
+     catch (_: Throwable) {
+        guardCount = 0
+    }
+    val hourNow = currentHour()
+    val isNight = hourNow >= 22 || hourNow < 7
+    val isWorkHour = hourNow >= 9 && hourNow < 18
+    val input = PhoneUsageEvalInput(totalMinutes = summary.totalMinutes, totalSeconds = summary.totalSeconds, hourText = summary.hourText, minuteText = summary.minuteText, appCount = summary.appCount, topApps = topDtos, isNight = isNight, isWorkHour = isWorkHour, guardCount = guardCount)
+    val userPrompt = buildPhoneUsageEvalPrompt(input)
+    console.log("[PhoneUsageService] aiEvaluateTodayUsage prompt len=" + userPrompt.length, " at services/PhoneUsageService.uts:162")
+    callMinimaxChat(SYSTEM_PROMPT_PHONE_USAGE, userPrompt, 600, fun(raw: String): Unit {
+        val cleaned = sanitizeAiEvalText(raw)
+        if (cleaned.length < 1) {
+            onComplete(getFallbackPhoneUsageEval())
+            return
+        }
+        onComplete(cleaned)
+    }
+    , fun(): Unit {
+        console.warn("[PhoneUsageService] aiEvaluateTodayUsage LLM 失败", " at services/PhoneUsageService.uts:173")
+        onComplete(getFallbackPhoneUsageEval())
+    }
+    )
+}
+fun sanitizeAiEvalText(raw: String): String {
+    if (raw == null || raw.length < 1) {
+        return ""
+    }
+    var s = raw.trim()
+    if (s.startsWith("```")) {
+        val firstNewline = s.indexOf("\n")
+        if (firstNewline > 0) {
+            s = s.substring(firstNewline + 1)
+        }
+        if (s.endsWith("```")) {
+            s = s.substring(0, s.length - 3)
+        }
+    }
+    s = s.trim()
+    if (s.length < 1) {
+        return ""
+    }
+    s = stripEmojiExceptBrand(s)
+    if (s.length > 600) {
+        s = s.substring(0, 600)
+    }
+    return s
+}
+fun stripEmojiExceptBrand(s: String): String {
+    var out = ""
+    run {
+        var i: Number = 0
+        while(i < s.length){
+            val ch = s.charAt(i)
+            if (ch == "🌙") {
+                out = out + ch
+                i++
+                continue
+            }
+            val code = s.charCodeAt(i)
+            if (code != null && code >= 0xD800 && code <= 0xDBFF) {
+                val next = s.charAt(i + 1)
+                val nextCode = next.charCodeAt(0)
+                if (nextCode != null && nextCode >= 0xDC00 && nextCode <= 0xDFFF) {
+                    i++
+                    i++
+                    continue
+                }
+            }
+            out = out + ch
+            i++
+        }
+    }
+    return out
 }
 open class PhoneUsageFromSystem (
     @JsonNotNull
@@ -9498,7 +9570,7 @@ open class PhoneUsageFromSystem (
     open var segments: UTSArray<PieSegment>,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("PhoneUsageFromSystem", "services/PhoneUsageService.uts", 100, 13)
+        return UTSSourceMapPosition("PhoneUsageFromSystem", "services/PhoneUsageService.uts", 218, 13)
     }
 }
 fun startOfTodayMs(): Number {
@@ -9515,7 +9587,7 @@ open class SystemUsageEntry (
     open var lastTimeUsed: Number,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("SystemUsageEntry", "services/PhoneUsageService.uts", 109, 6)
+        return UTSSourceMapPosition("SystemUsageEntry", "services/PhoneUsageService.uts", 227, 6)
     }
 }
 fun getPhoneUsageFromSystem(): PhoneUsageFromSystem {
@@ -9542,7 +9614,7 @@ fun getPhoneUsageFromSystem(): PhoneUsageFromSystem {
         }
     }
      catch (e: Throwable) {
-        console.error("[PhoneUsageService] queryUsageStatsOnce 失败: " + JSON.stringify(e), " at services/PhoneUsageService.uts:153")
+        console.error("[PhoneUsageService] queryUsageStatsOnce 失败: " + JSON.stringify(e), " at services/PhoneUsageService.uts:269")
         val emptyResult = PhoneUsageFromSystem(summary = emptySummary, segments = _uA())
         return emptyResult
     }
@@ -9644,14 +9716,24 @@ val GenComponentsPhoneUsageDialogClass = CreateVueComponent(GenComponentsPhoneUs
     return GenComponentsPhoneUsageDialog(instance)
 }
 )
-val GenComponentsLlmHistoryCardClass = CreateVueComponent(GenComponentsLlmHistoryCard::class.java, fun(): VueComponentOptions {
-    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsLlmHistoryCard.inheritAttrs, inject = GenComponentsLlmHistoryCard.inject, props = GenComponentsLlmHistoryCard.props, propsNeedCastKeys = GenComponentsLlmHistoryCard.propsNeedCastKeys, emits = GenComponentsLlmHistoryCard.emits, components = GenComponentsLlmHistoryCard.components, styles = GenComponentsLlmHistoryCard.styles, setup = fun(props: ComponentPublicInstance): Any? {
-        return GenComponentsLlmHistoryCard.setup(props as GenComponentsLlmHistoryCard)
+val GenComponentsRightSidebarClass = CreateVueComponent(GenComponentsRightSidebar::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsRightSidebar.inheritAttrs, inject = GenComponentsRightSidebar.inject, props = GenComponentsRightSidebar.props, propsNeedCastKeys = GenComponentsRightSidebar.propsNeedCastKeys, emits = GenComponentsRightSidebar.emits, components = GenComponentsRightSidebar.components, styles = GenComponentsRightSidebar.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsRightSidebar.setup(props as GenComponentsRightSidebar)
     }
     )
 }
-, fun(instance, renderer): GenComponentsLlmHistoryCard {
-    return GenComponentsLlmHistoryCard(instance)
+, fun(instance, renderer): GenComponentsRightSidebar {
+    return GenComponentsRightSidebar(instance)
+}
+)
+val GenComponentsAiPhoneEvalPanelClass = CreateVueComponent(GenComponentsAiPhoneEvalPanel::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsAiPhoneEvalPanel.inheritAttrs, inject = GenComponentsAiPhoneEvalPanel.inject, props = GenComponentsAiPhoneEvalPanel.props, propsNeedCastKeys = GenComponentsAiPhoneEvalPanel.propsNeedCastKeys, emits = GenComponentsAiPhoneEvalPanel.emits, components = GenComponentsAiPhoneEvalPanel.components, styles = GenComponentsAiPhoneEvalPanel.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsAiPhoneEvalPanel.setup(props as GenComponentsAiPhoneEvalPanel)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsAiPhoneEvalPanel {
+    return GenComponentsAiPhoneEvalPanel(instance)
 }
 )
 val GenComponentsTriggerRuleDialogClass = CreateVueComponent(GenComponentsTriggerRuleDialog::class.java, fun(): VueComponentOptions {
@@ -9886,7 +9968,7 @@ open class DailyOutput (
     open var bodyText: String,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("DailyOutput", "stores/appStore.uts", 18, 13)
+        return UTSSourceMapPosition("DailyOutput", "stores/appStore.uts", 20, 13)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return DailyOutputReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -9960,15 +10042,24 @@ open class AppStore (
     open var achievements: Ref<UTSArray<AchievementItem>>,
     @JsonNotNull
     open var pendingUnlockIds: Ref<UTSArray<String>>,
+    @JsonNotNull
+    open var nextCheckCountdownMs: Ref<Number>,
+    @JsonNotNull
+    open var nextCheckCountdownText: Ref<String>,
+    @JsonNotNull
+    open var nextTriggerCountdownMs: Ref<Number>,
+    @JsonNotNull
+    open var nextTriggerCountdownText: Ref<String>,
     open var refreshHomeData: () -> Unit,
     open var refreshWeeklyReport: () -> Unit,
     open var refreshLlmHistory: () -> Unit,
     open var refreshAchievements: () -> Unit,
     open var setPendingUnlocks: (ids: UTSArray<String>) -> Unit,
     open var shiftPendingUnlock: () -> Unit,
+    open var refreshTriggerCountdowns: () -> Unit,
 ) : UTSObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-        return UTSSourceMapPosition("AppStore", "stores/appStore.uts", 21, 13)
+        return UTSSourceMapPosition("AppStore", "stores/appStore.uts", 23, 13)
     }
 }
 val eyeScore = ref<Number>(0)
@@ -9993,6 +10084,10 @@ val weeklyReportLoading = ref<Boolean>(false)
 val llmHistory = ref(_uA<LlmHistoryEntry>())
 val achievements = ref(_uA<AchievementItem>())
 val pendingUnlockIds = ref(_uA<String>())
+val nextCheckCountdownMs = ref<Number>(0)
+val nextCheckCountdownText = ref<String>("--:--")
+val nextTriggerCountdownMs = ref<Number>(0)
+val nextTriggerCountdownText = ref<String>("可触发")
 fun emptySeenSet(): Set<String> {
     return Set<String>()
 }
@@ -10006,7 +10101,7 @@ fun refreshAchievementsFn(): Unit {
         } else {
             "null"
         }
-        ), " at stores/appStore.uts:81")
+        ), " at stores/appStore.uts:92")
         achievements.value = _uA()
     }
 }
@@ -10027,17 +10122,65 @@ fun shiftPendingUnlockFn(): Unit {
     }
     pendingUnlockIds.value = newArr
 }
+fun formatCountdown(ms: Number): String {
+    if (ms < 1) {
+        return "00:00"
+    }
+    val totalSec = Math.floor(ms / 1000)
+    val mm = Math.floor(totalSec / 60)
+    val ss = totalSec - mm * 60
+    val pad = fun(n: Number): String {
+        return if (n < 10) {
+            "0" + n
+        } else {
+            "" + n
+        }
+    }
+    return pad(mm) + ":" + pad(ss)
+}
+fun refreshTriggerCountdownsFn(): Unit {
+    var checkRemain: Number = 0
+    try {
+        val lastTick = getLastTickTimeMs()
+        val pollMs = getCurrentPollIntervalMs()
+        if (lastTick > 0 && pollMs > 0) {
+            val elapsed = Date.now() - lastTick
+            checkRemain = pollMs - elapsed
+            if (checkRemain < 0) {
+                checkRemain = 0
+            }
+        }
+    }
+     catch (_: Throwable) {
+        checkRemain = 0
+    }
+    nextCheckCountdownMs.value = checkRemain
+    nextCheckCountdownText.value = formatCountdown(checkRemain)
+    var triggerRemain: Number = 0
+    try {
+        triggerRemain = getRemainingCooldownMs()
+    }
+     catch (_: Throwable) {
+        triggerRemain = 0
+    }
+    nextTriggerCountdownMs.value = triggerRemain
+    nextTriggerCountdownText.value = if (triggerRemain > 0) {
+        formatCountdown(triggerRemain)
+    } else {
+        "可触发"
+    }
+}
 fun refreshLlmHistory(): Unit {
     try {
         llmHistory.value = getAllHistory(200)
     }
      catch (e: Throwable) {
-        console.warn("[appStore] refreshLlmHistory 失败: " + JSON.stringify(e), " at stores/appStore.uts:103")
+        console.warn("[appStore] refreshLlmHistory 失败: " + JSON.stringify(e), " at stores/appStore.uts:151")
         llmHistory.value = _uA()
     }
 }
 fun useAppStore(): AppStore {
-    val store = AppStore(eyeScore = eyeScore, eyeStatus = eyeStatus, postureScore = postureScore, postureStatus = postureStatus, vitalityScore = vitalityScore, vitalityStatus = vitalityStatus, guardCount = guardCount, penetration = penetration, phoneMinutes = phoneMinutes, todayCompletedCount = todayCompletedCount, recommendedActions = recommendedActions, heatmapData = heatmapData, dailySummary = dailySummary, dailySummaryLoading = dailySummaryLoading, homeDataLoaded = homeDataLoaded, weeklyReport = weeklyReport, weeklyReportLoading = weeklyReportLoading, llmHistory = llmHistory, achievements = achievements, pendingUnlockIds = pendingUnlockIds, refreshLlmHistory = fun(): Unit {
+    val store = AppStore(eyeScore = eyeScore, eyeStatus = eyeStatus, postureScore = postureScore, postureStatus = postureStatus, vitalityScore = vitalityScore, vitalityStatus = vitalityStatus, guardCount = guardCount, penetration = penetration, phoneMinutes = phoneMinutes, todayCompletedCount = todayCompletedCount, recommendedActions = recommendedActions, heatmapData = heatmapData, dailySummary = dailySummary, dailySummaryLoading = dailySummaryLoading, homeDataLoaded = homeDataLoaded, weeklyReport = weeklyReport, weeklyReportLoading = weeklyReportLoading, llmHistory = llmHistory, achievements = achievements, pendingUnlockIds = pendingUnlockIds, nextCheckCountdownMs = nextCheckCountdownMs, nextCheckCountdownText = nextCheckCountdownText, nextTriggerCountdownMs = nextTriggerCountdownMs, nextTriggerCountdownText = nextTriggerCountdownText, refreshLlmHistory = fun(): Unit {
         refreshLlmHistory()
     }
     , refreshAchievements = fun(): Unit {
@@ -10048,6 +10191,9 @@ fun useAppStore(): AppStore {
     }
     , shiftPendingUnlock = fun(): Unit {
         shiftPendingUnlockFn()
+    }
+    , refreshTriggerCountdowns = fun(): Unit {
+        refreshTriggerCountdownsFn()
     }
     , refreshHomeData = fun(): Unit {
         homeDataLoaded.value = false
@@ -10077,14 +10223,14 @@ fun useAppStore(): AppStore {
             val todayCache = getByKey(todayKey)
             if (todayCache != null) {
                 try {
-                    val parsed = UTSAndroid.consoleDebugError(JSON.parse(todayCache.response), " at stores/appStore.uts:164")
+                    val parsed = UTSAndroid.consoleDebugError(JSON.parse(todayCache.response), " at stores/appStore.uts:220")
                     dailySummary.value = parsed as DailyOutput
                 } catch (_: Throwable) {}
                 dailySummaryLoading.value = false
             } else {
                 dailySummaryLoading.value = true
                 generateDailySummary(date, fun(summary: DailyOutput){
-                    save__1(todayKey, "daily_summary", JSON.stringify(summary), nowMs + 604800000)
+                    save(todayKey, "daily_summary", JSON.stringify(summary), nowMs + 604800000)
                     dailySummary.value = summary
                     dailySummaryLoading.value = false
                 }
@@ -10095,7 +10241,7 @@ fun useAppStore(): AppStore {
             if (getByKey(yesterdayKey) == null) {
                 val ydata = getHomepageData(yDate)
                 val fallback = DailyOutput(bodyText = "昨日完成" + ydata.todayCompletedCount + "次微动作，累计" + ydata.guardCount + "次。\n\n今天继续加油！")
-                save__1(yesterdayKey, "daily_summary", JSON.stringify(fallback), nowMs + 2592000000)
+                save(yesterdayKey, "daily_summary", JSON.stringify(fallback), nowMs + 2592000000)
             }
         }
          catch (_: Throwable) {}
@@ -10321,6 +10467,227 @@ val GenComponentsLineChartClass = CreateVueComponent(GenComponentsLineChart::cla
     return GenComponentsLineChart(instance)
 }
 )
+val GenComponentsLlmHistoryCardClass = CreateVueComponent(GenComponentsLlmHistoryCard::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsLlmHistoryCard.inheritAttrs, inject = GenComponentsLlmHistoryCard.inject, props = GenComponentsLlmHistoryCard.props, propsNeedCastKeys = GenComponentsLlmHistoryCard.propsNeedCastKeys, emits = GenComponentsLlmHistoryCard.emits, components = GenComponentsLlmHistoryCard.components, styles = GenComponentsLlmHistoryCard.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsLlmHistoryCard.setup(props as GenComponentsLlmHistoryCard)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsLlmHistoryCard {
+    return GenComponentsLlmHistoryCard(instance)
+}
+)
+open class MoodWord (
+    @JsonNotNull
+    open var word: String,
+    @JsonNotNull
+    open var weight: Number,
+) : UTSReactiveObject(), IUTSSourceMap {
+    override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
+        return UTSSourceMapPosition("MoodWord", "models/MoodWord.uts", 1, 13)
+    }
+    override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
+        return MoodWordReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+}
+class MoodWordReactiveObject : MoodWord, IUTSReactive<MoodWord> {
+    override var __v_raw: MoodWord
+    override var __v_isReadonly: Boolean
+    override var __v_isShallow: Boolean
+    override var __v_skip: Boolean
+    constructor(__v_raw: MoodWord, __v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean) : super(word = __v_raw.word, weight = __v_raw.weight) {
+        this.__v_raw = __v_raw
+        this.__v_isReadonly = __v_isReadonly
+        this.__v_isShallow = __v_isShallow
+        this.__v_skip = __v_skip
+    }
+    override fun __v_clone(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): MoodWordReactiveObject {
+        return MoodWordReactiveObject(this.__v_raw, __v_isReadonly, __v_isShallow, __v_skip)
+    }
+    override var word: String
+        get() {
+            return _tRG(__v_raw, "word", __v_raw.word, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("word")) {
+                return
+            }
+            val oldValue = __v_raw.word
+            __v_raw.word = value
+            _tRS(__v_raw, "word", oldValue, value)
+        }
+    override var weight: Number
+        get() {
+            return _tRG(__v_raw, "weight", __v_raw.weight, __v_isReadonly, __v_isShallow)
+        }
+        set(value) {
+            if (!__v_canSet("weight")) {
+                return
+            }
+            val oldValue = __v_raw.weight
+            __v_raw.weight = value
+            _tRS(__v_raw, "weight", oldValue, value)
+        }
+}
+val SYSTEM_PROMPT_MOOD_CLOUD: String = "你是微憩星球里的\"小星球\"，温柔、不评判。任务：从用户近期的状态描述/触发提醒文本中，提取 10-18 个心情/状态关键词。输出必须是严格的 JSON 数组，不允许其他内容，不允许 markdown 包裹。格式：[{ \"word\": \"疲惫\", \"weight\": 8 }, { \"word\": \"专注\", \"weight\": 5 }]weight 范围 1-10，数字越大表示出现频次/强度越高。去重后输出，相似含义的词合并（如\"累\"和\"疲惫\"合并为\"疲惫\"）。如果文本信息不足，输出空数组 []。禁止使用表情符号。"
+fun buildMoodCloudPrompt(rawTexts: UTSArray<String>): String {
+    if (rawTexts.length < 1) {
+        return "用户暂无历史状态记录。请输出空数组 []。"
+    }
+    val joined: String = rawTexts.map(fun(s: String, i: Number): String {
+        return (i + 1) + ". " + s
+    }
+    ).join("\n")
+    return "请从以下 " + rawTexts.length + " 条用户历史状态/触发提醒中提取心情/状态关键词：\n" + joined + "\n\n" + "要求：\n" + "1. 只输出 JSON 数组，不要任何解释。\n" + "2. 词数控制在 10-18 个。\n" + "3. weight 是相对值（1-10），表示这个词的\"重要度\"。\n" + "4. 词性以形容词/状态名词为主（如\"专注\"\"疲惫\"\"放松\"\"焦虑\"）。"
+}
+val FALLBACK_MOOD_WORDS = _uA(
+    MoodWord(word = "平静", weight = 4),
+    MoodWord(word = "专注", weight = 3),
+    MoodWord(word = "稍累", weight = 2)
+) as UTSArray<MoodWord>
+fun getFallbackMoodWords(): UTSArray<MoodWord> {
+    return FALLBACK_MOOD_WORDS
+}
+val MIN_SAMPLE_COUNT: Number = 3
+val MAX_RAW_TEXTS: Number = 80
+fun collectRawTexts(): UTSArray<String> {
+    var entries: UTSArray<LlmHistoryEntry> = _uA()
+    try {
+        entries = getAllStateAndAdhocTexts(MAX_RAW_TEXTS)
+    }
+     catch (_: Throwable) {
+        entries = _uA()
+    }
+    val texts: UTSArray<String> = _uA()
+    run {
+        var i: Number = 0
+        while(i < entries.length){
+            val e = entries[i]
+            if (e == null) {
+                i++
+                continue
+            }
+            val pr = e.parsedResult
+            if (pr != null) {
+                val sd = pr.stateDescription
+                if (sd != null) {
+                    val sdVal = sd!!!!
+                    if (sdVal.length > 0) {
+                        texts.push(sdVal)
+                    }
+                }
+            }
+            if (e.adhocText != null && e.adhocText!!.length > 0) {
+                texts.push(e.adhocText!!)
+            }
+            i++
+        }
+    }
+    return texts
+}
+fun getMoodCloudSampleCount(): Number {
+    return collectRawTexts().length
+}
+fun generateMoodCloud(onOK: (words: UTSArray<MoodWord>) -> Unit, onFail: (msg: String) -> Unit): Unit {
+    val raw = collectRawTexts()
+    if (raw.length < MIN_SAMPLE_COUNT) {
+        onOK(getFallbackMoodWords())
+        return
+    }
+    val userPrompt = buildMoodCloudPrompt(raw)
+    console.log("[MoodCloudService] generateMoodCloud samples=" + raw.length + " promptLen=" + userPrompt.length, " at services/MoodCloudService.uts:47")
+    callMinimaxChat(SYSTEM_PROMPT_MOOD_CLOUD, userPrompt, 500, fun(rawResp: String): Unit {
+        val words = parseMoodCloudJson(rawResp)
+        if (words.length < 1) {
+            onOK(getFallbackMoodWords())
+            return
+        }
+        onOK(words)
+    }
+    , fun(): Unit {
+        console.warn("[MoodCloudService] LLM 失败", " at services/MoodCloudService.uts:58")
+        onOK(getFallbackMoodWords())
+    }
+    )
+}
+fun parseMoodCloudJson(raw: String): UTSArray<MoodWord> {
+    if (raw == null || raw.length < 1) {
+        return _uA()
+    }
+    var s: String = raw.trim()
+    if (s.startsWith("```")) {
+        val firstNl = s.indexOf("\n")
+        if (firstNl > 0) {
+            s = s.substring(firstNl + 1)
+        }
+        if (s.endsWith("```")) {
+            s = s.substring(0, s.length - 3)
+        }
+    }
+    s = s.trim()
+    val arrStart: Number = s.indexOf("[")
+    val arrEnd: Number = s.lastIndexOf("]")
+    if (arrStart < 0 || arrEnd <= arrStart) {
+        return _uA()
+    }
+    val sub: String = s.substring(arrStart, arrEnd + 1)
+    try {
+        val parsed = UTSAndroid.consoleDebugError(JSON.parse(sub), " at services/MoodCloudService.uts:77")
+        if (!UTSArray.isArray(parsed)) {
+            return _uA()
+        }
+        val out: UTSArray<MoodWord> = _uA()
+        val arr = parsed as UTSArray<MoodWord>
+        run {
+            var i: Number = 0
+            while(i < arr.length){
+                val it = arr[i]
+                if (it == null) {
+                    i++
+                    continue
+                }
+                val w = it.word
+                if (w == null || w.length < 1) {
+                    i++
+                    continue
+                }
+                var wn: Number = it.weight
+                if (wn == null) {
+                    wn = 1
+                }
+                wn = Math.floor(wn)
+                if (wn < 1) {
+                    wn = 1
+                }
+                if (wn > 10) {
+                    wn = 10
+                }
+                out.push(MoodWord(word = w, weight = wn))
+                i++
+            }
+        }
+        return out
+    }
+     catch (e: Throwable) {
+        val msg = if (e != null) {
+            ("" + e)
+        } else {
+            "null"
+        }
+        console.warn("[MoodCloudService] JSON 解析失败: " + msg, " at services/MoodCloudService.uts:97")
+        return _uA()
+    }
+}
+val GenComponentsWordCloudClass = CreateVueComponent(GenComponentsWordCloud::class.java, fun(): VueComponentOptions {
+    return VueComponentOptions(type = "component", name = "", inheritAttrs = GenComponentsWordCloud.inheritAttrs, inject = GenComponentsWordCloud.inject, props = GenComponentsWordCloud.props, propsNeedCastKeys = GenComponentsWordCloud.propsNeedCastKeys, emits = GenComponentsWordCloud.emits, components = GenComponentsWordCloud.components, styles = GenComponentsWordCloud.styles, setup = fun(props: ComponentPublicInstance): Any? {
+        return GenComponentsWordCloud.setup(props as GenComponentsWordCloud)
+    }
+    )
+}
+, fun(instance, renderer): GenComponentsWordCloud {
+    return GenComponentsWordCloud(instance)
+}
+)
 val GenPagesDataDashboardClass = CreateVueComponent(GenPagesDataDashboard::class.java, fun(): VueComponentOptions {
     return VueComponentOptions(type = "page", name = "", inheritAttrs = GenPagesDataDashboard.inheritAttrs, inject = GenPagesDataDashboard.inject, props = GenPagesDataDashboard.props, propsNeedCastKeys = GenPagesDataDashboard.propsNeedCastKeys, emits = GenPagesDataDashboard.emits, components = GenPagesDataDashboard.components, styles = GenPagesDataDashboard.styles, setup = fun(props: ComponentPublicInstance): Any? {
         return GenPagesDataDashboard.setup(props as GenPagesDataDashboard)
@@ -10378,11 +10745,7 @@ open class DbTableInfo (
     open var count: Number,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-<<<<<<< HEAD
-        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 178, 6)
-=======
-        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 173, 6)
->>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
+        return UTSSourceMapPosition("DbTableInfo", "pages/debug/logs.uvue", 179, 6)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return DbTableInfoReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
@@ -10434,11 +10797,7 @@ open class ConfigItem (
     open var value: String,
 ) : UTSReactiveObject(), IUTSSourceMap {
     override fun `__$getOriginalPosition`(): UTSSourceMapPosition? {
-<<<<<<< HEAD
-        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 182, 6)
-=======
-        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 177, 6)
->>>>>>> b47ceb2b6ee776642391bf71543f588897cdde9d
+        return UTSSourceMapPosition("ConfigItem", "pages/debug/logs.uvue", 183, 6)
     }
     override fun __v_create(__v_isReadonly: Boolean, __v_isShallow: Boolean, __v_skip: Boolean): UTSReactiveObject {
         return ConfigItemReactiveObject(this, __v_isReadonly, __v_isShallow, __v_skip)
